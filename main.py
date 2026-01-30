@@ -403,6 +403,7 @@ async def delete_user(user_id: int, admin: dict = Depends(require_admin)):
 # --- Invoice PDF endpoint (simple generator) ---
 from typing import Optional
 import io
+import logging
 from fpdf import FPDF
 
 
@@ -455,8 +456,15 @@ async def invoice_pdf(req: InvoicePDFRequest):
 
     For `web3`, include `blockchain_tx_id` to display the on-chain reference.
     """
-    pdf_bytes = render_invoice_pdf(req)
-    return Response(content=pdf_bytes, media_type="application/pdf")
+    try:
+        pdf_bytes = render_invoice_pdf(req)
+        return Response(content=pdf_bytes, media_type="application/pdf")
+    except Exception as e:
+        # Log full exception with traceback so it's visible in container logs
+        logger = logging.getLogger("uvicorn.error")
+        logger.exception("Error generating invoice PDF")
+        # Return sanitized error to client
+        raise HTTPException(status_code=500, detail="Internal server error while generating PDF")
 
 
 @app.post("/calculate-vat")
