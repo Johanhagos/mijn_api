@@ -48,7 +48,8 @@ pydantic_core==2.41.5
 python-dateutil==2.9.0.post0
 python-jose==3.5.0
 python-multipart==0.0.22
-pywin32==311
+# pywin32 is Windows-only and will fail on Linux hosts (e.g. Railway)
+# remove or make platform-specific; removed here for cross-platform installs
 referencing==0.37.0
 regex==2026.1.15
 requests==2.32.5
