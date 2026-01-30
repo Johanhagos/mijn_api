@@ -631,6 +631,9 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     # fpdf2: use `output(dest='S')` to get the PDF as a string, then encode to bytes
     pdf_str = pdf.output(dest='S')
     # fpdf2 uses latin-1 encoding for PDF bytes
+    # pdf.output may return `str`, `bytes` or `bytearray` depending on fpdf2 version.
+    if isinstance(pdf_str, (bytes, bytearray)):
+        return bytes(pdf_str)
     return pdf_str.encode('latin-1')
 
 
