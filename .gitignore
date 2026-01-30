@@ -6,3 +6,4 @@ __pycache__/
 # Local artifacts
 test.db
 invoice_*.pdf
+payload.json
