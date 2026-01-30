@@ -1,0 +1,146 @@
+openapi: 3.0.0
+info:
+  title: Mijn API
+  version: "1.0.0"
+  description: API for authentication, users, invoices, VAT and PDF generation (Web2 + Web3)
+servers:
+  - url: https://api.example.com
+paths:
+  /login:
+    post:
+      summary: Obtain access and refresh tokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: access token
+  /refresh:
+    post:
+      summary: Refresh access token using HttpOnly cookie
+      responses:
+        '200':
+          description: new access token
+  /users:
+    get:
+      summary: List users (requires auth)
+      responses:
+        '200':
+          description: list of users
+    post:
+      summary: Create user (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: user created
+  /invoice/pdf:
+    post:
+      summary: Render invoice PDF from provided invoice data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoicePDFRequest'
+      responses:
+        '200':
+          description: PDF bytes (application/pdf)
+  /invoices:
+    post:
+      summary: Create and persist an invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceCreate'
+      responses:
+        '201':
+          description: invoice created
+    get:
+      summary: List invoices
+      responses:
+        '200':
+          description: list of invoices
+  /calculate-vat:
+    post:
+      summary: Calculate VAT totals for a set of items
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+      responses:
+        '200':
+          description: VAT calculation result
+components:
+  schemas:
+    LoginRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+      required: [name, password]
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+      required: [id, name, password]
+    InvoicePDFRequest:
+      type: object
+      properties:
+        seller:
+          type: string
+        buyer:
+          type: string
+        invoice_number:
+          type: string
+        date:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        payment_system:
+          type: string
+        blockchain_tx_id:
+          type: string
+    InvoiceCreate:
+      type: object
+      properties:
+        seller_name:
+          type: string
+        seller_vat:
+          type: string
+        buyer_name:
+          type: string
+        buyer_vat:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+      required: [seller_name, buyer_name]

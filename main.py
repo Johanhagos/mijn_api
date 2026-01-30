@@ -38,6 +38,8 @@ if not DATA_DIR.exists():
 
 USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
+INVOICES_FILE = DATA_DIR / "invoices.json"
+INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
 
 # Detect read-only filesystem state so writes can be disabled safely.
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
@@ -155,6 +157,37 @@ def _ensure_users_file() -> None:
         USERS_FILE.write_text("[]", encoding="utf-8")
 
 
+def _ensure_invoices_file() -> None:
+    if READ_ONLY_FS:
+        return
+
+    if not INVOICES_FILE.exists():
+        INVOICES_FILE.write_text("[]", encoding="utf-8")
+
+
+def load_invoices() -> List[dict]:
+    _ensure_invoices_file()
+    try:
+        return json.loads(INVOICES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_invoices(invoices: List[dict]) -> None:
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist invoices.json")
+
+    with _lock:
+        INVOICES_FILE.write_text(json.dumps(invoices, indent=4), encoding="utf-8")
+
+
+def ensure_invoice_pdf_dir() -> None:
+    if READ_ONLY_FS:
+        return
+    if not INVOICE_PDF_DIR.exists():
+        INVOICE_PDF_DIR.mkdir(parents=True, exist_ok=True)
+
+
 def load_users() -> List[dict]:
     _ensure_users_file()
     try:
@@ -162,6 +195,89 @@ def load_users() -> List[dict]:
     except json.JSONDecodeError:
         # If the file is corrupted, return empty list (could also raise)
         return []
+
+
+def _get_db_session():
+    try:
+        from app.db.session import SessionLocal
+        return SessionLocal()
+    except Exception:
+        return None
+
+
+def db_get_user(username: str):
+    """Return a user dict from the database, or None if DB unavailable or user not found."""
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        user = db.query(ORMUser).filter(ORMUser.username == username).first()
+        if not user:
+            return None
+        return {"id": user.id, "name": user.username, "password": user.password_hash, "role": user.role}
+    except Exception:
+        return None
+
+
+def db_list_users():
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        rows = db.query(ORMUser).all()
+        return [{"id": r.id, "name": r.username, "role": r.role} for r in rows]
+    except Exception:
+        return None
+
+
+def db_create_user(user_dict: dict):
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        u = ORMUser(username=user_dict["name"], password_hash=user_dict["password"], role=user_dict.get("role", "user"))
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+        return {"id": u.id, "name": u.username, "role": u.role}
+    except Exception:
+        return None
+
+
+def db_delete_user_by_id(user_id: int):
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
+        if not u:
+            return None
+        out = {"id": u.id, "name": u.username, "role": u.role}
+        db.delete(u)
+        db.commit()
+        return out
+    except Exception:
+        return None
+
+
+def db_update_role(user_id: int, role: str):
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
+        if not u:
+            return None
+        u.role = role
+        db.commit()
+        return {"id": u.id, "name": u.username, "role": u.role}
+    except Exception:
+        return None
 
 
 def save_users(users: List[dict]) -> None:
@@ -228,6 +344,11 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     username = payload.get("sub")
+    # Prefer DB-backed users when available
+    user = db_get_user(username)
+    if user:
+        return user
+
     users = load_users()
     user = next((u for u in users if u["name"] == username), None)
     if not user:
@@ -269,7 +390,9 @@ async def health_check():
 
 @app.get("/users", response_model=List[PublicUser])
 async def list_users(current_user: dict = Depends(get_current_user)):
-    users = load_users()
+    users = db_list_users()
+    if users is None:
+        users = load_users()
     # Hide password hashes from responses
     return [{"id": u["id"], "name": u["name"], "role": u.get("role", "user")} for u in users]
 
@@ -277,7 +400,9 @@ async def list_users(current_user: dict = Depends(get_current_user)):
 @app.get("/users/{user_id}", response_model=PublicUser)
 async def get_user(user_id: int, current_user: dict = Depends(get_current_user)):
     """Return a single public user by id. 404 if not found."""
-    users = load_users()
+    users = db_list_users()
+    if users is None:
+        users = load_users()
     user = next((u for u in users if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -286,13 +411,6 @@ async def get_user(user_id: int, current_user: dict = Depends(get_current_user))
 
 @app.post("/users", response_model=PublicUser, status_code=201)
 async def add_user(user: User, admin: dict = Depends(require_admin)):
-    users = load_users()
-
-    if any(u["id"] == user.id for u in users):
-        raise HTTPException(status_code=400, detail="User id already exists")
-    if any(u["name"] == user.name for u in users):
-        raise HTTPException(status_code=400, detail="User name already exists")
-
     # Enforce bcrypt byte-length limit on password (UTF-8 bytes)
     pw_bytes = user.password.encode("utf-8")
     if len(pw_bytes) > BCRYPT_MAX_BYTES:
@@ -307,22 +425,25 @@ async def add_user(user: User, admin: dict = Depends(require_admin)):
     try:
         hashed = _hash_password(user.password)
     except ValueError as e:
-        # Known validation error from bcrypt (e.g. password too long)
         raise HTTPException(status_code=400, detail=str(e))
     except Exception:
-        # Unexpected error during hashing; don't leak internals
         raise HTTPException(status_code=500, detail="Error processing password")
 
-    new_user = {
-        "id": user.id,
-        "name": user.name,
-        "password": hashed,
-        "role": user.role,
-    }
+    # Try to create user in DB first
+    created = db_create_user({"name": user.name, "password": hashed, "role": user.role})
+    if created:
+        return {"id": created["id"], "name": created["name"], "role": created.get("role", "user")}
 
+    # Fallback to file-based store
+    users = load_users()
+    if any(u["id"] == user.id for u in users):
+        raise HTTPException(status_code=400, detail="User id already exists")
+    if any(u["name"] == user.name for u in users):
+        raise HTTPException(status_code=400, detail="User name already exists")
+
+    new_user = {"id": user.id, "name": user.name, "password": hashed, "role": user.role}
     users.append(new_user)
     save_users(users)
-
     return {"id": new_user["id"], "name": new_user["name"], "role": new_user.get("role", "user")}
 
 
@@ -415,6 +536,12 @@ async def protected_route(token: str = Depends(oauth2_scheme)):
 @app.delete("/users/{user_id}", response_model=PublicUser)
 async def delete_user(user_id: int, admin: dict = Depends(require_admin)):
     """Admin-only: delete a user by id and return the deleted user's public info."""
+    # Try DB delete first
+    db_removed = db_delete_user_by_id(user_id)
+    if db_removed:
+        log_event(f"DELETE_USER id={user_id}", admin["name"], "-")
+        return db_removed
+
     users = load_users()
     idx = next((i for i, u in enumerate(users) if u["id"] == user_id), None)
     if idx is None:
@@ -445,6 +572,33 @@ class InvoicePDFRequest(BaseModel):
     amount: Optional[float] = 100.0
     payment_system: Optional[str] = "web2"  # 'web2' or 'web3'
     blockchain_tx_id: Optional[str] = None
+
+
+class InvoiceCreate(BaseModel):
+    seller_name: str
+    seller_vat: Optional[str] = None
+    buyer_name: str
+    buyer_vat: Optional[str] = None
+    invoice_number: Optional[str] = None
+    order_number: Optional[str] = None
+    date_issued: Optional[str] = Field(default_factory=lambda: datetime.now(timezone.utc).date().isoformat())
+    items: Optional[List[dict]] = []
+    payment_system: Optional[str] = "web2"
+    blockchain_tx_id: Optional[str] = None
+
+
+class InvoiceOut(BaseModel):
+    id: int
+    invoice_number: str
+    order_number: Optional[str] = None
+    seller_name: str
+    buyer_name: str
+    subtotal: float
+    vat_amount: float
+    total: float
+    payment_system: Optional[str]
+    blockchain_tx_id: Optional[str]
+    pdf_url: Optional[str] = None
 
 
 def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
@@ -480,6 +634,22 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     return pdf_str.encode('latin-1')
 
 
+def _compute_invoice_totals(items: List[dict]) -> tuple:
+    # items: each item should have qty, unit_price, vat_rate
+    subtotal = 0.0
+    vat_total = 0.0
+    for it in items:
+        qty = float(it.get("qty") or it.get("quantity") or 1)
+        price = float(it.get("unit_price") or it.get("price") or 0)
+        rate = float(it.get("vat_rate") or it.get("vat") or 0)
+        line = qty * price
+        subtotal += line
+        vat_total += line * (rate / 100.0)
+
+    total = subtotal + vat_total
+    return round(subtotal, 2), round(vat_total, 2), round(total, 2)
+
+
 @app.post("/invoice/pdf")
 async def invoice_pdf(req: InvoicePDFRequest):
     """Generate an invoice PDF. Set `payment_system` to 'web2' or 'web3'.
@@ -495,6 +665,153 @@ async def invoice_pdf(req: InvoicePDFRequest):
         logger.exception("Error generating invoice PDF")
         # Return sanitized error to client
         raise HTTPException(status_code=500, detail="Internal server error while generating PDF")
+
+
+@app.post("/invoices", response_model=InvoiceOut, status_code=201)
+async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(get_current_user)):
+    """Create and persist an invoice. Returns invoice metadata and PDF URL when available."""
+    # compute totals
+    items = payload.items or []
+    subtotal, vat_total, total = _compute_invoice_totals(items)
+
+    invoices = load_invoices()
+    next_id = (max((inv.get("id", 0) for inv in invoices), default=0) + 1)
+
+    invoice_number = payload.invoice_number or f"INV-{next_id:06d}"
+
+    inv = {
+        "id": next_id,
+        "invoice_number": invoice_number,
+        "order_number": payload.order_number,
+        "seller_name": payload.seller_name,
+        "seller_vat": payload.seller_vat,
+        "buyer_name": payload.buyer_name,
+        "buyer_vat": payload.buyer_vat,
+        "date_issued": payload.date_issued,
+        "items": items,
+        "subtotal": subtotal,
+        "vat_amount": vat_total,
+        "total": total,
+        "payment_system": payload.payment_system,
+        "blockchain_tx_id": payload.blockchain_tx_id,
+        "created_by": current_user.get("name"),
+    }
+
+    invoices.append(inv)
+    try:
+        save_invoices(invoices)
+    except RuntimeError:
+        # Filesystem read-only: continue without persistence (in-memory only)
+        pass
+
+    # Generate and store PDF if possible
+    pdf_url = None
+    try:
+        pdf_req = InvoicePDFRequest(
+            seller=inv["seller_name"],
+            buyer=inv["buyer_name"],
+            invoice_number=inv["invoice_number"],
+            date=inv.get("date_issued"),
+            description=payload.items[0].get("description") if payload.items else "",
+            amount=inv["total"],
+            payment_system=inv.get("payment_system", "web2"),
+            blockchain_tx_id=inv.get("blockchain_tx_id"),
+        )
+
+        pdf_bytes = render_invoice_pdf(pdf_req)
+        ensure_invoice_pdf_dir()
+        if not READ_ONLY_FS and INVOICE_PDF_DIR.exists():
+            pdf_path = INVOICE_PDF_DIR / f"invoice-{next_id}.pdf"
+            pdf_path.write_bytes(pdf_bytes)
+            pdf_url = str(pdf_path)
+    except Exception:
+        pdf_url = None
+
+    inv["pdf_url"] = pdf_url
+
+    return InvoiceOut(
+        id=inv["id"],
+        invoice_number=inv["invoice_number"],
+        order_number=inv.get("order_number"),
+        seller_name=inv["seller_name"],
+        buyer_name=inv["buyer_name"],
+        subtotal=inv["subtotal"],
+        vat_amount=inv["vat_amount"],
+        total=inv["total"],
+        payment_system=inv.get("payment_system"),
+        blockchain_tx_id=inv.get("blockchain_tx_id"),
+        pdf_url=inv.get("pdf_url"),
+    )
+
+
+@app.get("/invoices", response_model=List[InvoiceOut])
+async def list_invoices(current_user: dict = Depends(get_current_user)):
+    invoices = load_invoices()
+    return [InvoiceOut(**{
+        "id": inv.get("id"),
+        "invoice_number": inv.get("invoice_number"),
+        "order_number": inv.get("order_number"),
+        "seller_name": inv.get("seller_name"),
+        "buyer_name": inv.get("buyer_name"),
+        "subtotal": inv.get("subtotal", 0),
+        "vat_amount": inv.get("vat_amount", 0),
+        "total": inv.get("total", 0),
+        "payment_system": inv.get("payment_system"),
+        "blockchain_tx_id": inv.get("blockchain_tx_id"),
+        "pdf_url": inv.get("pdf_url"),
+    }) for inv in invoices]
+
+
+@app.get("/invoices/{invoice_id}", response_model=InvoiceOut)
+async def get_invoice(invoice_id: int, current_user: dict = Depends(get_current_user)):
+    invoices = load_invoices()
+    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return InvoiceOut(**{
+        "id": inv.get("id"),
+        "invoice_number": inv.get("invoice_number"),
+        "order_number": inv.get("order_number"),
+        "seller_name": inv.get("seller_name"),
+        "buyer_name": inv.get("buyer_name"),
+        "subtotal": inv.get("subtotal", 0),
+        "vat_amount": inv.get("vat_amount", 0),
+        "total": inv.get("total", 0),
+        "payment_system": inv.get("payment_system"),
+        "blockchain_tx_id": inv.get("blockchain_tx_id"),
+        "pdf_url": inv.get("pdf_url"),
+    })
+
+
+@app.get("/invoices/{invoice_id}/pdf")
+async def download_invoice_pdf(invoice_id: int, current_user: dict = Depends(get_current_user)):
+    invoices = load_invoices()
+    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # If a stored pdf exists, return it
+    if inv.get("pdf_url"):
+        try:
+            path = Path(inv.get("pdf_url"))
+            if path.exists():
+                return Response(content=path.read_bytes(), media_type="application/pdf")
+        except Exception:
+            pass
+
+    # Otherwise generate on-the-fly
+    pdf_req = InvoicePDFRequest(
+        seller=inv.get("seller_name"),
+        buyer=inv.get("buyer_name"),
+        invoice_number=inv.get("invoice_number"),
+        date=inv.get("date_issued"),
+        description=inv.get("items", [{}])[0].get("description") if inv.get("items") else "",
+        amount=inv.get("total", 0),
+        payment_system=inv.get("payment_system"),
+        blockchain_tx_id=inv.get("blockchain_tx_id"),
+    )
+    pdf_bytes = render_invoice_pdf(pdf_req)
+    return Response(content=pdf_bytes, media_type="application/pdf")
 
 
 @app.post("/calculate-vat")
@@ -529,7 +846,9 @@ async def pdf_hash(file: UploadFile = File(...)):
 @app.get("/admin/users", response_model=List[PublicUser])
 async def admin_list_users(admin: dict = Depends(require_admin)):
     """Admin-only: return all users (public view)."""
-    users = load_users()
+    users = db_list_users()
+    if users is None:
+        users = load_users()
     return [{"id": u["id"], "name": u["name"], "role": u.get("role", "user")} for u in users]
 
 
@@ -549,7 +868,9 @@ async def get_audit_logs(admin: dict = Depends(require_admin)):
 @app.get("/admin/users/{user_id}", response_model=PublicUser)
 async def admin_get_user(user_id: int, admin: dict = Depends(require_admin)):
     """Admin-only: return a single user by id."""
-    users = load_users()
+    users = db_list_users()
+    if users is None:
+        users = load_users()
     user = next((u for u in users if u["id"] == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -559,6 +880,10 @@ async def admin_get_user(user_id: int, admin: dict = Depends(require_admin)):
 @app.delete("/admin/users/{user_id}", response_model=PublicUser)
 async def admin_delete_user(user_id: int, admin: dict = Depends(require_admin)):
     """Admin-only: delete a user by id and return the deleted user's public info."""
+    db_removed = db_delete_user_by_id(user_id)
+    if db_removed:
+        return db_removed
+
     users = load_users()
     idx = next((i for i, u in enumerate(users) if u["id"] == user_id), None)
     if idx is None:
@@ -576,11 +901,16 @@ async def update_user_role(
     payload: RoleUpdate,
     current_user: dict = Depends(require_admin),
 ):
-    users = load_users()
-
     if payload.role not in ["admin", "user"]:
         raise HTTPException(status_code=400, detail="Role must be admin or user")
 
+    # Try DB update first
+    updated = db_update_role(user_id, payload.role)
+    if updated:
+        log_event(f"ROLE_CHANGE id={user_id} → {payload.role}", current_user["name"], "-")
+        return {"message": f"User {updated['name']} role updated to {payload.role}"}
+
+    users = load_users()
     for u in users:
         if u["id"] == user_id:
             u["role"] = payload.role
