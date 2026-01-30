@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field
+from pydantic import ConfigDict
 from datetime import date
 from decimal import Decimal
 from typing import Optional
@@ -41,5 +42,5 @@ class InvoiceOut(InvoiceCreate):
     payment_system: "PaymentSystem"
     blockchain_tx_id: Optional[str] = None
 
-    class Config:
-        orm_mode = True
+    # Pydantic v2 configuration
+    model_config = ConfigDict(from_attributes=True)
