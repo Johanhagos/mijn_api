@@ -177,7 +177,8 @@ def calculate_vat(payload: dict) -> dict:
     where each item contains `qty` (or `quantity`), `unit_price` (or `price`) and `vat_rate`.
     Returns dict with stringified decimal totals: subtotal, vat_total, total.
     """
-    items = payload.get("items") or []
+    # Accept either `items` (preferred) or `lines` (legacy clients)
+    items = payload.get("items") or payload.get("lines") or []
 
     subtotal = Decimal("0.00")
     vat_total = Decimal("0.00")
@@ -191,9 +192,26 @@ def calculate_vat(payload: dict) -> dict:
 
         try:
             # Best-effort: attempt to use `compute_vat_for_line` when shop/customer
-            # objects are available and compatible. Falls back to simple rate calc.
+            # objects are available and compatible. Accept dicts by coercing
+            # them into simple objects exposing the expected attributes.
             shop = payload.get("shop")
             customer = payload.get("customer")
+
+            class _Simple:
+                def __init__(self, d: dict | None):
+                    if not d:
+                        self.country = ""
+                        self.vat_number = ""
+                    else:
+                        self.country = d.get("country", "")
+                        # support both vat_number and vatNo keys
+                        self.vat_number = d.get("vat_number") or d.get("vatNo") or ""
+
+            if isinstance(shop, dict):
+                shop = _Simple(shop)
+            if isinstance(customer, dict):
+                customer = _Simple(customer)
+
             v = compute_vat_for_line(shop, customer, unit_price, qty, vat_rate)
             v = Decimal(str(v))
         except Exception:
