@@ -1,0 +1,14 @@
+INFO:     127.0.0.1:57610 - "POST /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54343 - "GET /login HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:65006 - "POST /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64592 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59443 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49670 - "GET /login HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:49670 - "POST /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60671 - "POST /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60671 - "GET /login HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:59244 - "GET /users/ HTTP/1.1" 307 Temporary Redirect
+INFO:     127.0.0.1:59244 - "GET /users HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49670 - "GET /login HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:49670 - "POST /login HTTP/1.1" 200 OK
+INFO:     127.0.0.1:65167 - "POST /login HTTP/1.1" 200 OK

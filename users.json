@@ -1,0 +1,55 @@
+[
+    {
+        "id": 5,
+        "name": "Duudee",
+        "password": "f75778f7425be4db0369d09af37a6c2b9a83dea0e53e7bd57412e4b060e607f7"
+    },
+    {
+        "id": 20,
+        "name": "VerifyUser",
+        "password": "$2b$12$ThIYSgfXjIyGyprcVkMKsuI.D2K.fL/9ikGW2vLucAvYVGZq2wjx6"
+    },
+    {
+        "id": 4,
+        "name": "Hihhi",
+        "password": "$2b$12$JjLQR/WwIWO8/EDH4DIQ3OF0/Ib7fOosVYp.INkGIazEsZ..eKSzq"
+    },
+    {
+        "id": 10,
+        "name": "AliceAdmin",
+        "password": "$2b$12$5dqJ.jYxy4VyhrjPwDjBcum3RcVp/Ubg0vgXj22mKheWLQ5g.tv6y"
+    },
+    {
+        "id": 11,
+        "name": "PMTest",
+        "password": "$2b$12$Hm9kKzjDSMOQAIJV64eqBOvxjk.uAMNDXaP4rrCG1HmFml/4ehiOm"
+    },
+    {
+        "id": 12,
+        "name": "NewAdmin",
+        "password": "$2b$12$xTYJMl6hO.UzZnJRR8fz.Ow5z8V9CzRxRw8K.1tP4994EAFFvC/wm"
+    },
+    {
+        "id": 1,
+        "name": "NewkomAdmin",
+        "password": "$2b$12$G6LggwgbhE3BI/GErUO8G.QyxvWlIHpoFLROsoUaj3SfHTJoerCja"
+    },
+    {
+        "id": 15,
+        "name": "NewAdminjoij",
+        "password": "$2b$12$ISD2YXk/lmspJd5vukyBV.RGT.ex5gofKOy1l94GEir.FQlKGeMBC",
+        "role": "admin"
+    },
+    {
+        "id": 19,
+        "name": "NewAdminnator",
+        "password": "$2b$12$zaebq7RKPiumj4g6c5rZU.EVJPC1ldAxRo6UnwdnkbyxT8GWZm3xC",
+        "role": "admin"
+    },
+    {
+        "id": 21,
+        "name": "Postman",
+        "password": "$2b$12$W3hRZeph5BlnRxHCqZCv5uOiAh..SBXeJ/YjfPUrZtsPVxkSh17GS",
+        "role": "admin"
+    }
+]
