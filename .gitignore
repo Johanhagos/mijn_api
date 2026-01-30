@@ -7,3 +7,5 @@ __pycache__/
 test.db
 invoice_*.pdf
 payload.json
+invoice.pdf
+pytest.ini
