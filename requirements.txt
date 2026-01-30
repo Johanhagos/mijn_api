@@ -24,7 +24,7 @@ eth-rlp==2.2.0
 eth-typing==5.2.1
 eth-utils==5.3.1
 eth_abi==5.2.0
-fastapi==0.100.0
+fastapi>=0.110
 frozenlist==1.8.0
 greenlet==3.3.1
 h11==0.16.0
@@ -43,7 +43,8 @@ protobuf==6.33.4
 pyasn1==0.6.2
 pycparser==3.0
 pycryptodome==3.23.0
-pydantic==2.5.1
+# Require Pydantic 2.5 or newer; allow pip to resolve a compatible pydantic-core
+pydantic>=2.5
 # Leave `pydantic_core` unpinned so pip can select a compatible build
 python-dateutil==2.9.0.post0
 python-jose==3.5.0
@@ -59,12 +60,13 @@ rsa==4.9.1
 s3transfer==0.7.0
 six==1.17.0
 SQLAlchemy==2.0.28
-starlette==0.27.0
+# Allow Starlette to be resolved by FastAPI's requirements
+starlette>=0.30
 toolz==1.1.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 urllib3==2.0.7
-uvicorn==0.22.0
+uvicorn>=0.23
 web3==6.2.0
 websockets==16.0
 yarl==1.22.0
