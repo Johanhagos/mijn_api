@@ -24,7 +24,7 @@ eth-rlp==2.2.0
 eth-typing==5.2.1
 eth-utils==5.3.1
 eth_abi==5.2.0
-fastapi==0.95.2
+fastapi==0.100.0
 frozenlist==1.8.0
 greenlet==3.3.1
 h11==0.16.0
@@ -43,8 +43,8 @@ protobuf==6.33.4
 pyasn1==0.6.2
 pycparser==3.0
 pycryptodome==3.23.0
-pydantic==1.10.26
-pydantic_core==2.41.5
+pydantic==2.5.1
+# Leave `pydantic_core` unpinned so pip can select a compatible build
 python-dateutil==2.9.0.post0
 python-jose==3.5.0
 python-multipart==0.0.22
