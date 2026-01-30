@@ -13,6 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 
+# Copy entrypoint script (runs migrations then starts the app)
+COPY entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh
+
 RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app \
     && chown -R app:app /app
 USER app
@@ -20,4 +24,5 @@ USER app
 ENV PORT=8000
 EXPOSE ${PORT}
 
-CMD ["gunicorn", "-k", "uvicorn.workers.UvicornWorker", "-w", "4", "main:app", "--bind", "0.0.0.0:8000", "--timeout", "120"]
+# Use entrypoint to run alembic migrations inside the container, then start gunicorn
+ENTRYPOINT ["/app/entrypoint.sh"]
