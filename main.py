@@ -5,6 +5,7 @@ from typing import List
 import json
 from pathlib import Path
 import os
+import sys
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from time import time
@@ -15,15 +16,31 @@ import threading
 
 app = FastAPI(title="Secure User API")
 
-# Determine storage directory. Use /tmp when running in AWS Lambda (writable),
-# otherwise keep the file next to the module for local dev.
-if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
-    DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp"))
-else:
-    DATA_DIR = Path(__file__).parent
+# --- Environment / production hardening ---
+# Detect a Railway production environment. Set `RAILWAY_ENVIRONMENT=production` there.
+IS_PROD = os.getenv("RAILWAY_ENVIRONMENT") == "production"
+
+# In production we must have an explicit JWT secret. Fail fast if missing.
+if IS_PROD:
+    if not os.getenv("JWT_SECRET_KEY"):
+        print("FATAL: JWT_SECRET_KEY is not set", file=sys.stderr)
+        sys.exit(1)
+
+# Determine storage directory. Prefer `DATA_DIR` env var (set to /tmp on Railway),
+# otherwise fall back to /tmp by default. For local dev you can set DATA_DIR back
+# to a project-local path if desired.
+DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp"))
+
+if not DATA_DIR.exists():
+    # Try creating DATA_DIR when not running in production (local dev).
+    if not IS_PROD:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
+
+# Detect read-only filesystem state so writes can be disabled safely.
+READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
 
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
@@ -36,8 +53,8 @@ BCRYPT_MAX_BYTES = 72
 
 
 # JWT / OAuth2 config
-# Prefer a secret from the environment for production. Fallback only for dev/testing.
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "supersecretkey123")
+# In production `JWT_SECRET_KEY` must be set (checked above). Do not use a hard-coded fallback.
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -49,9 +66,9 @@ MAX_ATTEMPTS = 5
 LOCK_TIME_SECONDS = 15 * 60  # 15 minutes
 failed_logins = {}
 
-# Cookie settings for refresh token storage (change for production)
+# Cookie settings for refresh token storage. Force secure cookies in production.
 COOKIE_NAME = "refresh_token"
-COOKIE_SECURE = False  # Set True in production (HTTPS only)
+COOKIE_SECURE = IS_PROD
 COOKIE_SAMESITE = "lax"
 
 
@@ -89,6 +106,11 @@ def clear_attempts(username: str):
 def log_event(event: str, username: str = "-", ip: str = "-"):
     timestamp = datetime.now(timezone.utc).isoformat()
     line = f"{timestamp} | {ip} | {username} | {event}\n"
+    if READ_ONLY_FS:
+        # Fall back to stderr so platform logs still capture the event.
+        print(line, file=sys.stderr, end="")
+        return
+
     with _lock:
         with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line)
@@ -125,6 +147,10 @@ class RoleUpdate(BaseModel):
 
 
 def _ensure_users_file() -> None:
+    if READ_ONLY_FS:
+        # Running on read-only filesystem — don't attempt to create files.
+        return
+
     if not USERS_FILE.exists():
         USERS_FILE.write_text("[]", encoding="utf-8")
 
@@ -139,6 +165,9 @@ def load_users() -> List[dict]:
 
 
 def save_users(users: List[dict]) -> None:
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist users.json")
+
     with _lock:
         USERS_FILE.write_text(json.dumps(users, indent=4), encoding="utf-8")
 
