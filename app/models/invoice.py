@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Date, Numeric, Enum as SAEnum
+from sqlalchemy import Column, Integer, String, Date, Numeric, Enum as SAEnum, ForeignKey
 from app.db.session import Base
 import enum
 
@@ -42,3 +42,5 @@ class Invoice(Base):
     # Payment system: web2 (traditional) or web3 (blockchain)
     payment_system = Column(SAEnum(PaymentSystem), default=PaymentSystem.web2)
     blockchain_tx_id = Column(String, nullable=True)  # only for web3 payments
+    # Merchant ownership
+    merchant_id = Column(Integer, ForeignKey("users.id"), nullable=True)

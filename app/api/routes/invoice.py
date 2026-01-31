@@ -6,13 +6,14 @@ from app.schemas.invoice import InvoiceCreate, InvoiceOut, CustomerType, Payment
 from app.models.invoice import Invoice, CustomerType as ModelCustomerType, PaymentSystem as ModelPaymentSystem
 from app.db.session import get_db
 from app.utils.pdf import generate_invoice_pdf
+from app.api.deps import get_merchant_by_api_key
 from zeep import Client
 from zeep.exceptions import Fault
 
 router = APIRouter(prefix="/invoice", tags=["Invoice"])
 
 @router.post("/create", response_model=InvoiceOut)
-def create_invoice(invoice_in: InvoiceCreate, db: Session = Depends(get_db)):
+def create_invoice(invoice_in: InvoiceCreate, db: Session = Depends(get_db), merchant_id: int | None = Depends(get_merchant_by_api_key)):
     # Auto-incrementing invoice number
     last_invoice = db.query(Invoice).order_by(Invoice.invoice_number.desc()).first()
     invoice_number = 1 if not last_invoice else (last_invoice.invoice_number or 0) + 1
@@ -41,6 +42,9 @@ def create_invoice(invoice_in: InvoiceCreate, db: Session = Depends(get_db)):
         vat_total=vat_total,
         total=total
     )
+    # associate with merchant
+    if merchant_id:
+        invoice.merchant_id = merchant_id
 
     # set payment system and blockchain tx id if provided
     try:
@@ -56,7 +60,7 @@ def create_invoice(invoice_in: InvoiceCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/create_pdf")
-def create_invoice_pdf(invoice_in: InvoiceCreate, db: Session = Depends(get_db)):
+def create_invoice_pdf(invoice_in: InvoiceCreate, db: Session = Depends(get_db), merchant_id: int | None = Depends(get_merchant_by_api_key)):
     # reuse create_invoice logic but return PDF file
     # validate B2B VAT number
     if invoice_in.customer_type == CustomerType.business and not invoice_in.customer_vat_number:
@@ -115,6 +119,8 @@ def create_invoice_pdf(invoice_in: InvoiceCreate, db: Session = Depends(get_db))
         vat_total=vat_total,
         total=total
     )
+    if merchant_id:
+        invoice.merchant_id = merchant_id
 
     try:
         invoice.payment_system = ModelPaymentSystem(invoice_in.payment_system.value if hasattr(invoice_in.payment_system, 'value') else str(invoice_in.payment_system))
