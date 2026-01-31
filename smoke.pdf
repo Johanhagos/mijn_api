@@ -1,0 +1,9 @@
+HTTP/1.1 422 Unprocessable Entity
+Content-Length: 158
+Content-Type: application/json
+Date: Sat, 31 Jan 2026 16:46:17 GMT
+Server: railway-edge
+X-Railway-Edge: railway/europe-west4-drams3a
+X-Railway-Request-Id: ZkVtT3vZSLKZyT9MN8N_Fg
+
+{"detail":[{"type":"json_invalid","loc":["body",1],"msg":"JSON decode error","input":{},"ctx":{"error":"Expecting property name enclosed in double quotes"}}]}
