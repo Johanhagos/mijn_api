@@ -11,3 +11,4 @@ invoice_*.pdf
 payload.json
 invoice.pdf
 pytest.ini
+migrated.db
