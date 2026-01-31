@@ -5,3 +5,4 @@ from . import user  # noqa: F401
 from . import payment  # noqa: F401
 from . import blockchain  # noqa: F401
 from . import audit  # noqa: F401
+from . import api_key  # noqa: F401
