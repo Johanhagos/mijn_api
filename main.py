@@ -19,7 +19,7 @@ import threading
 
 app = FastAPI(title="Secure User API")
 
-# CORS: lock down to known frontend origins in production, allow localhost in non-prod
+# CORS configuration: lock down to known frontend origins in production, allow localhost in non-prod
 FRONTEND_ORIGINS = [
     "https://dashboard.apiblockchain.io",
     "https://apiblockchain.io",
