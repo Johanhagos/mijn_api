@@ -1,0 +1,6 @@
+[2026-02-01T18:54:42.236Z] info: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-02-01T18:54:42.452Z] log: [HMR] connected
+[2026-02-01T18:54:43.113Z] log: [Fast Refresh] rebuilding
+[2026-02-01T18:54:44.338Z] log: [Fast Refresh] done in 1224ms
+[2026-02-01T18:54:49.344Z] info: %cDownload the React DevTools for a better development experience: https://reactjs.org/link/react-devtools font-weight:bold
+[2026-02-01T18:54:49.649Z] log: [HMR] connected

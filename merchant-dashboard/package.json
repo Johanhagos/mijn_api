@@ -1,0 +1,28 @@
+{
+  "name": "merchant-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "^13.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^2.5.0",
+    "framer-motion": "^10.12.16",
+    "lucide-react": "^0.269.0",
+    "clsx": "^1.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.7.1",
+    "@types/react": "^18.2.21",
+    "autoprefixer": "^10.4.0",
+    "playwright": "^1.36.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.7",
+    "typescript": "^5.1.6"
+  }
+}

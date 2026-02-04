@@ -1,0 +1,35 @@
+[
+    {
+        "id": 1,
+        "user_id": 5,
+        "key_hash": "66ea62cbc13ba00c268fb599cf7d9cf8177c937e2edda8417b13393cfbcffbe0",
+        "label": "devkey",
+        "mode": "test",
+        "created_at": "2026-01-31T22:20:03.635605+00:00"
+    },
+    {
+        "id": 2,
+        "user_id": 5,
+        "key_hash": "7b57ded1b033f98ecd4f2a74dcb5c150828d8f2941286226f71a5d3f7f0ee6e1",
+        "label": "devkey",
+        "mode": "test",
+        "created_at": "2026-01-31T22:20:13.663572+00:00"
+    },
+    {
+        "id": 3,
+        "user_id": 5,
+        "key_hash": "a2b529a46dd16ac48b9038106277fc2cf7aea00f81dc30d9baffbf21425c5a91",
+        "label": "devkey2",
+        "mode": "test",
+        "created_at": "2026-01-31T22:21:02.764017+00:00"
+    },
+    {
+        "id": 4,
+        "user_id": 1,
+        "merchant_id": 1,
+        "key": "sk_test_local_automation",
+        "label": "local-automation",
+        "mode": "test",
+        "created_at": "2026-02-01T00:00:00+00:00"
+    }
+]

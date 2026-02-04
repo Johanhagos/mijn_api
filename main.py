@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Body, Response, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Body, Response, Request, UploadFile, File, Header
+from fastapi.middleware.cors import CORSMiddleware
 import hashlib
 from pydantic import BaseModel, Field
 from typing import List
@@ -8,6 +9,8 @@ import os
 import sys
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
+import uuid
+from fastapi.responses import JSONResponse, HTMLResponse
 from time import time
 from jose import jwt, JWTError
 from fastapi import Depends
@@ -16,9 +19,46 @@ import threading
 
 app = FastAPI(title="Secure User API")
 
+# CORS: lock down to known frontend origins in production, allow localhost in non-prod
+FRONTEND_ORIGINS = [
+    "https://dashboard.apiblockchain.io",
+    "https://apiblockchain.io",
+]
+
+# Allow localhost origins when not running in production (convenience for dev)
+if os.getenv("RAILWAY_ENVIRONMENT") != "production":
+    FRONTEND_ORIGINS += [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=FRONTEND_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Middleware to block debug routes when debug access is disabled.
+@app.middleware("http")
+async def block_debug_routes(request, call_next):
+    path = request.url.path or ""
+    if path.startswith("/debug") and (IS_PROD or not ALLOW_DEBUG):
+        # Return 404 for any debug route when disabled for safety in production.
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    return await call_next(request)
+
 # --- Environment / production hardening ---
 # Detect a Railway production environment. Set `RAILWAY_ENVIRONMENT=production` there.
 IS_PROD = os.getenv("RAILWAY_ENVIRONMENT") == "production"
+# Require explicit opt-in to debug endpoints (extra safety).
+# ALLOW_DEBUG is only true when the env var is set and we're NOT in production.
+# This ensures Railway/production cannot enable debug routes accidentally.
+ALLOW_DEBUG = (os.getenv("ALLOW_DEBUG", "0") == "1") and (not IS_PROD)
 
 # In production we must have an explicit JWT secret. Fail fast if missing.
 if IS_PROD:
@@ -40,6 +80,8 @@ USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
 INVOICES_FILE = DATA_DIR / "invoices.json"
 INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
+API_KEYS_FILE = DATA_DIR / "api_keys.json"
+SESSIONS_FILE = DATA_DIR / "sessions.json"
 
 # Detect read-only filesystem state so writes can be disabled safely.
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
@@ -165,6 +207,20 @@ def _ensure_invoices_file() -> None:
         INVOICES_FILE.write_text("[]", encoding="utf-8")
 
 
+def _ensure_api_keys_file() -> None:
+    if READ_ONLY_FS:
+        return
+    if not API_KEYS_FILE.exists():
+        API_KEYS_FILE.write_text("[]", encoding="utf-8")
+
+
+def _ensure_sessions_file() -> None:
+    if READ_ONLY_FS:
+        return
+    if not SESSIONS_FILE.exists():
+        SESSIONS_FILE.write_text("[]", encoding="utf-8")
+
+
 def load_invoices() -> List[dict]:
     _ensure_invoices_file()
     try:
@@ -179,6 +235,37 @@ def save_invoices(invoices: List[dict]) -> None:
 
     with _lock:
         INVOICES_FILE.write_text(json.dumps(invoices, indent=4), encoding="utf-8")
+
+
+def load_api_keys() -> List[dict]:
+    _ensure_api_keys_file()
+    try:
+        return json.loads(API_KEYS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def load_sessions() -> List[dict]:
+    _ensure_sessions_file()
+    try:
+        return json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_api_keys(keys: List[dict]) -> None:
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist api_keys.json")
+    with _lock:
+        API_KEYS_FILE.write_text(json.dumps(keys, indent=4), encoding="utf-8")
+
+
+def save_sessions(sessions: List[dict]) -> None:
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist sessions.json")
+
+    with _lock:
+        SESSIONS_FILE.write_text(json.dumps(sessions, indent=4), encoding="utf-8")
 
 
 def ensure_invoice_pdf_dir() -> None:
@@ -337,23 +424,89 @@ async def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
     return decode_jwt(token)
 
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
-    """Resolve the current user from the OAuth2 token."""
-    payload = verify_token(token)
-    if payload is None:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+async def get_current_user(request: Request):
+    """Resolve the current user from either a Bearer JWT or an API key.
 
-    username = payload.get("sub")
-    # Prefer DB-backed users when available
-    user = db_get_user(username)
-    if user:
-        return user
+    Order of precedence:
+    1. Bearer JWT in `Authorization: Bearer <token>`
+    2. API key in `X-API-KEY: <key>` or `Authorization: ApiKey <key>`
+    3. Non-production fallback to the first user in `users.json` for local dev convenience
+    """
+    # Try JWT first (Authorization: Bearer ...)
+    auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth and isinstance(auth, str) and auth.lower().startswith("bearer "):
+        token = auth.split(None, 1)[1]
+        payload = verify_token(token)
+        if payload:
+            username = payload.get("sub")
+            user = db_get_user(username) or next((u for u in load_users() if u.get("name") == username), None)
+            if user:
+                return user
 
-    users = load_users()
-    user = next((u for u in users if u["name"] == username), None)
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
+    # Next: accept API keys via X-API-KEY header or Authorization: ApiKey <key>
+    api_key = request.headers.get("x-api-key") or request.headers.get("X-API-KEY")
+    if not api_key and auth and isinstance(auth, str):
+        # Accept Authorization: ApiKey <key> or Authorization: Api-Key <key>
+        low = auth.lower()
+        if low.startswith("apikey ") or low.startswith("api-key ") or low.startswith("api_key "):
+            api_key = auth.split(None, 1)[1]
+
+    if api_key:
+        try:
+            key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
+            # First check file-based api_keys store
+            keys = load_api_keys()
+            # Primary lookup: SHA256 key hash (preferred)
+            row = next((k for k in keys if k.get("key_hash") == key_hash), None)
+            # Backward-compatibility: accept raw `key` field if present in the store
+            if not row:
+                row = next((k for k in keys if k.get("key") == api_key), None)
+            if row:
+                uid = row.get("user_id")
+                # Prefer DB-backed user if available
+                try:
+                    from app.models.user import User as ORMUser
+                    db = _get_db_session()
+                    if db:
+                        u = db.query(ORMUser).filter(ORMUser.id == uid).first()
+                        if u:
+                            return {"id": u.id, "name": u.username, "role": u.role}
+                except Exception:
+                    pass
+                # Fallback to file-based users
+                users = load_users()
+                u = next((x for x in users if x.get("id") == uid), None)
+                if u:
+                    return u
+
+            # Try DB-backed API keys when available (older deployments)
+            try:
+                from app.models.api_key import APIKey as ORMAPIKey
+                db = _get_db_session()
+                if db:
+                    row = db.query(ORMAPIKey).filter(ORMAPIKey.key_hash == key_hash).first()
+                    if row:
+                        try:
+                            from app.models.user import User as ORMUser
+                            u = db.query(ORMUser).filter(ORMUser.id == row.user_id).first()
+                            if u:
+                                return {"id": u.id, "name": u.username, "role": u.role}
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+    # Development fallback: allow local dev convenience when not in production
+    if not IS_PROD:
+        users = load_users()
+        if users:
+            return users[0]
+        return {"id": 0, "name": "dev", "role": "user"}
+
+    # No auth found
+    raise HTTPException(status_code=401, detail="Invalid or expired token or API key")
 
 
 def role_required(*allowed_roles: str):
@@ -464,7 +617,21 @@ async def login_for_access_token(
     users = load_users()
     user = next((u for u in users if u["name"] == login.name), None)
 
-    if not user or not pwd_context.verify(login.password, user["password"]):
+    stored_pw = user.get("password") if user else None
+    valid = False
+    if stored_pw and isinstance(stored_pw, str) and stored_pw.startswith("sha256$"):
+        try:
+            import hashlib as _hl
+            valid = _hl.sha256(login.password.encode("utf-8")).hexdigest() == stored_pw.split("sha256$", 1)[1]
+        except Exception:
+            valid = False
+    else:
+        try:
+            valid = bool(stored_pw and pwd_context.verify(login.password, stored_pw))
+        except Exception:
+            valid = False
+
+    if not user or not valid:
         log_event("LOGIN_FAIL", login.name, ip)
         register_failed_attempt(login.name)
         raise HTTPException(status_code=401, detail="Invalid username or password")
@@ -492,7 +659,60 @@ async def login_for_access_token(
     # Audit successful login
     log_event("LOGIN_SUCCESS", user["name"], ip)
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Return canonical auth response including merchant identity
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "merchant_id": user.get("id"),
+        "email": user.get("email") if isinstance(user, dict) else None,
+    }
+
+
+@app.post("/forgot_password")
+async def forgot_password(request: Request, payload: dict = Body(...)):
+    """Development-only password reset endpoint.
+
+    For local development this endpoint will reset the user's password
+    to a new randomly-generated temporary password and return it in the
+    JSON response so the developer can sign in. This endpoint is
+    explicitly disabled in production deployments.
+    """
+    if IS_PROD:
+        raise HTTPException(status_code=403, detail="Not allowed in production")
+
+    name = payload.get("name")
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing 'name' field")
+
+    # Optional: allow caller to specify an explicit password to set (dev only)
+    set_to = payload.get("set_to")
+
+    users = load_users()
+    user = next((u for u in users if u.get("name") == name), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    import hashlib as _hl
+
+    if set_to:
+        # Developer explicitly provided a password — store as sha256$ for quick dev logins
+        user["password"] = "sha256$" + _hl.sha256(str(set_to).encode("utf-8")).hexdigest()
+        save_users(users)
+        ip = get_client_ip(request)
+        log_event("PASSWORD_SET", name, ip)
+        return {"detail": "password set (dev)", "password": "(hidden)"}
+
+    # Generate a temporary password and store it as a sha256$ entry
+    # (login endpoint supports sha256$ entries for dev convenience).
+    import secrets
+    temp_pw = secrets.token_urlsafe(8) + "A1!"
+    user["password"] = "sha256$" + _hl.sha256(temp_pw.encode("utf-8")).hexdigest()
+    save_users(users)
+
+    ip = get_client_ip(request)
+    log_event("PASSWORD_RESET", name, ip)
+
+    return {"detail": "password reset", "password": temp_pw}
 
 
 @app.post("/refresh")
@@ -765,6 +985,230 @@ async def list_invoices(current_user: dict = Depends(get_current_user)):
     }) for inv in invoices]
 
 
+@app.get("/merchant/usage")
+async def merchant_usage(request: Request):
+    """Return simple usage statistics for the current merchant/user.
+
+    If an Authorization bearer token is provided it will be used to resolve the
+    current user. In non-production environments, if no valid token is present
+    a fallback user from `users.json` will be used to make local development
+    and the AuthGuard easier to test.
+    """
+    # Try to resolve user from Authorization header first
+    current_user = None
+    auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth and auth.lower().startswith("bearer "):
+        token = auth.split(None, 1)[1]
+        payload = verify_token(token)
+        if payload:
+            username = payload.get("sub")
+            # Prefer DB-backed user when available
+            current_user = db_get_user(username) or next((u for u in load_users() if u.get("name") == username), None)
+
+    # Fallback to a local user in non-production for convenience
+    if current_user is None:
+        if IS_PROD:
+            raise HTTPException(status_code=401, detail="Unauthorized")
+        users = load_users()
+        current_user = users[0] if users else {"id": 0, "name": "dev", "role": "user"}
+    """Return simple usage statistics for the current merchant/user.
+
+    Aggregates invoices created by the current user (or matching `merchant_id` when present).
+    """
+    invoices = load_invoices()
+
+    merchant_name = current_user.get("name")
+    merchant_id = current_user.get("id")
+
+    # Match either by `created_by` (legacy) or explicit `merchant_id` field
+    my_invoices = [
+        inv for inv in invoices
+        if (inv.get("created_by") == merchant_name) or (merchant_id is not None and inv.get("merchant_id") == merchant_id)
+    ]
+
+    total_invoices = len(my_invoices)
+    web2_invoices = [i for i in my_invoices if (i.get("payment_system") or "web2") == "web2"]
+    web3_invoices = [i for i in my_invoices if i.get("payment_system") == "web3"]
+
+    def _sum_total(lst):
+        try:
+            return round(sum(float(i.get("total", 0) or 0) for i in lst), 2)
+        except Exception:
+            return 0.0
+
+    web2_total = _sum_total(web2_invoices)
+    web3_total = _sum_total(web3_invoices)
+    total_amount = _sum_total(my_invoices)
+
+    return {
+        "total_invoices": total_invoices,
+        "web2_count": len(web2_invoices),
+        "web3_count": len(web3_invoices),
+        "web2_total": web2_total,
+        "web3_total": web3_total,
+        "total_amount": total_amount,
+    }
+
+
+@app.get("/merchant/me")
+async def merchant_me(current_user: dict = Depends(get_current_user)):
+    """Return merchant identity info (id, name, email if present)."""
+    return {"id": current_user.get("id"), "name": current_user.get("name"), "email": current_user.get("email")}
+
+
+class APIKeyCreate(BaseModel):
+    label: str = None
+    mode: str = "live"  # 'live' or 'test'
+
+
+@app.get("/api-keys")
+async def list_api_keys(current_user: dict = Depends(get_current_user)):
+    """List API keys for the current user (does NOT return raw key material)."""
+    keys = load_api_keys()
+    my = [k for k in keys if k.get("merchant_id") == current_user.get("id") or k.get("user_id") == current_user.get("id")]
+
+    def mask_key(raw: str | None) -> str | None:
+        if not raw:
+            return None
+        # preserve prefix and last 4 chars
+        for p in ("sk_live_", "sk_test_"):
+            if raw.startswith(p):
+                return f"{p}****{raw[-4:]}"
+        # generic mask
+        return f"****{raw[-4:]}"
+
+    # Return safe fields including masked key
+    return [{
+        "id": k.get("id"),
+        "label": k.get("label"),
+        "mode": k.get("mode"),
+        "created_at": k.get("created_at"),
+        "key_masked": mask_key(k.get("key"))
+    } for k in my]
+
+
+@app.post("/api-keys")
+async def create_api_key(payload: APIKeyCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new API key for the current user and return the raw key once.
+
+    Keys are prefixed with `sk_test_` or `sk_live_`. We persist the raw key (masked in listings),
+    along with `merchant_id`, `mode` and `created_at` as requested.
+    """
+    if READ_ONLY_FS:
+        raise HTTPException(status_code=500, detail="Storage is read-only; cannot create API keys")
+    import secrets
+    mode = (payload.mode or "live").lower()
+    if mode not in ("live", "test"):
+        raise HTTPException(status_code=400, detail="mode must be 'live' or 'test'")
+
+    prefix = "sk_live_" if mode == "live" else "sk_test_"
+    raw_suffix = secrets.token_urlsafe(24)
+    raw = f"{prefix}{raw_suffix}"
+
+    keys = load_api_keys()
+    next_id = (max((k.get("id", 0) for k in keys), default=0) + 1)
+    now = datetime.now(timezone.utc).isoformat()
+
+    # Persist the raw key and merchant association
+    new = {
+        "id": next_id,
+        "user_id": current_user.get("id"),
+        "merchant_id": current_user.get("id"),
+        "key": raw,
+        "label": payload.label,
+        "mode": mode,
+        "created_at": now,
+    }
+    keys.append(new)
+    save_api_keys(keys)
+
+    # Return raw key once to user
+    return {"id": next_id, "key": raw, "label": payload.label, "mode": mode, "created_at": now}
+
+
+@app.delete("/api-keys/{key_id}")
+async def revoke_api_key(key_id: int, current_user: dict = Depends(get_current_user)):
+    """Revoke (delete) an API key owned by the current user."""
+    if READ_ONLY_FS:
+        raise HTTPException(status_code=500, detail="Storage is read-only; cannot delete API keys")
+    keys = load_api_keys()
+    idx = next((i for i, k in enumerate(keys) if k.get("id") == key_id and k.get("user_id") == current_user.get("id")), None)
+    if idx is None:
+        raise HTTPException(status_code=404, detail="API key not found")
+    removed = keys.pop(idx)
+    save_api_keys(keys)
+    return {"ok": True, "id": removed.get("id")}
+
+
+@app.get("/debug/invoices_file")
+async def debug_invoices_file():
+    """Debug endpoint: return the configured invoices file path and current content."""
+    raise HTTPException(status_code=404, detail="Not found")
+
+
+@app.post("/debug/add_invoice")
+async def debug_add_invoice(payload: dict = Body(...)):
+    """Debug helper: append an invoice dict to the invoices store used by the app."""
+    raise HTTPException(status_code=404, detail="Not found")
+
+
+@app.get('/debug/users')
+async def debug_users():
+    raise HTTPException(status_code=404, detail="Not found")
+
+
+@app.post('/debug/add_user')
+async def debug_add_user(payload: dict = Body(...)):
+    """Debug helper: add a plaintext-password user to the app's users.json (dev only)."""
+    # Only allow this in non-production when explicitly enabled via ALLOW_DEBUG
+    if IS_PROD or not ALLOW_DEBUG:
+        raise HTTPException(status_code=404, detail="Not found")
+
+    try:
+        name = payload.get('name')
+        password = payload.get('password')
+        role = payload.get('role', 'user')
+        if not name or not password:
+            raise HTTPException(status_code=400, detail="name and password required")
+
+        users = load_users()
+        if any(u.get('name') == name for u in users):
+            return {"ok": False, "reason": "exists"}
+
+        # Try to hash with bcrypt; fall back to a debug sha256 prefix if hashing fails
+        try:
+            pw_bytes = password.encode('utf-8')
+            if len(pw_bytes) > BCRYPT_MAX_BYTES:
+                raise HTTPException(status_code=400, detail="Password too long for bcrypt")
+            hashed = _hash_password(password)
+        except HTTPException:
+            raise
+        except Exception:
+            import hashlib as _hl
+            hashed = "sha256$" + _hl.sha256(password.encode("utf-8")).hexdigest()
+
+        next_id = (max((u.get('id', 0) for u in users), default=0) + 1)
+        users.append({"id": next_id, "name": name, "password": hashed, "role": role})
+        try:
+            save_users(users)
+        except Exception:
+            # Best-effort: if saving fails on this host, still return success for testing
+            pass
+
+        log_event("DEBUG_ADD_USER", name, "-")
+        return {"ok": True, "id": next_id, "name": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post('/debug/add_api_key')
+async def debug_add_api_key(payload: dict = Body(...)):
+    """Debug helper: create an API key for a given user id and return the raw key (dev only)."""
+    raise HTTPException(status_code=404, detail="Not found")
+
+
 @app.get("/invoices/{invoice_id}", response_model=InvoiceOut)
 async def get_invoice(invoice_id: int, current_user: dict = Depends(get_current_user)):
     invoices = load_invoices()
@@ -934,3 +1378,374 @@ try:
     handler = Mangum(app)
 except Exception:
     handler = None
+
+
+# --- Simple checkout endpoint for plugin integration (persistence-only) ---
+@app.post("/checkout")
+def checkout(
+    payload: dict,
+    x_api_key: str = Header(None)
+):
+    # Require API key header
+    if not x_api_key:
+        return JSONResponse(status_code=401, content={"error": "Missing API key"})
+
+    # Persistence must be available
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled on this server"})
+
+    # Find key from persistent storage
+    try:
+        api_keys = load_api_keys()
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to load API keys"})
+
+    key = next((k for k in api_keys if k.get("key") == x_api_key), None)
+    # Local dev fallback: allow any key in non-production for quick testing
+    if not key and not IS_PROD:
+        # Create a temporary key object mapping to merchant_id 1
+        key = {"merchant_id": 1, "key": x_api_key, "mode": "test"}
+    if not key:
+        return JSONResponse(status_code=403, content={"error": "Invalid API key"})
+
+    # Build invoice and persist to invoices.json
+    try:
+        invoices = load_invoices()
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to load invoices storage"})
+
+    try:
+        amount = float(payload.get("amount", 0) or 0)
+    except Exception:
+        amount = 0.0
+    mode = payload.get("mode", "test")
+
+    invoice = {
+        "id": str(uuid.uuid4()),
+        "merchant_id": key.get("merchant_id"),
+        "amount": amount,
+        "mode": mode,
+        "status": "paid" if mode == "test" else "pending",
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+    invoices.append(invoice)
+
+    try:
+        save_invoices(invoices)
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to persist invoice"})
+
+    return {"success": True, "invoice": invoice}
+
+
+# Hosted session creation endpoint used by the plugin to create server-side sessions
+@app.post("/create_session")
+def create_session(
+    payload: dict,
+    x_api_key: str = Header(None)
+):
+    # Require API key header
+    if not x_api_key:
+        return JSONResponse(status_code=401, content={"error": "Missing API key"})
+
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled on this server"})
+
+    try:
+        api_keys = load_api_keys()
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to load API keys"})
+
+    key = next((k for k in api_keys if k.get("key") == x_api_key), None)
+    if not key and not IS_PROD:
+        key = {"merchant_id": 1, "key": x_api_key, "mode": "test"}
+    if not key:
+        return JSONResponse(status_code=403, content={"error": "Invalid API key"})
+
+    # Prefer DB-backed sessions when available
+    db_sessions_available = False
+    try:
+        from app.db.sessions import create_session as db_create_session
+        db_sessions_available = True
+    except Exception:
+        db_sessions_available = False
+
+    try:
+        amount = float(payload.get("amount", 0) or 0)
+    except Exception:
+        amount = 0.0
+
+    success_url = payload.get("success_url") or payload.get("successUrl") or payload.get("success")
+    cancel_url = payload.get("cancel_url") or payload.get("cancelUrl") or payload.get("cancel")
+    mode = payload.get("mode", key.get("mode", "test"))
+
+    session_id = str(uuid.uuid4())
+
+    # Build hosted checkout URL. Allow override via HOSTED_CHECKOUT_BASE env var.
+    HOSTED_BASE = os.getenv("HOSTED_CHECKOUT_BASE", "https://api.apiblockchain.io")
+    session_url = f"{HOSTED_BASE.rstrip('/')}/checkout?session={session_id}"
+
+    session = {
+        "id": session_id,
+        "merchant_id": key.get("merchant_id"),
+        "amount": amount,
+        "mode": mode,
+        "status": "created",
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+        "url": session_url,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+    if db_sessions_available:
+        try:
+            created = db_create_session(session)
+            return {"success": True, "id": created.get("id"), "url": created.get("url"), "session": created}
+        except Exception:
+            # Fall back to file-based persistence
+            pass
+
+    try:
+        sessions = load_sessions()
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to load sessions storage"})
+
+    sessions.append(session)
+
+    try:
+        save_sessions(sessions)
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to persist session"})
+
+    return {"success": True, "id": session_id, "url": session_url, "session": session}
+
+
+@app.get("/session/{session_id}")
+def get_session(session_id: str):
+    # Try DB-backed lookup first
+    try:
+        from app.db.sessions import get_session as db_get_session
+        s = db_get_session(session_id)
+        if s:
+            return {"success": True, "session": s}
+    except Exception:
+        pass
+
+    try:
+        sessions = load_sessions()
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to load sessions storage"})
+
+    s = next((x for x in sessions if x.get("id") == session_id), None)
+    if not s:
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    return {"success": True, "session": s}
+
+
+@app.get("/checkout")
+def hosted_checkout(session: str = None):
+        """Hosted checkout page. Renders a simple UI to pay a session.
+
+        Query param: ?session=<session_id>
+        """
+        if not session:
+                return HTMLResponse("<h1>Missing session</h1>", status_code=400)
+
+        # Try DB-backed lookup first
+        s = None
+        try:
+            from app.db.sessions import get_session as db_get_session
+            s = db_get_session(session)
+        except Exception:
+            s = None
+
+        if not s:
+            try:
+                sessions = load_sessions()
+            except Exception:
+                return HTMLResponse("<h1>Failed to load sessions</h1>", status_code=500)
+
+            s = next((x for x in sessions if x.get("id") == session), None)
+        if not s:
+                return HTMLResponse("<h1>Session not found</h1>", status_code=404)
+
+        # Resolve merchant name if available
+        merchant_name = None
+        try:
+                users = load_users()
+                u = next((x for x in users if x.get("id") == s.get("merchant_id")), None)
+                if u:
+                        merchant_name = u.get("name")
+        except Exception:
+                merchant_name = None
+
+        if not merchant_name:
+                merchant_name = f"Merchant {s.get('merchant_id')}"
+
+        amount = float(s.get("amount") or 0)
+        success_url = s.get("success_url") or ""
+        cancel_url = s.get("cancel_url") or ""
+
+        # Build HTML by concatenation to avoid f-string brace escaping issues
+        sess_id_js = json.dumps(s.get('id'))
+        success_js = json.dumps(success_url)
+        cancel_js = json.dumps(cancel_url)
+        merchant_escaped = (merchant_name or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        html = (
+            "<!doctype html>"
+            "<html>"
+            "<head>"
+            "<meta charset=\"utf-8\"/>"
+            "<title>APIBlockchain Checkout</title>"
+            "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/>"
+            "<style>"
+            " :root{--primary:#0b63ff;--bg:#f6f8fb;--text:#071226}"
+            " body{font-family:Arial,Helvetica,sans-serif;background:var(--bg);color:var(--text);padding:20px;margin:0;}"
+            " .box{max-width:520px;margin:32px auto;background:#fff;padding:20px;border-radius:10px;box-shadow:0 8px 24px rgba(7,18,38,0.06);}"
+            " .logo{display:block;margin:0 auto 12px;max-width:160px;}"
+            " h2{color:var(--primary);text-align:center;margin:6px 0 12px;}"
+            " .amount{font-size:1.25rem;margin:8px 0;}"
+            " .actions{margin-top:14px;text-align:center;}"
+            " button{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:10px 16px;margin:6px;cursor:pointer;font-weight:600;}"
+            " button.secondary{background:#fff;color:var(--primary);border:1px solid #e6e9ef;}"
+            " #status{margin-top:12px;text-align:center;color:#093;}"
+            " footer{margin-top:18px;font-size:12px;color:#7b8390;text-align:center;}"
+            "</style>"
+            "</head>"
+            "<body>"
+            "<div class=\"box\">"
+            "<img class=\"logo\" src=\"https://apiblockchain.io/logo.svg\" alt=\"APIBlockchain\"/>"
+            "<h2>Checkout</h2>"
+            "<p><strong>Merchant:</strong> " + merchant_escaped + "</p>"
+            "<p class=\"amount\"><strong>Amount:</strong> $" + f"{amount:.2f}" + "</p>"
+            "<div class=\"actions\">"
+            "<button id=\"pay-web2\">Pay with Card</button>"
+            "<button id=\"pay-web3\" class=\"secondary\">Pay with Crypto</button>"
+            "</div>"
+            "<div id=\"status\"></div>"
+            "<footer><a href=\"https://apiblockchain.io\" target=\"_blank\">Powered by APIBlockchain</a></footer>"
+            "<script>"
+            "const sessionId = " + sess_id_js + ";"
+            "const successUrl = " + success_js + ";"
+            "const cancelUrl = " + cancel_js + ";"
+            "async function complete(payment_system){"
+            "document.getElementById('status').innerText = 'Processing...';"
+            "try{"
+            "const res = await fetch('/session/' + sessionId + '/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_system }) });"
+            "const data = await res.json();"
+            "if(!res.ok){ document.getElementById('status').innerText = 'Error: ' + (data.error || res.statusText); return; }"
+            "document.getElementById('status').innerText = 'Payment successful';"
+            "try{ window.opener && window.opener.postMessage({ type: 'apiblockchain.checkout_complete', sessionId: sessionId }, '*'); }catch(e){}"
+            "setTimeout(()=>{ if(successUrl) window.location.href = successUrl; else document.getElementById('status').innerText += ' — You may close this window.'; }, 800);"
+            "}catch(e){ document.getElementById('status').innerText = 'Network error'; }"
+            "}"
+            "document.getElementById('pay-web2').addEventListener('click', ()=> complete('web2'));"
+            "document.getElementById('pay-web3').addEventListener('click', ()=> complete('web3'));"
+            "</script>"
+            "</div>"
+            "</body>"
+            "</html>"
+        )
+
+        return HTMLResponse(html)
+
+
+@app.post("/session/{session_id}/complete")
+def complete_session(session_id: str, payload: dict = Body(...)):
+        """Mark session paid, create invoice, persist to `invoices.json` and update session."""
+        payment_system = payload.get('payment_system', 'web2')
+        blockchain_tx_id = payload.get('blockchain_tx_id')
+
+        if READ_ONLY_FS:
+                return JSONResponse(status_code=503, content={"error": "Persistence disabled on this server"})
+
+        # Try DB-backed lookup first
+        s = None
+        db_available = False
+        try:
+            from app.db.sessions import get_session as db_get_session, update_session as db_update_session
+            db_available = True
+            s = db_get_session(session_id)
+        except Exception:
+            s = None
+
+        if not s:
+            try:
+                sessions = load_sessions()
+            except Exception:
+                return JSONResponse(status_code=500, content={"error": "Failed to load sessions storage"})
+
+            s = next((x for x in sessions if x.get('id') == session_id), None)
+            if not s:
+                return JSONResponse(status_code=404, content={"error": "Session not found"})
+        else:
+            # s found in DB
+            pass
+
+        # ensure we don't double-pay
+        if s.get('status') == 'paid':
+                return {"success": True, "message": "Already paid"}
+
+        # create invoice
+        try:
+                invoices = load_invoices()
+        except Exception:
+                return JSONResponse(status_code=500, content={"error": "Failed to load invoices storage"})
+
+        invoice = {
+                'id': str(uuid.uuid4()),
+                'merchant_id': s.get('merchant_id'),
+                'amount': float(s.get('amount') or 0),
+                'mode': s.get('mode', 'test'),
+                'status': 'paid',
+                'payment_system': payment_system,
+                'blockchain_tx_id': blockchain_tx_id,
+                'created_at': datetime.utcnow().isoformat(),
+        }
+
+        invoices.append(invoice)
+
+        # update session (DB or file)
+        if db_available and s and isinstance(s, dict) and s.get('id'):
+            try:
+                db_update_session(session_id, {
+                    'status': 'paid',
+                    'paid_at': datetime.utcnow(),
+                    'payment_system': payment_system,
+                    'blockchain_tx_id': blockchain_tx_id,
+                })
+            except Exception:
+                return JSONResponse(status_code=500, content={"error": "Failed to persist DB session"})
+        else:
+            s['status'] = 'paid'
+            s['paid_at'] = datetime.utcnow().isoformat()
+            s['payment_system'] = payment_system
+            if blockchain_tx_id:
+                s['blockchain_tx_id'] = blockchain_tx_id
+
+            try:
+                save_invoices(invoices)
+                save_sessions(sessions)
+            except Exception:
+                return JSONResponse(status_code=500, content={"error": "Failed to persist invoice/session"})
+
+        # simple audit/event
+        log_event('SESSION_COMPLETED id=' + session_id, '-', '-')
+
+        return {"success": True, "invoice": invoice, "session": s}
+
+
+@app.post('/webhook/stripe')
+def webhook_stripe(payload: dict = Body(...)):
+        # Placeholder for Stripe webhook processing
+        log_event('WEBHOOK_STRIPE', '-', '-')
+        return {"received": True}
+
+
+@app.post('/webhook/web3')
+def webhook_web3(payload: dict = Body(...)):
+        # Placeholder for Web3 payment webhook processing
+        log_event('WEBHOOK_WEB3', '-', '-')
+        return {"received": True}
