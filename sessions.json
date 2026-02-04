@@ -1,0 +1,61 @@
+[
+    {
+        "id": "6702d613-850a-45cb-a271-d1a976732929",
+        "merchant_id": 1,
+        "amount": 10.0,
+        "mode": "test",
+        "status": "paid",
+        "success_url": "http://localhost:3000/ok",
+        "cancel_url": "http://localhost:3000/cancel",
+        "url": "https://apiblockchain.io/checkout?session=6702d613-850a-45cb-a271-d1a976732929",
+        "created_at": "2026-02-02T17:05:39.335958",
+        "paid_at": "2026-02-02T17:08:32.881518",
+        "payment_system": "web2"
+    },
+    {
+        "id": "e3f1bef6-ea5a-4c0e-b1a9-7e1d8e73c17d",
+        "merchant_id": 1,
+        "amount": 10.0,
+        "mode": "test",
+        "status": "created",
+        "success_url": null,
+        "cancel_url": null,
+        "url": "https://apiblockchain.io/checkout?session=e3f1bef6-ea5a-4c0e-b1a9-7e1d8e73c17d",
+        "created_at": "2026-02-02T17:28:12.526180"
+    },
+    {
+        "id": "9baa406a-a128-47c1-b5a5-ee83f5f5ec25",
+        "merchant_id": 1,
+        "amount": 10.0,
+        "mode": "test",
+        "status": "paid",
+        "success_url": "http://localhost/success",
+        "cancel_url": "http://localhost/cancel",
+        "url": "https://apiblockchain.io/checkout?session=9baa406a-a128-47c1-b5a5-ee83f5f5ec25",
+        "created_at": "2026-02-02T18:45:05.893717",
+        "paid_at": "2026-02-02T18:47:45.677470",
+        "payment_system": "web2"
+    },
+    {
+        "id": "1a206acb-6083-4267-b200-8b55056a1137",
+        "merchant_id": 1,
+        "amount": 10.0,
+        "mode": "test",
+        "status": "created",
+        "success_url": null,
+        "cancel_url": null,
+        "url": "https://apiblockchain.io/checkout?session=1a206acb-6083-4267-b200-8b55056a1137",
+        "created_at": "2026-02-02T18:45:26.352794"
+    },
+    {
+        "id": "0a148e14-ea07-4589-992d-59ad37c4ac44",
+        "merchant_id": 1,
+        "amount": 10.0,
+        "mode": "test",
+        "status": "created",
+        "success_url": "https://example.com/success",
+        "cancel_url": "https://example.com/cancel",
+        "url": "https://api.apiblockchain.io/checkout?session=0a148e14-ea07-4589-992d-59ad37c4ac44",
+        "created_at": "2026-02-04T20:04:27.380456"
+    }
+]

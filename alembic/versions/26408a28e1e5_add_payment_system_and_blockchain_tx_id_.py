@@ -20,7 +20,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    pass
+    try:
+        op.add_column(
+            "invoices",
+            sa.Column("payment_system", sa.String(length=10), server_default=sa.text("'web2'"), nullable=False),
+        )
+    except Exception:
+        pass
+    try:
+        op.add_column(
+            "invoices",
+            sa.Column("blockchain_tx_id", sa.String(), nullable=True),
+        )
+    except Exception:
+        pass
 
 
 def downgrade() -> None:

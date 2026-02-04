@@ -1,0 +1,17 @@
+Subject: Invoicing Merchant Dashboard — Merchant Login Details
+
+Hello {{merchant_name}},
+
+Your merchant account for the Invoicing Merchant Dashboard has been created for testing.
+
+Login URL: http://localhost:3000/login
+
+Username: merchant_test@example.com
+Password: merchant123
+
+Once you sign in, you can create API keys under "API Keys" and copy the plugin snippet under "Plugin Setup".
+
+If you did not request this account, please ignore this message.
+
+Regards,
+Invoicing Merchant Team

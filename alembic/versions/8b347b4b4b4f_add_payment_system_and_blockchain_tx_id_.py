@@ -21,14 +21,21 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Upgrade schema."""
     # Add columns: payment_system (string default 'web2') and blockchain_tx_id (nullable)
-    op.add_column(
-        "invoices",
-        sa.Column("payment_system", sa.String(length=10), server_default=sa.text("'web2'"), nullable=False),
-    )
-    op.add_column(
-        "invoices",
-        sa.Column("blockchain_tx_id", sa.String(), nullable=True),
-    )
+    try:
+        op.add_column(
+            "invoices",
+            sa.Column("payment_system", sa.String(length=10), server_default=sa.text("'web2'"), nullable=False),
+        )
+    except Exception:
+        # column may already exist in a fresh DB created outside migrations
+        pass
+    try:
+        op.add_column(
+            "invoices",
+            sa.Column("blockchain_tx_id", sa.String(), nullable=True),
+        )
+    except Exception:
+        pass
     # ### end Alembic commands ###
 
 

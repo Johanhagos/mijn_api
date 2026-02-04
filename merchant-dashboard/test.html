@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <h1>APIBlockchain Test Checkout</h1>
+
+    <script src="http://localhost:3001/plugin.js"></script>
+    <script>
+      ApiBlockchain.init({
+        // For hosted flow prefer not to provide secret keys in the browser.
+        // If you do provide `apiKey` here, the plugin will attempt to create a
+        // server-side session via `apiUrl` (best-effort). Otherwise it opens
+        // the hosted checkout page directly.
+        mode: "test",
+        apiUrl: "https://apiblockchain.up.railway.app",
+        hostedUrl: "https://apiblockchain.io"
+      });
+    </script>
+
+    <button onclick="ApiBlockchain.checkout({ amount: 10 })">
+      Pay $10
+    </button>
+  </body>
+</html>

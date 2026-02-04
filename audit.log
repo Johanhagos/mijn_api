@@ -3,3 +3,33 @@
 2026-01-25T10:26:10.877742+00:00 | 127.0.0.1 | Postman | LOGIN_SUCCESS
 2026-01-25T10:26:29.871661+00:00 | 127.0.0.1 | Postman | LOGIN_SUCCESS
 2026-01-25T10:27:14.489264+00:00 | 127.0.0.1 | Postman | LOGIN_FAIL
+2026-01-31T22:18:47.753403+00:00 | 127.0.0.1 | dev1 | LOGIN_FAIL
+2026-02-01T17:29:54.578900+00:00 | testclient | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T17:56:35.517959+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T18:17:08.476251+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T18:31:35.048802+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T18:54:43.097667+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T18:57:57.576711+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:40:57.451623+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:41:37.972218+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:43:47.954251+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:43:52.273532+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:45:42.664125+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:45:46.733416+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:47:01.630188+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:47:05.524677+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:48:12.670322+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:49:48.839894+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:49:53.801868+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:51:06.960482+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:51:18.110876+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:54:35.351947+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:54:41.305932+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:56:55.100328+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:56:58.123094+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:57:30.676745+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T19:57:34.056053+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T20:03:05.086482+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-01T20:03:08.284462+00:00 | 127.0.0.1 | merchant_test@example.com | LOGIN_SUCCESS
+2026-02-02T17:08:32.884745+00:00 | - | - | SESSION_COMPLETED id=6702d613-850a-45cb-a271-d1a976732929
+2026-02-02T18:47:45.682640+00:00 | - | - | SESSION_COMPLETED id=9baa406a-a128-47c1-b5a5-ee83f5f5ec25
