@@ -86,6 +86,17 @@ SESSIONS_FILE = DATA_DIR / "sessions.json"
 # Detect read-only filesystem state so writes can be disabled safely.
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
 
+# Initialize api_keys.json from repo if not present in DATA_DIR (important for Railway deployments)
+if not READ_ONLY_FS and not (DATA_DIR / "api_keys.json").exists():
+    repo_api_keys = Path(__file__).parent / "api_keys.json"
+    if repo_api_keys.exists():
+        import shutil
+        try:
+            shutil.copy(str(repo_api_keys), str(DATA_DIR / "api_keys.json"))
+            print(f"[INFO] Initialized api_keys.json from repo to {DATA_DIR}")
+        except Exception as e:
+            print(f"[WARNING] Failed to copy api_keys.json: {e}")
+
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
 
