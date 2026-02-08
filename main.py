@@ -154,6 +154,62 @@ def register_failed_attempt(username: str, ip: str = "-"):
     failed_logins[username] = (attempts, lock_until)
 
 
+# --- PHASE 2: Payment State Machine Helpers ---
+def validate_payment_state_transition(current_status: str, new_status: str) -> bool:
+    """Validate state machine: created -> pending -> paid -> failed"""
+    valid_transitions = {
+        "created": ["pending", "paid", "failed"],
+        "pending": ["paid", "failed"],
+        "paid": [],
+        "failed": [],
+    }
+    return new_status in valid_transitions.get(current_status, [])
+
+
+def generate_customer_access_link(session_id: str, merchant_id: int, expires_days: int = 7) -> dict:
+    """Generate JWT-based customer access link valid for N days."""
+    expires = datetime.utcnow() + timedelta(days=expires_days)
+    payload = {
+        "sub": f"customer_{session_id}",
+        "merchant_id": merchant_id,
+        "session_id": session_id,
+        "exp": expires,
+        "iat": datetime.utcnow(),
+    }
+    token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+    return {
+        "token": token,
+        "expires_at": expires.isoformat(),
+        "access_url": f"{os.getenv('HOSTED_CHECKOUT_BASE', 'https://api.apiblockchain.io')}/access/{session_id}?token={token}"
+    }
+
+
+def auto_unlock_api_keys(merchant_id: int, session: dict) -> dict:
+    """On payment, create API keys for merchant if they don't exist."""
+    keys = load_api_keys()
+    existing = next((k for k in keys if k.get("merchant_id") == merchant_id), None)
+    if existing:
+        return existing
+    
+    import secrets
+    raw_suffix = secrets.token_urlsafe(24)
+    raw_key = f"sk_test_{raw_suffix}"
+    
+    new_key = {
+        "id": max((k.get("id", 0) for k in keys), default=0) + 1,
+        "merchant_id": merchant_id,
+        "key": raw_key,
+        "label": f"Auto-generated from session {session.get('id')[:8]}",
+        "mode": "test",
+        "created_at": datetime.utcnow().isoformat(),
+    }
+    
+    keys.append(new_key)
+    save_api_keys(keys)
+    log_event(f"API_KEY_CREATED merchant_id={merchant_id}", "-", "-")
+    return new_key
+
+
 def clear_attempts(username: str):
     failed_logins.pop(username, None)
 
@@ -199,6 +255,20 @@ class LoginRequest(BaseModel):
 
 class RoleUpdate(BaseModel):
     role: str  # expected values: "admin" or "user"
+
+
+class StripeWebhookPayload(BaseModel):
+    type: str
+    data: dict
+
+
+class OneComWebhookPayload(BaseModel):
+    event: str
+    reference: str
+    amount: float
+    currency: str = "USD"
+    merchant_id: int
+    payload: dict = {}
 
 
 def _ensure_users_file() -> None:
@@ -1503,10 +1573,16 @@ def create_session(
         "amount": amount,
         "mode": mode,
         "status": "created",
+        "payment_status": "not_started",
         "success_url": success_url,
         "cancel_url": cancel_url,
         "url": session_url,
         "created_at": datetime.utcnow().isoformat(),
+        "metadata": {
+            "customer_email": payload.get("customer_email"),
+            "customer_name": payload.get("customer_name"),
+            "webhook_sources": [],
+        }
     }
 
     if db_sessions_available:
@@ -1748,15 +1824,261 @@ def complete_session(session_id: str, payload: dict = Body(...)):
         return {"success": True, "invoice": invoice, "session": s}
 
 
-@app.post('/webhook/stripe')
-def webhook_stripe(payload: dict = Body(...)):
-        # Placeholder for Stripe webhook processing
-        log_event('WEBHOOK_STRIPE', '-', '-')
+@app.post('/webhooks/stripe')
+def webhook_stripe(payload: dict = Body(...), request: Request = None):
+    """Stripe webhook: payment_intent.succeeded -> mark session PAID."""
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
+    
+    event_type = payload.get('type', '')
+    if event_type not in ['payment_intent.succeeded', 'charge.completed']:
+        log_event(f'WEBHOOK_STRIPE_IGNORED event_type={event_type}', '-', '-')
         return {"received": True}
+    
+    intent_data = payload.get('data', {}).get('object', {})
+    session_id = intent_data.get('metadata', {}).get('session_id') or intent_data.get('description', '')
+    
+    if not session_id:
+        log_event('WEBHOOK_STRIPE_NO_SESSION_ID', '-', '-')
+        return JSONResponse(status_code=400, content={"error": "No session_id in webhook"})
+    
+    try:
+        sessions = load_sessions()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+    session = next((s for s in sessions if s.get('id') == session_id), None)
+    if not session:
+        log_event(f'WEBHOOK_STRIPE_SESSION_NOT_FOUND session_id={session_id[:8]}', '-', '-')
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    
+    if session.get('status') in ['paid', 'failed']:
+        return {"success": True, "message": f"Session already in terminal state: {session.get('status')}"}
+    
+    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
+        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
+    
+    session['status'] = 'paid'
+    session['payment_status'] = 'completed'
+    session['paid_at'] = datetime.utcnow().isoformat()
+    session['payment_provider'] = 'stripe'
+    session['stripe_intent_id'] = intent_data.get('id')
+    session['metadata']['webhook_sources'].append('stripe')
+    
+    try:
+        invoices = load_invoices()
+    except Exception:
+        invoices = []
+    
+    invoice = {
+        'id': str(uuid.uuid4()),
+        'session_id': session_id,
+        'merchant_id': session.get('merchant_id'),
+        'amount': session.get('amount'),
+        'mode': session.get('mode', 'test'),
+        'status': 'paid',
+        'payment_provider': 'stripe',
+        'stripe_intent_id': intent_data.get('id'),
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    invoices.append(invoice)
+    
+    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
+    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
+    
+    try:
+        save_sessions(sessions)
+        save_invoices(invoices)
+    except Exception as e:
+        log_event(f'WEBHOOK_STRIPE_PERSIST_FAILED {str(e)[:50]}', '-', '-')
+        return JSONResponse(status_code=500, content={"error": "Failed to persist"})
+    
+    log_event(f'WEBHOOK_STRIPE_SUCCESS session_id={session_id[:8]} amount={session.get("amount")}', '-', '-')
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "invoice": invoice,
+        "api_key_generated": api_key.get('id'),
+        "customer_access": access_link,
+    }
 
 
-@app.post('/webhook/web3')
-def webhook_web3(payload: dict = Body(...)):
-        # Placeholder for Web3 payment webhook processing
-        log_event('WEBHOOK_WEB3', '-', '-')
+@app.post('/webhooks/onecom')
+def webhook_onecom(payload: dict = Body(...), request: Request = None):
+    """One.com webhook: payment.completed -> mark session PAID."""
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
+    
+    event = payload.get('event', '')
+    if event != 'payment.completed':
+        log_event(f'WEBHOOK_ONECOM_IGNORED event={event}', '-', '-')
         return {"received": True}
+    
+    session_id = payload.get('reference')
+    if not session_id:
+        log_event('WEBHOOK_ONECOM_NO_REFERENCE', '-', '-')
+        return JSONResponse(status_code=400, content={"error": "No reference (session_id) in webhook"})
+    
+    try:
+        sessions = load_sessions()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+    session = next((s for s in sessions if s.get('id') == session_id), None)
+    if not session:
+        log_event(f'WEBHOOK_ONECOM_SESSION_NOT_FOUND session_id={session_id[:8]}', '-', '-')
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    
+    if session.get('status') in ['paid', 'failed']:
+        return {"success": True, "message": f"Session already in terminal state: {session.get('status')}"}
+    
+    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
+        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
+    
+    session['status'] = 'paid'
+    session['payment_status'] = 'completed'
+    session['paid_at'] = datetime.utcnow().isoformat()
+    session['payment_provider'] = 'onecom'
+    session['onecom_txn_id'] = payload.get('payload', {}).get('txn_id')
+    session['metadata']['webhook_sources'].append('onecom')
+    
+    try:
+        invoices = load_invoices()
+    except Exception:
+        invoices = []
+    
+    invoice = {
+        'id': str(uuid.uuid4()),
+        'session_id': session_id,
+        'merchant_id': session.get('merchant_id'),
+        'amount': payload.get('amount', session.get('amount')),
+        'currency': payload.get('currency', 'USD'),
+        'mode': session.get('mode', 'test'),
+        'status': 'paid',
+        'payment_provider': 'onecom',
+        'onecom_txn_id': payload.get('payload', {}).get('txn_id'),
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    invoices.append(invoice)
+    
+    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
+    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
+    
+    try:
+        save_sessions(sessions)
+        save_invoices(invoices)
+    except Exception as e:
+        log_event(f'WEBHOOK_ONECOM_PERSIST_FAILED {str(e)[:50]}', '-', '-')
+        return JSONResponse(status_code=500, content={"error": "Failed to persist"})
+    
+    log_event(f'WEBHOOK_ONECOM_SUCCESS session_id={session_id[:8]} amount={payload.get("amount")}', '-', '-')
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "invoice": invoice,
+        "api_key_generated": api_key.get('id'),
+        "customer_access": access_link,
+    }
+
+
+@app.post('/webhooks/web3')
+def webhook_web3(payload: dict = Body(...), request: Request = None):
+    """Web3 webhook: blockchain payment verification."""
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
+    
+    event = payload.get('event', '')
+    if event not in ['payment.confirmed', 'transfer.confirmed']:
+        log_event(f'WEBHOOK_WEB3_IGNORED event={event}', '-', '-')
+        return {"received": True}
+    
+    session_id = payload.get('session_id')
+    if not session_id:
+        return JSONResponse(status_code=400, content={"error": "No session_id"})
+    
+    try:
+        sessions = load_sessions()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+    session = next((s for s in sessions if s.get('id') == session_id), None)
+    if not session:
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    
+    if session.get('status') in ['paid', 'failed']:
+        return {"success": True, "message": f"Already in {session.get('status')}"}
+    
+    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
+        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
+    
+    session['status'] = 'paid'
+    session['payment_status'] = 'completed'
+    session['paid_at'] = datetime.utcnow().isoformat()
+    session['payment_provider'] = 'web3'
+    session['blockchain_tx_id'] = payload.get('blockchain_tx_id')
+    session['blockchain_network'] = payload.get('network')
+    session['metadata']['webhook_sources'].append('web3')
+    
+    try:
+        invoices = load_invoices()
+    except Exception:
+        invoices = []
+    
+    invoice = {
+        'id': str(uuid.uuid4()),
+        'session_id': session_id,
+        'merchant_id': session.get('merchant_id'),
+        'amount': payload.get('amount', session.get('amount')),
+        'mode': session.get('mode', 'test'),
+        'status': 'paid',
+        'payment_provider': 'web3',
+        'blockchain_tx_id': payload.get('blockchain_tx_id'),
+        'blockchain_network': payload.get('network'),
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    invoices.append(invoice)
+    
+    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
+    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
+    
+    try:
+        save_sessions(sessions)
+        save_invoices(invoices)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+    log_event(f'WEBHOOK_WEB3_SUCCESS session_id={session_id[:8]} tx_id={payload.get("blockchain_tx_id")[:16]}', '-', '-')
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "invoice": invoice,
+        "api_key_generated": api_key.get('id'),
+        "customer_access": access_link,
+        "blockchain_tx": payload.get('blockchain_tx_id'),
+    }
+
+
+@app.get('/session/{session_id}/status')
+def get_session_status(session_id: str):
+    """Public endpoint to check session payment status."""
+    try:
+        sessions = load_sessions()
+    except Exception:
+        return JSONResponse(status_code=500, content={"error": "Failed to load sessions"})
+    
+    session = next((s for s in sessions if s.get('id') == session_id), None)
+    if not session:
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    
+    return {
+        "session_id": session_id,
+        "status": session.get('status'),
+        "payment_status": session.get('payment_status'),
+        "payment_provider": session.get('payment_provider'),
+        "paid_at": session.get('paid_at'),
+        "amount": session.get('amount'),
+        "created_at": session.get('created_at'),
+    }

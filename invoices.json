@@ -26,5 +26,27 @@
         "payment_system": "web2",
         "blockchain_tx_id": null,
         "created_at": "2026-02-02T18:47:45.677441"
+    },
+    {
+        "id": "61451a5b-0979-4aca-a9c3-99e906f8da6a",
+        "session_id": "b26a6c97-8fa0-4f90-80ac-dda93f0d2fc6",
+        "merchant_id": 1,
+        "amount": 99.99,
+        "mode": "test",
+        "status": "paid",
+        "payment_provider": "stripe",
+        "stripe_intent_id": "pi_stripe_123",
+        "created_at": "2026-02-08T15:28:39.787946"
+    },
+    {
+        "id": "2f0782d7-b8ad-4c8d-8d6e-c58fb7963f0a",
+        "session_id": "0a5aa39d-a0fd-44a4-911d-c3aac8731b85",
+        "merchant_id": 1,
+        "amount": 99.99,
+        "mode": "test",
+        "status": "paid",
+        "payment_provider": "stripe",
+        "stripe_intent_id": "pi_stripe_123",
+        "created_at": "2026-02-08T15:28:53.943792"
     }
 ]

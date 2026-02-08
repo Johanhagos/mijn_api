@@ -57,5 +57,60 @@
         "cancel_url": "https://example.com/cancel",
         "url": "https://api.apiblockchain.io/checkout?session=0a148e14-ea07-4589-992d-59ad37c4ac44",
         "created_at": "2026-02-04T20:04:27.380456"
+    },
+    {
+        "id": "8275a819-6b07-4c6c-9803-cb64fc937925",
+        "merchant_id": 1,
+        "amount": 10.0,
+        "mode": "test",
+        "status": "created",
+        "success_url": "https://example.com/success",
+        "cancel_url": "https://example.com/cancel",
+        "url": "https://api.apiblockchain.io/checkout?session=8275a819-6b07-4c6c-9803-cb64fc937925",
+        "created_at": "2026-02-04T20:32:10.360681"
+    },
+    {
+        "id": "b26a6c97-8fa0-4f90-80ac-dda93f0d2fc6",
+        "merchant_id": 1,
+        "amount": 99.99,
+        "mode": "test",
+        "status": "paid",
+        "payment_status": "completed",
+        "success_url": "https://example.com/success",
+        "cancel_url": "https://example.com/cancel",
+        "url": "https://api.apiblockchain.io/checkout?session=b26a6c97-8fa0-4f90-80ac-dda93f0d2fc6",
+        "created_at": "2026-02-08T15:28:39.576202",
+        "metadata": {
+            "customer_email": "customer@example.com",
+            "customer_name": "John Doe",
+            "webhook_sources": [
+                "stripe"
+            ]
+        },
+        "paid_at": "2026-02-08T15:28:39.768289",
+        "payment_provider": "stripe",
+        "stripe_intent_id": "pi_stripe_123"
+    },
+    {
+        "id": "0a5aa39d-a0fd-44a4-911d-c3aac8731b85",
+        "merchant_id": 1,
+        "amount": 99.99,
+        "mode": "test",
+        "status": "paid",
+        "payment_status": "completed",
+        "success_url": "https://example.com/success",
+        "cancel_url": "https://example.com/cancel",
+        "url": "https://api.apiblockchain.io/checkout?session=0a5aa39d-a0fd-44a4-911d-c3aac8731b85",
+        "created_at": "2026-02-08T15:28:53.872079",
+        "metadata": {
+            "customer_email": "customer@example.com",
+            "customer_name": "John Doe",
+            "webhook_sources": [
+                "stripe"
+            ]
+        },
+        "paid_at": "2026-02-08T15:28:53.913526",
+        "payment_provider": "stripe",
+        "stripe_intent_id": "pi_stripe_123"
     }
 ]
