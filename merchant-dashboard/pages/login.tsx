@@ -4,19 +4,21 @@ import api from '../lib/api';
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [identifier, setIdentifier] = useState(''); // username or email
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault(); // 🔥 THIS IS THE MISSING PIECE
+    e.preventDefault();
 
     setError(null as any);
     setLoading(true);
 
     try {
-      const res: any = await api.login(email, password);
+      // Send as 'name' field if it looks like a username, otherwise as 'email'
+      const isEmail = identifier.includes('@');
+      const res: any = await api.login(isEmail ? '' : identifier, password, isEmail ? identifier : undefined);
 
       // store access token under `jwt` (used by lib/api and protectedApi)
       if (res?.access_token) localStorage.setItem('jwt', res.access_token);
@@ -66,10 +68,10 @@ export default function Login() {
         <h1 className="text-2xl font-bold mb-4">Merchant Login</h1>
         {error && <p className="text-red-600">{error}</p>}
         <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
+          type="text"
+          placeholder="Username or Email"
+          value={identifier}
+          onChange={e => setIdentifier(e.target.value)}
           className="border p-2 rounded"
           required
         />
@@ -88,12 +90,11 @@ export default function Login() {
           <h2 className="text-lg font-semibold">Forgot your password?</h2>
           <div className="flex gap-2 mt-2" role="form">
             <input
-              type="email"
+              type="text"
               placeholder="Email or username"
               value={forgotEmail}
               onChange={e => setForgotEmail(e.target.value)}
               className="border p-2 rounded flex-1"
-              required
             />
             <button type="button" onClick={handleForgot} disabled={forgotLoading} className="bg-gray-600 text-white p-2 rounded">{forgotLoading ? 'Sending…' : 'Reset'}</button>
           </div>

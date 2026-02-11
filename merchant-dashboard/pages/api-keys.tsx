@@ -131,7 +131,6 @@ function ApiKeys() {
       )}
       </div>
     </AuthGuard>
-    </div>
   );
 }
 

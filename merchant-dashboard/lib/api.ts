@@ -16,7 +16,7 @@ export const api = async (path: string, method = 'GET', data?: any) => {
   return res.json();
 };
 
-export const login = async (name: string, password: string) => {
+export const login = async (name: string, password: string, email?: string) => {
   // In the browser, proxy login through Next (`/api/login`) to avoid CORS
   // issues during local development. The Next API route will forward the
   // request to the backend and relay cookies.
@@ -25,7 +25,11 @@ export const login = async (name: string, password: string) => {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, password }),
+    body: JSON.stringify({ 
+      name: name || undefined,
+      email: email || undefined,
+      password 
+    }),
     credentials: 'include',
   });
   if (!res.ok) throw new Error(await res.text());

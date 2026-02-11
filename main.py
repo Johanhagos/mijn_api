@@ -249,8 +249,17 @@ class PublicUser(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    name: str
+    name: str | None = None  # username (can login by username or email)
+    email: str | None = None  # email (alternative to username)
     password: str
+
+    def get_identifier(self) -> str:
+        """Return either the name or email, whichever is provided."""
+        if self.name:
+            return self.name
+        if self.email:
+            return self.email
+        raise ValueError("Either 'name' (username) or 'email' must be provided")
 
 
 class RoleUpdate(BaseModel):
@@ -687,7 +696,13 @@ async def login_for_access_token(
     response: Response,
     login: LoginRequest = Body(...)
 ):
-    if is_locked(login.name):
+    # Get the identifier (username or email, whichever is provided)
+    try:
+        identifier = login.get_identifier()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if is_locked(identifier):
         raise HTTPException(
             status_code=403,
             detail="Account temporarily locked due to too many failed login attempts. Try again later."
@@ -696,7 +711,12 @@ async def login_for_access_token(
     ip = get_client_ip(request)
 
     users = load_users()
-    user = next((u for u in users if u["name"] == login.name), None)
+    # Search by username or email
+    user = None
+    if login.name:
+        user = next((u for u in users if u["name"] == login.name), None)
+    elif login.email:
+        user = next((u for u in users if u.get("email") == login.email), None)
 
     stored_pw = user.get("password") if user else None
     valid = False
@@ -713,11 +733,11 @@ async def login_for_access_token(
             valid = False
 
     if not user or not valid:
-        log_event("LOGIN_FAIL", login.name, ip)
-        register_failed_attempt(login.name)
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        log_event("LOGIN_FAIL", identifier, ip)
+        register_failed_attempt(identifier)
+        raise HTTPException(status_code=401, detail="Invalid username/email or password")
 
-    clear_attempts(login.name)
+    clear_attempts(identifier)
 
     access_token = create_access_token(
         data={"sub": user["name"], "role": user.get("role", "user")}

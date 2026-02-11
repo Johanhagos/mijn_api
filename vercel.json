@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "buildCommand": "cd merchant-dashboard && npm install && npm run build",
+  "outputDirectory": "merchant-dashboard/.next",
+  "installCommand": "npm install --prefix ./merchant-dashboard",
+  "framework": "nextjs",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/merchant-dashboard/$1"
+    }
+  ]
+}
