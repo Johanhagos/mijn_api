@@ -164,9 +164,14 @@ export default function Invoices() {
               <h1 className="text-4xl font-bold text-gray-900 mb-2">Invoices</h1>
               <p className="text-gray-600">Manage, view, and download your merchant invoices</p>
             </div>
-            <Link href="/dashboard" className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
-              Dashboard
-            </Link>
+            <div className="flex gap-3">
+              <Link href="/invoices/create" className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium transition">
+                ➕ Create Invoice
+              </Link>
+              <Link href="/dashboard" className="px-4 py-2 rounded bg-gray-600 text-white hover:bg-gray-700 text-sm font-medium transition">
+                Dashboard
+              </Link>
+            </div>
           </div>
 
           {loading ? (
