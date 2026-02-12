@@ -991,14 +991,28 @@ class InvoicePDFRequest(BaseModel):
 class InvoiceCreate(BaseModel):
     seller_name: str
     seller_vat: Optional[str] = None
+    seller_address: Optional[str] = None
+    seller_country: Optional[str] = None
     buyer_name: str
     buyer_vat: Optional[str] = None
-    invoice_number: Optional[str] = None
+    buyer_address: Optional[str] = None
+    buyer_country: Optional[str] = None
+    buyer_type: Optional[str] = None  # "B2B" or "B2C"
+    invoice_number: Optional[str] = None  # Auto-generated if not provided
     order_number: Optional[str] = None
     date_issued: Optional[str] = Field(default_factory=lambda: datetime.now(timezone.utc).date().isoformat())
+    due_date: Optional[str] = None
     items: Optional[List[dict]] = []
-    payment_system: Optional[str] = "web2"
+    subtotal: Optional[float] = None
+    vat_rate: Optional[float] = None  # Percentage (e.g., 21 for 21% VAT)
+    vat_amount: Optional[float] = None  # Auto-calculated if not provided
+    total: Optional[float] = None  # Auto-calculated if not provided
+    payment_system: Optional[str] = "web2"  # "web2" or "web3"
     blockchain_tx_id: Optional[str] = None
+    description: Optional[str] = None
+    notes: Optional[str] = None
+    status: Optional[str] = "issued"  # "issued", "paid", "void", "draft"
+    merchant_logo_url: Optional[str] = None
 
 
 class InvoiceOut(BaseModel):
@@ -1006,13 +1020,45 @@ class InvoiceOut(BaseModel):
     invoice_number: Optional[str] = None
     order_number: Optional[str] = None
     seller_name: Optional[str] = None
+    seller_address: Optional[str] = None
+    seller_country: Optional[str] = None
+    seller_vat: Optional[str] = None
     buyer_name: Optional[str] = None
+    buyer_address: Optional[str] = None
+    buyer_country: Optional[str] = None
+    buyer_vat: Optional[str] = None
+    buyer_type: Optional[str] = None
     subtotal: float = 0.0
+    vat_rate: Optional[float] = None
     vat_amount: float = 0.0
     total: float = 0.0
     payment_system: Optional[str] = None
     blockchain_tx_id: Optional[str] = None
     pdf_url: Optional[str] = None
+    status: Optional[str] = "issued"
+    created_at: Optional[str] = None
+    due_date: Optional[str] = None
+    notes: Optional[str] = None
+    merchant_logo_url: Optional[str] = None
+
+
+class CreditNoteCreate(BaseModel):
+    invoice_id: str  # Reference to original invoice
+    amount: float
+    vat_amount: Optional[float] = None
+    reason: str  # "full_refund", "partial_refund", etc.
+    description: Optional[str] = None
+
+
+class CreditNoteOut(BaseModel):
+    id: str
+    credit_note_number: str
+    invoice_reference: str
+    amount: float
+    vat_amount: float = 0.0
+    reason: str
+    description: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
@@ -1031,12 +1077,12 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     # Left side: Invoice title and numbers
     # Right side: Seller company info
     pdf.set_font("Arial", "B", size=20)
-    pdf.set_text_color(0, 51, 102)  # Dark blue
+    pdf.set_text_color(34, 139, 34)  # Nature green (Forest Green)
     pdf.cell(100, 12, "INVOICE", ln=False)
     
     # Seller info on right
     pdf.set_font("Arial", "B", size=10)
-    pdf.set_text_color(0, 51, 102)
+    pdf.set_text_color(34, 139, 34)  # Nature green
     pdf.cell(0, 6, "SELLER", ln=True, align="R")
     pdf.set_font("Arial", size=9)
     pdf.set_text_color(0, 0, 0)
@@ -1085,7 +1131,7 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     
     # ========== BILLING ADDRESS (LEFT) & ADDITIONAL INFO (RIGHT) ==========
     pdf.set_font("Arial", "B", size=11)
-    pdf.set_text_color(0, 51, 102)
+    pdf.set_text_color(34, 139, 34)  # Nature green
     pdf.cell(95, 6, "BILL TO", ln=False)
     pdf.cell(0, 6, "ORDER INFORMATION", ln=True, align="R")
     pdf.set_text_color(0, 0, 0)
@@ -1129,9 +1175,9 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     
     pdf.ln(4)
     
-    # ========== 4️⃣ DESCRIPTION TABLE (Tax-Safe Format) ==========
+    # ========== DESCRIPTION TABLE (Tax-Safe Format) ==========
     pdf.set_font("Arial", "B", size=9)
-    pdf.set_fill_color(0, 51, 102)  # Dark blue header
+    pdf.set_fill_color(34, 139, 34)  # Nature green header
     pdf.set_text_color(255, 255, 255)  # White text
     pdf.cell(75, 7, "Description", border=1, fill=True, align="L")
     pdf.cell(15, 7, "Qty", border=1, fill=True, align="C")
@@ -1171,16 +1217,16 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     # Total (Gross)
     pdf.set_x(x_right)
     pdf.set_font("Arial", "B", size=11)
-    pdf.set_text_color(0, 51, 102)
+    pdf.set_text_color(34, 139, 34)  # Nature green
     pdf.cell(35, 7, "TOTAL:", align="L")
     pdf.cell(0, 7, f"{currency} {total_amount:.2f}", align="R", ln=True)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
     
-    # ========== 5️⃣ TAX INFORMATION SECTION (Flexible) ==========
+    # ========== TAX INFORMATION SECTION (Flexible) ==========
     if data.is_reverse_charge or data.is_export or data.is_outside_scope or data.tax_exempt_reason or data.tax_treatment:
         pdf.set_font("Arial", "B", size=10)
-        pdf.set_text_color(0, 51, 102)
+        pdf.set_text_color(34, 139, 34)  # Nature green
         pdf.cell(0, 6, "TAX TREATMENT", ln=True)
         pdf.set_text_color(0, 0, 0)
         pdf.set_font("Arial", size=8)
@@ -1199,9 +1245,9 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
             pdf.cell(0, 4, "Tax calculated in accordance with local regulations.", ln=True)
         pdf.ln(2)
     
-    # ========== 6️⃣ PAYMENT INFORMATION ==========
+    # ========== PAYMENT INFORMATION ==========
     pdf.set_font("Arial", "B", size=10)
-    pdf.set_text_color(0, 51, 102)
+    pdf.set_text_color(34, 139, 34)  # Nature green
     pdf.cell(0, 6, "PAYMENT INFORMATION", ln=True)
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", size=9)
@@ -1297,34 +1343,134 @@ async def invoice_pdf(req: InvoicePDFRequest):
         raise HTTPException(status_code=500, detail="Internal server error while generating PDF")
 
 
+# ========== INVOICE NUMBERING HELPERS ==========
+def get_next_invoice_number(merchant_id: int = None) -> str:
+    """Get next sequential invoice number (e.g., INV-2026-0001)."""
+    invoices = load_invoices()
+    year = datetime.now(timezone.utc).year
+    
+    # Find max invoice number for this year
+    max_num = 0
+    for inv in invoices:
+        inv_num = inv.get("invoice_number", "")
+        if inv_num.startswith(f"INV-{year}-"):
+            try:
+                num = int(inv_num.split("-")[-1])
+                if num > max_num:
+                    max_num = num
+            except (ValueError, IndexError):
+                pass
+    
+    return f"INV-{year}-{max_num + 1:04d}"
+
+
+def calculate_vat(subtotal: float, vat_rate: float = 0) -> tuple:
+    """Calculate VAT amount and total.
+    
+    Args:
+        subtotal: Net amount before VAT
+        vat_rate: VAT percentage (0-100)
+    
+    Returns:
+        (vat_amount, total_with_vat)
+    """
+    if vat_rate <= 0:
+        return 0.0, subtotal
+    
+    vat_amount = round(subtotal * (vat_rate / 100), 2)
+    total = round(subtotal + vat_amount, 2)
+    return vat_amount, total
+
+
+def create_credit_note_number(merchant_id: int = None) -> str:
+    """Generate credit note number (e.g., CN-2026-0001)."""
+    invoices = load_invoices()
+    year = datetime.now(timezone.utc).year
+    
+    max_num = 0
+    for inv in invoices:
+        cn_num = inv.get("credit_note_number", "")
+        if cn_num.startswith(f"CN-{year}-"):
+            try:
+                num = int(cn_num.split("-")[-1])
+                if num > max_num:
+                    max_num = num
+            except (ValueError, IndexError):
+                pass
+    
+    return f"CN-{year}-{max_num + 1:04d}"
+
+
 @app.post("/invoices", response_model=InvoiceOut, status_code=201)
 async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(get_current_user)):
-    """Create and persist an invoice. Returns invoice metadata and PDF URL when available."""
-    # compute totals
-    items = payload.items or []
-    subtotal, vat_total, total = _compute_invoice_totals(items)
-
+    """Create and persist an invoice with automatic numbering and VAT calculation."""
+    import uuid
+    
     invoices = load_invoices()
-    next_id = (max((inv.get("id", 0) for inv in invoices), default=0) + 1)
-
-    invoice_number = payload.invoice_number or f"INV-{next_id:06d}"
+    
+    # Generate unique ID
+    unique_id = str(uuid.uuid4())
+    
+    # Auto-generate invoice number if not provided
+    invoice_number = payload.invoice_number or get_next_invoice_number()
+    
+    # Calculate VAT and totals
+    subtotal = payload.subtotal
+    if subtotal is None and payload.items:
+        subtotal = sum(item.get("quantity", 1) * item.get("unit_price", 0) for item in payload.items)
+    subtotal = subtotal or 0.0
+    
+    # Determine VAT rate
+    vat_rate = 0.0
+    if payload.buyer_type == "B2B" and payload.buyer_vat:
+        # B2B with VAT number: reverse charge (0% VAT)
+        vat_rate = 0.0
+    elif payload.vat_rate is not None:
+        vat_rate = payload.vat_rate
+    else:
+        # Default: 21% VAT (adjustable by merchant later)
+        vat_rate = 21.0
+    
+    vat_amount, total = calculate_vat(subtotal, vat_rate)
+    
+    # If user provided vat_amount, use it (for special cases)
+    if payload.vat_amount is not None:
+        vat_amount = payload.vat_amount
+        total = subtotal + vat_amount
+    
+    # If user provided total, recalculate vat_amount
+    if payload.total is not None:
+        total = payload.total
+        vat_amount = total - subtotal
 
     inv = {
-        "id": next_id,
+        "id": unique_id,
         "invoice_number": invoice_number,
         "order_number": payload.order_number,
         "seller_name": payload.seller_name,
         "seller_vat": payload.seller_vat,
+        "seller_address": payload.seller_address,
+        "seller_country": payload.seller_country,
         "buyer_name": payload.buyer_name,
         "buyer_vat": payload.buyer_vat,
-        "date_issued": payload.date_issued,
-        "items": items,
-        "subtotal": subtotal,
-        "vat_amount": vat_total,
-        "total": total,
-        "payment_system": payload.payment_system,
+        "buyer_address": payload.buyer_address,
+        "buyer_country": payload.buyer_country,
+        "buyer_type": payload.buyer_type,
+        "date_issued": payload.date_issued or datetime.now(timezone.utc).date().isoformat(),
+        "due_date": payload.due_date,
+        "items": payload.items or [],
+        "subtotal": round(subtotal, 2),
+        "vat_rate": vat_rate,
+        "vat_amount": round(vat_amount, 2),
+        "total": round(total, 2),
+        "payment_system": payload.payment_system or "web2",
         "blockchain_tx_id": payload.blockchain_tx_id,
+        "description": payload.description,
+        "notes": payload.notes,
+        "status": payload.status or "issued",
+        "merchant_logo_url": payload.merchant_logo_url,
         "created_by": current_user.get("name"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     invoices.append(inv)
@@ -1338,12 +1484,25 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
     pdf_url = None
     try:
         pdf_req = InvoicePDFRequest(
-            seller=inv["seller_name"],
-            buyer=inv["buyer_name"],
+            logo_url=inv.get("merchant_logo_url"),
             invoice_number=inv["invoice_number"],
-            date=inv.get("date_issued"),
-            description=payload.items[0].get("description") if payload.items else "",
-            amount=inv["total"],
+            invoice_date=inv.get("date_issued"),
+            seller=inv["seller_name"],
+            seller_vat=inv.get("seller_vat"),
+            seller_address=inv.get("seller_address"),
+            seller_country=inv.get("seller_country"),
+            buyer=inv["buyer_name"],
+            buyer_vat=inv.get("buyer_vat"),
+            buyer_address=inv.get("buyer_address"),
+            buyer_country=inv.get("buyer_country"),
+            buyer_type=inv.get("buyer_type"),
+            description=inv.get("description") or (payload.items[0].get("description") if payload.items else ""),
+            quantity=payload.items[0].get("quantity", 1) if payload.items else 1,
+            unit_price=payload.items[0].get("unit_price", 0) if payload.items else 0,
+            net_amount=inv["subtotal"],
+            vat_amount=inv["vat_amount"],
+            vat_rate=vat_rate,
+            total_amount=inv["total"],
             payment_system=inv.get("payment_system", "web2"),
             blockchain_tx_id=inv.get("blockchain_tx_id"),
         )
@@ -1351,26 +1510,46 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
         pdf_bytes = render_invoice_pdf(pdf_req)
         ensure_invoice_pdf_dir()
         if not READ_ONLY_FS and INVOICE_PDF_DIR.exists():
-            pdf_path = INVOICE_PDF_DIR / f"invoice-{next_id}.pdf"
+            pdf_path = INVOICE_PDF_DIR / f"invoice-{unique_id}.pdf"
             pdf_path.write_bytes(pdf_bytes)
             pdf_url = str(pdf_path)
-    except Exception:
+    except Exception as e:
+        logger = logging.getLogger("uvicorn.error")
+        logger.exception("Error generating invoice PDF")
         pdf_url = None
 
     inv["pdf_url"] = pdf_url
+    
+    # Update saved invoice with PDF URL
+    invoices[-1] = inv
+    try:
+        save_invoices(invoices)
+    except RuntimeError:
+        pass
 
     return InvoiceOut(
         id=inv["id"],
         invoice_number=inv["invoice_number"],
         order_number=inv.get("order_number"),
         seller_name=inv["seller_name"],
+        seller_address=inv.get("seller_address"),
+        seller_vat=inv.get("seller_vat"),
         buyer_name=inv["buyer_name"],
+        buyer_address=inv.get("buyer_address"),
+        buyer_vat=inv.get("buyer_vat"),
+        buyer_type=inv.get("buyer_type"),
         subtotal=inv["subtotal"],
+        vat_rate=inv.get("vat_rate"),
         vat_amount=inv["vat_amount"],
         total=inv["total"],
         payment_system=inv.get("payment_system"),
         blockchain_tx_id=inv.get("blockchain_tx_id"),
         pdf_url=inv.get("pdf_url"),
+        status=inv.get("status"),
+        created_at=inv.get("created_at"),
+        due_date=inv.get("due_date"),
+        notes=inv.get("notes"),
+        merchant_logo_url=inv.get("merchant_logo_url"),
     )
 
 
@@ -1382,14 +1561,126 @@ async def list_invoices(current_user: dict = Depends(get_current_user)):
         "invoice_number": inv.get("invoice_number"),
         "order_number": inv.get("order_number"),
         "seller_name": inv.get("seller_name"),
+        "seller_address": inv.get("seller_address"),
+        "seller_vat": inv.get("seller_vat"),
         "buyer_name": inv.get("buyer_name"),
+        "buyer_address": inv.get("buyer_address"),
+        "buyer_vat": inv.get("buyer_vat"),
+        "buyer_type": inv.get("buyer_type"),
         "subtotal": inv.get("subtotal", 0),
+        "vat_rate": inv.get("vat_rate"),
         "vat_amount": inv.get("vat_amount", 0),
         "total": inv.get("total", 0),
         "payment_system": inv.get("payment_system"),
         "blockchain_tx_id": inv.get("blockchain_tx_id"),
         "pdf_url": inv.get("pdf_url"),
+        "status": inv.get("status", "issued"),
+        "created_at": inv.get("created_at"),
+        "due_date": inv.get("due_date"),
+        "notes": inv.get("notes"),
+        "merchant_logo_url": inv.get("merchant_logo_url"),
     }) for inv in invoices]
+
+
+@app.post("/invoices/{invoice_id}/void")
+async def void_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+    """Mark an invoice as VOID without reusing its number. Only works for non-sent invoices."""
+    invoices = load_invoices()
+    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+    
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # Only allow voiding drafted/non-sent invoices
+    if inv.get("status") in ["paid", "refunded"]:
+        raise HTTPException(status_code=400, detail="Cannot void a paid or refunded invoice")
+    
+    inv["status"] = "void"
+    inv["voided_at"] = datetime.now(timezone.utc).isoformat()
+    inv["voided_by"] = current_user.get("name")
+    
+    try:
+        save_invoices(invoices)
+    except RuntimeError:
+        pass
+    
+    return {"status": "voided", "invoice_id": invoice_id, "invoice_number": inv.get("invoice_number")}
+
+
+@app.post("/credit-notes", response_model=CreditNoteOut, status_code=201)
+async def create_credit_note(payload: CreditNoteCreate, current_user: dict = Depends(get_current_user)):
+    """Create a credit note referencing an original invoice. This handles refunds without modifying the original."""
+    invoices = load_invoices()
+    
+    # Find original invoice
+    original_inv = next((i for i in invoices if i.get("id") == payload.invoice_id), None)
+    if not original_inv:
+        raise HTTPException(status_code=404, detail="Referenced invoice not found")
+    
+    credit_note_num = create_credit_note_number()
+    
+    credit_note = {
+        "id": str(uuid.uuid4()),
+        "type": "credit_note",
+        "credit_note_number": credit_note_num,
+        "invoice_reference": original_inv.get("invoice_number"),
+        "invoice_id": payload.invoice_id,
+        "amount": payload.amount,
+        "vat_amount": payload.vat_amount or 0,
+        "reason": payload.reason,  # "full_refund", "partial_refund", etc.
+        "description": payload.description,
+        "created_by": current_user.get("name"),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    
+    # Mark original invoice as having a credit note
+    if "credit_notes" not in original_inv:
+        original_inv["credit_notes"] = []
+    original_inv["credit_notes"].append(credit_note_num)
+    
+    invoices.append(credit_note)
+    try:
+        save_invoices(invoices)
+    except RuntimeError:
+        pass
+    
+    return CreditNoteOut(
+        id=credit_note["id"],
+        credit_note_number=credit_note["credit_note_number"],
+        invoice_reference=credit_note["invoice_reference"],
+        amount=credit_note["amount"],
+        vat_amount=credit_note["vat_amount"],
+        reason=credit_note["reason"],
+        description=credit_note["description"],
+        created_at=credit_note["created_at"],
+    )
+
+
+@app.get("/invoices/{invoice_id}/credit-notes", response_model=List[CreditNoteOut])
+async def get_invoice_credit_notes(invoice_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all credit notes for an invoice."""
+    invoices = load_invoices()
+    
+    # Find original invoice
+    original_inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+    if not original_inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    credit_notes = []
+    for cn in invoices:
+        if cn.get("type") == "credit_note" and cn.get("invoice_id") == invoice_id:
+            credit_notes.append(CreditNoteOut(
+                id=cn["id"],
+                credit_note_number=cn["credit_note_number"],
+                invoice_reference=cn["invoice_reference"],
+                amount=cn["amount"],
+                vat_amount=cn.get("vat_amount", 0),
+                reason=cn["reason"],
+                description=cn.get("description"),
+                created_at=cn.get("created_at"),
+            ))
+    
+    return credit_notes
 
 
 @app.get("/merchant/usage")
@@ -1461,6 +1752,62 @@ async def merchant_usage(request: Request):
 async def merchant_me(current_user: dict = Depends(get_current_user)):
     """Return merchant identity info (id, name, email if present)."""
     return {"id": current_user.get("id"), "name": current_user.get("name"), "email": current_user.get("email")}
+
+
+@app.post("/merchant/logo")
+async def upload_merchant_logo(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
+    """Upload merchant logo for use in invoices. Returns logo URL."""
+    if not file.filename or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+    
+    # Validate file size (max 2MB)
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large (max 2MB)")
+    
+    # Generate filename
+    merchant_id = current_user.get("id", "unknown")
+    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    filename = f"merchant-{merchant_id}-logo.{ext}"
+    
+    # Save to LOGOS directory
+    logo_dir = DATA_DIR / "logos"
+    try:
+        logo_dir.mkdir(parents=True, exist_ok=True)
+        logo_path = logo_dir / filename
+        logo_path.write_bytes(content)
+        logo_url = str(logo_path)
+        
+        return {
+            "status": "success",
+            "logo_url": logo_url,
+            "filename": filename,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save logo: {str(e)}")
+
+
+@app.get("/merchant/logo")
+async def get_merchant_logo(current_user: dict = Depends(get_current_user)):
+    """Get merchant's uploaded logo URL if it exists."""
+    merchant_id = current_user.get("id", "unknown")
+    logo_dir = DATA_DIR / "logos"
+    
+    # Check for common logo files
+    for ext in ["png", "jpg", "jpeg", "gif", "webp"]:
+        logo_path = logo_dir / f"merchant-{merchant_id}-logo.{ext}"
+        if logo_path.exists():
+            return {
+                "status": "success",
+                "logo_url": str(logo_path),
+                "filename": logo_path.name,
+            }
+    
+    return {
+        "status": "not_found",
+        "logo_url": None,
+        "message": "No logo uploaded yet"
+    }
 
 
 class APIKeyCreate(BaseModel):
