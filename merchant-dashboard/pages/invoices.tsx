@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Link from 'next/link';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
 import Header from '../components/Header';
