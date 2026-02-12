@@ -1417,8 +1417,14 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
     # Calculate VAT and totals
     subtotal = payload.subtotal
     if subtotal is None and payload.items:
-        subtotal = sum(item.get("quantity", 1) * item.get("unit_price", 0) for item in payload.items)
-    subtotal = subtotal or 0.0
+        try:
+            subtotal = sum(float(str(item.get("quantity", 1)).strip() or 1) * float(str(item.get("unit_price", 0)).strip() or 0) for item in payload.items)
+        except (ValueError, TypeError):
+            subtotal = 0.0
+    try:
+        subtotal = float(str(subtotal or 0).strip())
+    except (ValueError, TypeError):
+        subtotal = 0.0
     
     # Determine VAT rate
     vat_rate = 0.0
@@ -1730,7 +1736,16 @@ async def merchant_usage(request: Request):
 
     def _sum_total(lst):
         try:
-            return round(sum(float(i.get("total", 0) or 0) for i in lst), 2)
+            total = 0.0
+            for i in lst:
+                val = i.get("total", 0)
+                if val is None:
+                    val = 0
+                try:
+                    total += float(str(val).strip())
+                except (ValueError, TypeError):
+                    total += 0.0
+            return round(total, 2)
         except Exception:
             return 0.0
 
@@ -1755,8 +1770,14 @@ async def merchant_usage(request: Request):
                 # Parse date (format: 2026-02-12 or 2026-02-12T...)
                 date_str = created_at.split("T")[0] if "T" in created_at else created_at[:10]
                 if date_str in daily_revenue:
-                    daily_revenue[date_str] += float(inv.get("total", 0) or 0)
-        except:
+                    val = inv.get("total", 0)
+                    if val is None:
+                        val = 0
+                    try:
+                        daily_revenue[date_str] += float(str(val).strip())
+                    except (ValueError, TypeError):
+                        daily_revenue[date_str] += 0.0
+        except Exception:
             pass
     
     # Format as array for chart, sorted by date
