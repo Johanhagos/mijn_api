@@ -85,7 +85,7 @@ export default function Login() {
           className="border p-2 rounded"
           required
         />
-        <button disabled={loading} className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 disabled:opacity-50">
+        <button disabled={loading} className="bg-green-600 text-white p-2 rounded hover:bg-green-700 disabled:opacity-50">
           {loading ? 'Logging in…' : 'Login'}
         </button>
         <div className="mt-4 border-t pt-4">

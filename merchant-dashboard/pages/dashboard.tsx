@@ -5,6 +5,7 @@ import RevenueChart from '../components/RevenueChart';
 import PaymentDonut from '../components/PaymentDonut';
 import ApiKeysList from '../components/ApiKeysList';
 import PluginSetup from '../components/PluginSetup';
+import VATChecker from '../components/VATChecker';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -87,12 +88,18 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="col-span-3">
+            <VATChecker />
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 gap-4">
           <div className="col-span-2">
             <ApiKeysList keys={apiKeys.map((k: any) => ({ id: k.id, key_type: k.type, masked: k.masked || k.id, created_at: k.created_at }))} onRevoke={handleRevoke} />
           </div>
           <div>
-            <PluginSetup snippet={`<script src=\"/plugin.js\"></script>`} />
+            <PluginSetup snippet={`<script src="/plugin.js"></script>`} />
           </div>
         </div>
       </div>

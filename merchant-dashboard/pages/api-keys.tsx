@@ -91,7 +91,7 @@ function ApiKeys() {
           <div className="flex items-start gap-4 mt-2">
             <pre className="bg-white p-2 rounded text-sm break-all">{lastCreated}</pre>
             <div className="flex flex-col gap-2">
-              <button onClick={async () => { try { await navigator.clipboard.writeText(lastCreated); setCopiedId(-1); setTimeout(()=>setCopiedId(null),1500);} catch{} }} className="bg-blue-600 text-white px-3 py-1 rounded">{copiedId===-1 ? 'Copied!' : 'Copy'}</button>
+              <button onClick={async () => { try { await navigator.clipboard.writeText(lastCreated); setCopiedId(-1); setTimeout(()=>setCopiedId(null),1500);} catch{} }} className="bg-green-600 text-white px-3 py-1 rounded">{copiedId===-1 ? 'Copied!' : 'Copy'}</button>
               <button onClick={() => { setShowModal(false); setLastCreated(null); }} className="bg-gray-300 text-gray-800 px-3 py-1 rounded">Close</button>
             </div>
           </div>
@@ -114,7 +114,7 @@ function ApiKeys() {
                   onClick={async () => {
                     alert('Raw key material is only shown at creation time for security. Create a new key to receive the raw value.');
                   }}
-                  className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                  className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                 >
                   Copy
                 </button>

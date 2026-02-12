@@ -56,7 +56,7 @@ function PluginSetup() {
             </button>
           )}
           {key && (
-            <button onClick={() => { navigator.clipboard?.writeText(snippet(key)); }} className="bg-blue-600 text-white px-3 py-1 rounded">
+            <button onClick={() => { navigator.clipboard?.writeText(snippet(key)); }} className="bg-green-600 text-white px-3 py-1 rounded">
               Copy snippet
             </button>
           )}
@@ -91,7 +91,7 @@ function PluginSetup() {
             <div className="flex items-center gap-4 mt-2">
               <pre className="bg-white p-2 rounded break-all">{key}</pre>
               <div className="flex flex-col gap-2">
-                <button onClick={async () => { try { await navigator.clipboard.writeText(key); setCopied(true); setTimeout(()=>setCopied(false),1500);} catch{} }} className="bg-blue-600 text-white px-3 py-1 rounded">{copied ? 'Copied!' : 'Copy'}</button>
+                <button onClick={async () => { try { await navigator.clipboard.writeText(key); setCopied(true); setTimeout(()=>setCopied(false),1500);} catch{} }} className="bg-green-600 text-white px-3 py-1 rounded">{copied ? 'Copied!' : 'Copy'}</button>
                 <button onClick={() => setShowModal(false)} className="bg-gray-300 text-gray-800 px-3 py-1 rounded">Close</button>
               </div>
             </div>
