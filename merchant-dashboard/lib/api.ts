@@ -17,10 +17,8 @@ export const api = async (path: string, method = 'GET', data?: any) => {
 };
 
 export const login = async (name: string, password: string, email?: string) => {
-  // In the browser, proxy login through Next (`/api/login`) to avoid CORS
-  // issues during local development. The Next API route will forward the
-  // request to the backend and relay cookies.
-  const url = typeof window !== 'undefined' ? '/api/login' : `${API_BASE}/login`;
+  // Call backend API directly since CORS is configured for dashboard.apiblockchain.io
+  const url = `${API_BASE}/login`;
 
   const res = await fetch(url, {
     method: 'POST',
