@@ -134,10 +134,7 @@ export default function CreateInvoice() {
         subtotal: parseFloat((formData.quantity * formData.unit_price).toFixed(2)),
       };
 
-      const response = await api.protectedApi('/invoices', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
+      const response = await api.protectedApi('/invoices', 'POST', payload);
 
       if (response && response.invoice_number) {
         router.push(`/invoices/${response.id}`);
