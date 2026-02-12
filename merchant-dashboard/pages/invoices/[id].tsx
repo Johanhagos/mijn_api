@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import api from '../../lib/api';
 import AuthGuard from '../../components/AuthGuard';
-import Header from '../../components/Header';
 
 interface Invoice {
   id: string;
@@ -85,9 +84,7 @@ export default function InvoiceDetail() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-        <Header />
-        
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">        
         <div className="max-w-4xl mx-auto px-4 py-8">
           {/* Back Button */}
           <div className="mb-6">
