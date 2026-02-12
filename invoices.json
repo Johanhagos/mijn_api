@@ -146,5 +146,57 @@
         "notes": "Bulk order of premium white sugar for bakery production. Delivered 2026-02-12. Payment received via Stripe. Invoice generated for record keeping.",
         "created_at": "2026-02-12T10:30:00.000000",
         "due_date": "2026-02-26T00:00:00.000000"
+    },
+    {
+        "id": "9b7f3f1a-2b8d-4c7e-9f2a-7e9c4d6a1b22",
+        "merchant_id": 100,
+        "invoice_number": "INV-000003",
+        "order_number": "ORD-20260212-RND-771",
+        "invoice_date": "2026-02-12",
+        "supply_date": "2026-02-12",
+        "currency": "EUR",
+
+        "seller_name": "Nordic Arbor Supplies AB",
+        "seller_address": "Fjällgatan 12\n115 23 Stockholm\nSweden",
+        "seller_country": "Sweden",
+        "seller_vat": "SE556677889901",
+        "seller_registration_number": "556677-8899",
+        "seller_email": "billing@nordicarbor.se",
+        "seller_phone": "+46 8 555 012 34",
+
+        "buyer_name": "Greenfield Landscapes Ltd",
+        "buyer_address": "45 Meadow Park\nBristol BS1 4ND\nUnited Kingdom",
+        "buyer_country": "United Kingdom",
+        "buyer_vat": "GB123456789",
+        "buyer_registration_number": "09876543",
+        "buyer_email": "accounts@greenfield-landscapes.co.uk",
+        "buyer_phone": "+44 20 7946 0123",
+        "buyer_type": "B2B",
+
+        "description": "Landscape maintenance services (February)",
+        "items": [
+            {
+                "description": "On-site maintenance — 3 visits",
+                "quantity": 3,
+                "unit_price": 420.00,
+                "amount": 1260.00
+            }
+        ],
+
+        "subtotal": 1260.00,
+        "vat_rate": 20,
+        "vat_amount": 252.00,
+        "total": 1512.00,
+        "amount": 1512.00,
+
+        "mode": "live",
+        "status": "paid",
+        "payment_system": "web2",
+        "payment_provider": "stripe",
+        "stripe_intent_id": "pi_rnd_20260212_771",
+        "payment_terms": "Net 14",
+        "due_date": "2026-02-26T00:00:00.000000",
+
+        "notes": "Randomized demo invoice for dashboard testing. Service period: Feb 2026."
     }
 ]

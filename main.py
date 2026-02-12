@@ -108,6 +108,17 @@ if not READ_ONLY_FS:
         except Exception as e:
             print(f"[WARN] Could not copy users.json: {e}")
 
+# Initialize invoices.json from repo if not present in DATA_DIR
+if not READ_ONLY_FS and not (DATA_DIR / "invoices.json").exists():
+    repo_invoices = Path(__file__).parent / "invoices.json"
+    if repo_invoices.exists():
+        import shutil
+        try:
+            shutil.copy(str(repo_invoices), str(DATA_DIR / "invoices.json"))
+            print(f"[INFO] Initialized invoices.json from repo to {DATA_DIR}")
+        except Exception as e:
+            print(f"[WARN] Could not copy invoices.json: {e}")
+
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
 
@@ -896,14 +907,71 @@ from fpdf import FPDF
 
 
 class InvoicePDFRequest(BaseModel):
-    seller: Optional[str] = "Example Seller"
-    buyer: Optional[str] = "Example Buyer"
+    # ========== HEADER SECTION ==========
+    logo_url: Optional[str] = None
     invoice_number: Optional[str] = "INV-TEST-001"
-    date: Optional[str] = datetime.now(timezone.utc).date().isoformat()
-    description: Optional[str] = "Service"
-    amount: Optional[float] = 100.0
-    payment_system: Optional[str] = "web2"  # 'web2' or 'web3'
-    blockchain_tx_id: Optional[str] = None
+    invoice_date: Optional[str] = None  # e.g., "2026-02-12"
+    supply_date: Optional[str] = None  # If different from invoice date
+    currency: Optional[str] = "EUR"  # ISO code: EUR, USD, GBP, etc.
+    
+    # ========== SELLER INFORMATION (Legal Entity) ==========
+    seller: Optional[str] = "Example Seller"  # Legal business name
+    seller_address: Optional[str] = None  # Full address with country
+    seller_country: Optional[str] = None  # Country code or name
+    seller_registration_number: Optional[str] = None  # Company reg. number
+    seller_vat: Optional[str] = None  # VAT ID / Tax ID
+    seller_eori: Optional[str] = None  # EORI for international export
+    seller_email: Optional[str] = None
+    seller_phone: Optional[str] = None
+    
+    # ========== BUYER INFORMATION ==========
+    buyer: Optional[str] = "Example Buyer"  # Legal name
+    buyer_address: Optional[str] = None  # Full address with country
+    buyer_country: Optional[str] = None  # Country code or name
+    buyer_vat: Optional[str] = None  # VAT ID / Tax ID (for B2B reverse charge)
+    buyer_registration_number: Optional[str] = None  # Company reg. number
+    buyer_email: Optional[str] = None
+    buyer_phone: Optional[str] = None
+    buyer_type: Optional[str] = None  # "B2B" or "B2C" (affects tax treatment)
+    
+    # ========== DESCRIPTION TABLE (Tax-Safe Format) ==========
+    description: Optional[str] = "Service"  # Line item description
+    quantity: Optional[float] = 1.0
+    unit_price: Optional[float] = 100.0
+    net_amount: Optional[float] = None  # Subtotal before tax
+    vat_rate: Optional[float] = 0.0  # Tax rate percentage (e.g., 19.0 for 19%)
+    vat_amount: Optional[float] = None  # Tax amount
+    total_amount: Optional[float] = None  # Total amount gross
+    
+    # Legacy fields (for backward compatibility)
+    subtotal: Optional[float] = None  # Deprecated: use net_amount
+    amount: Optional[float] = None  # Deprecated: use total_amount
+    order_number: Optional[str] = None
+    due_date: Optional[str] = None
+    
+    # ========== TAX INFORMATION SECTION (Flexible) ==========
+    # Choose appropriate tax treatment statement
+    tax_treatment: Optional[str] = None  # E.g. "VAT calculated in accordance with local regulations"
+    is_reverse_charge: Optional[bool] = False  # EU reverse charge
+    is_export: Optional[bool] = False  # Export of services - VAT exempt
+    is_outside_scope: Optional[bool] = False  # Outside scope of VAT
+    tax_exempt_reason: Optional[str] = None  # E.g. "Charity donation", "Government agency"
+    
+    # ========== PAYMENT INFORMATION ==========
+    payment_terms: Optional[str] = None  # E.g. "14 days net", "Net 30"
+    payment_system: Optional[str] = "web2"  # web2 or web3
+    payment_provider: Optional[str] = None  # E.g. Stripe, PayPal
+    blockchain_tx_id: Optional[str] = None  # Blockchain reference
+    bank_name: Optional[str] = None
+    iban: Optional[str] = None
+    swift_bic: Optional[str] = None
+    alternative_payment_methods: Optional[str] = None  # Free text
+    late_payment_clause: Optional[str] = None  # E.g. interest rate info
+    
+    # ========== ADDITIONAL INFO ==========
+    notes: Optional[str] = None  # General notes
+    footer_statement: Optional[str] = None  # Legal footer text
+    registered_office: Optional[str] = None  # For footer
 
 
 class InvoiceCreate(BaseModel):
@@ -934,36 +1002,224 @@ class InvoiceOut(BaseModel):
 
 
 def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
+    """Render universal international invoice PDF compliant with EU, UK, US, and global tax jurisdictions."""
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.set_font("Arial", size=14)
-
-    pdf.cell(0, 10, f"Invoice {data.invoice_number}", ln=True, align="C")
-    pdf.ln(6)
-
-    pdf.set_font("Arial", size=12)
-    pdf.cell(0, 8, f"Seller: {data.seller}", ln=True)
-    pdf.cell(0, 8, f"Buyer: {data.buyer}", ln=True)
-    pdf.cell(0, 8, f"Date: {data.date}", ln=True)
-    pdf.ln(6)
-
-    pdf.cell(0, 8, f"Description: {data.description}", ln=True)
-    pdf.cell(0, 8, f"Amount: EUR {data.amount:.2f}", ln=True)
-    pdf.ln(6)
-
-    pdf.cell(0, 8, f"Payment system: {data.payment_system}", ln=True)
-    if data.payment_system == "web3" and data.blockchain_tx_id:
-        pdf.cell(0, 8, f"Blockchain TX ID: {data.blockchain_tx_id}", ln=True)
-
-    pdf.ln(10)
+    pdf.set_auto_page_break(auto=True, margin=10)
+    
+    # Normalize fields for backward compatibility
+    net_amount = data.net_amount or data.subtotal or (data.quantity * data.unit_price if data.quantity and data.unit_price else 0)
+    total_amount = data.total_amount or data.amount or (net_amount + (data.vat_amount or 0))
+    invoice_date = data.invoice_date or datetime.now(timezone.utc).date().isoformat()
+    currency = data.currency or "EUR"
+    
+    # ========== 1️⃣ HEADER SECTION ==========
+    if data.logo_url:
+        try:
+            pdf.image(data.logo_url, x=10, y=10, w=30)
+            pdf.set_xy(45, 15)
+        except:
+            pass  # Logo failed, continue without it
+    
+    pdf.set_font("Arial", "B", size=20)
+    pdf.set_text_color(0, 51, 102)  # Dark blue
+    pdf.cell(0, 12, "INVOICE", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(3)
+    
+    # Invoice header info
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 6, "This PDF was generated by the API for testing Web2 vs Web3 invoice rendering.")
-
-    # fpdf2: use `output(dest='S')` to get the PDF as a string, then encode to bytes
+    pdf.cell(50, 5, f"Invoice #: {data.invoice_number or 'N/A'}", ln=False)
+    pdf.cell(0, 5, f"Currency: {currency}", ln=True)
+    pdf.cell(50, 5, f"Invoice Date: {invoice_date}", ln=False)
+    if data.supply_date and data.supply_date != invoice_date:
+        pdf.cell(0, 5, f"Supply Date: {data.supply_date}", ln=True)
+    else:
+        pdf.ln(5)
+    pdf.ln(4)
+    
+    # ========== 2️⃣ SELLER INFORMATION (Legal Entity) ==========
+    pdf.set_font("Arial", "B", size=11)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 6, "SELLER INFORMATION", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", size=9)
+    
+    pdf.cell(0, 5, data.seller or "Unknown Seller", ln=True)
+    if data.seller_vat:
+        pdf.cell(0, 4, f"VAT / Tax ID: {data.seller_vat}", ln=True)
+    if data.seller_registration_number:
+        pdf.cell(0, 4, f"Company Reg: {data.seller_registration_number}", ln=True)
+    if data.seller_eori:
+        pdf.cell(0, 4, f"EORI: {data.seller_eori}", ln=True)
+    if data.seller_address:
+        for line in data.seller_address.split('\n'):
+            if line.strip():
+                pdf.cell(0, 4, line, ln=True)
+    if data.seller_country:
+        pdf.cell(0, 4, f"Country: {data.seller_country}", ln=True)
+    if data.seller_email:
+        pdf.cell(0, 4, f"Email: {data.seller_email}", ln=True)
+    if data.seller_phone:
+        pdf.cell(0, 4, f"Phone: {data.seller_phone}", ln=True)
+    pdf.ln(3)
+    
+    # ========== 3️⃣ BUYER INFORMATION ==========
+    pdf.set_font("Arial", "B", size=11)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 6, "BILL TO", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", size=9)
+    
+    pdf.cell(0, 5, data.buyer or "Unknown Buyer", ln=True)
+    if data.buyer_vat:
+        pdf.cell(0, 4, f"VAT / Tax ID: {data.buyer_vat}", ln=True)
+    if data.buyer_registration_number:
+        pdf.cell(0, 4, f"Company Reg: {data.buyer_registration_number}", ln=True)
+    if data.buyer_email:
+        pdf.cell(0, 4, f"Email: {data.buyer_email}", ln=True)
+    if data.buyer_phone:
+        pdf.cell(0, 4, f"Phone: {data.buyer_phone}", ln=True)
+    if data.buyer_address:
+        for line in data.buyer_address.split('\n'):
+            if line.strip():
+                pdf.cell(0, 4, line, ln=True)
+    if data.buyer_country:
+        pdf.cell(0, 4, f"Country: {data.buyer_country}", ln=True)
+    if data.buyer_type:
+        pdf.cell(0, 4, f"Type: {data.buyer_type}", ln=True)
+    pdf.ln(4)
+    
+    # ========== 4️⃣ DESCRIPTION TABLE (Tax-Safe Format) ==========
+    pdf.set_font("Arial", "B", size=9)
+    pdf.set_fill_color(0, 51, 102)  # Dark blue header
+    pdf.set_text_color(255, 255, 255)  # White text
+    pdf.cell(75, 7, "Description", border=1, fill=True, align="L")
+    pdf.cell(15, 7, "Qty", border=1, fill=True, align="C")
+    pdf.cell(25, 7, "Unit Price", border=1, fill=True, align="R")
+    pdf.cell(25, 7, "Net Amount", border=1, fill=True, align="R", ln=True)
+    
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", size=9)
+    desc = (data.description or "Service")[:75]
+    pdf.cell(75, 6, desc, border=1, align="L")
+    pdf.cell(15, 6, f"{data.quantity:.0f}", border=1, align="C")
+    pdf.cell(25, 6, f"{currency} {data.unit_price:.2f}", border=1, align="R")
+    pdf.cell(25, 6, f"{currency} {net_amount:.2f}", border=1, align="R", ln=True)
+    pdf.ln(4)
+    
+    # ========== TAX CALCULATION SUMMARY ==========
+    x_right = 125
+    pdf.set_font("Arial", size=9)
+    
+    # Subtotal (Net)
+    pdf.set_x(x_right)
+    pdf.cell(35, 5, "Subtotal (Net):", align="L")
+    pdf.cell(0, 5, f"{currency} {net_amount:.2f}", align="R", ln=True)
+    
+    # VAT/Tax line (only if applicable)
+    if data.vat_amount and data.vat_amount > 0:
+        pdf.set_x(x_right)
+        vat_rate = data.vat_rate or 0
+        pdf.cell(35, 5, f"Tax ({vat_rate}%):", align="L")
+        pdf.cell(0, 5, f"{currency} {data.vat_amount:.2f}", align="R", ln=True)
+    elif data.is_reverse_charge or data.is_export or data.is_outside_scope or data.tax_exempt_reason:
+        pdf.set_x(x_right)
+        pdf.set_font("Arial", "I", size=8)
+        pdf.cell(0, 5, "Tax: 0.00 (see tax treatment)", align="R", ln=True)
+        pdf.set_font("Arial", size=9)
+    
+    # Total (Gross)
+    pdf.set_x(x_right)
+    pdf.set_font("Arial", "B", size=11)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(35, 7, "TOTAL:", align="L")
+    pdf.cell(0, 7, f"{currency} {total_amount:.2f}", align="R", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(4)
+    
+    # ========== 5️⃣ TAX INFORMATION SECTION (Flexible) ==========
+    if data.is_reverse_charge or data.is_export or data.is_outside_scope or data.tax_exempt_reason or data.tax_treatment:
+        pdf.set_font("Arial", "B", size=10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 6, "TAX TREATMENT", ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", size=8)
+        
+        if data.is_reverse_charge and data.buyer_vat:
+            pdf.cell(0, 4, "VAT reverse charged to customer (B2B EU transaction).", ln=True)
+        if data.is_export:
+            pdf.cell(0, 4, "Export of services — VAT exempt per international trade rules.", ln=True)
+        if data.is_outside_scope:
+            pdf.cell(0, 4, "Transaction outside scope of VAT.", ln=True)
+        if data.tax_exempt_reason:
+            pdf.cell(0, 4, f"Tax exempt: {data.tax_exempt_reason}", ln=True)
+        if not (data.is_reverse_charge or data.is_export or data.is_outside_scope or data.tax_exempt_reason) and data.tax_treatment:
+            pdf.multi_cell(0, 4, data.tax_treatment)
+        elif not (data.is_reverse_charge or data.is_export or data.is_outside_scope or data.tax_exempt_reason):
+            pdf.cell(0, 4, "Tax calculated in accordance with local regulations.", ln=True)
+        pdf.ln(2)
+    
+    # ========== 6️⃣ PAYMENT INFORMATION ==========
+    pdf.set_font("Arial", "B", size=10)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(0, 6, "PAYMENT INFORMATION", ln=True)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_font("Arial", size=9)
+    
+    if data.payment_terms:
+        pdf.cell(0, 4, f"Terms: {data.payment_terms}", ln=True)
+    if data.due_date:
+        pdf.cell(0, 4, f"Due Date: {data.due_date}", ln=True)
+    
+    pdf.cell(0, 4, f"Method: {data.payment_provider or data.payment_system.upper()}", ln=True)
+    
+    if data.iban:
+        pdf.cell(0, 4, f"IBAN: {data.iban}", ln=True)
+    if data.swift_bic:
+        pdf.cell(0, 4, f"SWIFT/BIC: {data.swift_bic}", ln=True)
+    if data.bank_name:
+        pdf.cell(0, 4, f"Bank: {data.bank_name}", ln=True)
+    
+    if data.blockchain_tx_id:
+        pdf.cell(0, 4, f"Blockchain TX: {data.blockchain_tx_id}", ln=True)
+    
+    if data.alternative_payment_methods:
+        pdf.set_font("Arial", size=8)
+        pdf.multi_cell(0, 3, f"Other methods: {data.alternative_payment_methods}")
+        pdf.set_font("Arial", size=9)
+    
+    if data.late_payment_clause:
+        pdf.set_font("Arial", "I", size=8)
+        pdf.multi_cell(0, 3, f"Late payment: {data.late_payment_clause}")
+        pdf.set_font("Arial", size=9)
+    
+    pdf.ln(2)
+    
+    # ========== NOTES SECTION ==========
+    if data.notes:
+        pdf.set_font("Arial", "B", size=10)
+        pdf.set_text_color(0, 51, 102)
+        pdf.cell(0, 6, "NOTES", ln=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font("Arial", size=8)
+        pdf.multi_cell(0, 4, data.notes)
+        pdf.ln(2)
+    
+    # ========== 7️⃣ FOOTER (Universal Legal Safety) ==========
+    pdf.set_font("Arial", "I", size=7)
+    pdf.set_text_color(100, 100, 100)
+    
+    footer_text = data.footer_statement or "This invoice is issued in accordance with applicable international tax regulations."
+    if data.registered_office:
+        footer_text += f" | Registered Office: {data.registered_office}"
+    if data.seller_registration_number:
+        footer_text += f" | Company Reg: {data.seller_registration_number}"
+    
+    pdf.multi_cell(0, 3, footer_text)
+    
+    # Generate PDF
     pdf_str = pdf.output(dest='S')
-    # fpdf2 uses latin-1 encoding for PDF bytes
-    # pdf.output may return `str`, `bytes` or `bytearray` depending on fpdf2 version.
     if isinstance(pdf_str, (bytes, bytearray)):
         return bytes(pdf_str)
     return pdf_str.encode('latin-1')
@@ -1343,7 +1599,7 @@ async def get_invoice(invoice_id: int, current_user: dict = Depends(get_current_
 
 
 @app.get("/invoices/{invoice_id}/pdf")
-async def download_invoice_pdf(invoice_id: int, current_user: dict = Depends(get_current_user)):
+async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_user)):
     invoices = load_invoices()
     inv = next((i for i in invoices if i.get("id") == invoice_id), None)
     if not inv:
@@ -1358,19 +1614,208 @@ async def download_invoice_pdf(invoice_id: int, current_user: dict = Depends(get
         except Exception:
             pass
 
-    # Otherwise generate on-the-fly
+    # Generate comprehensive international invoice PDF with all details
+    items = inv.get("items", [])
+    first_item = items[0] if items else {}
+    
+    # Determine tax treatment based on invoice data
+    is_b2b = inv.get("buyer_type") == "B2B" or (inv.get("buyer_vat") and inv.get("buyer_vat").strip())
+    is_reverse_charge = is_b2b and inv.get("seller_country") and inv.get("buyer_country") and inv.get("seller_country") != inv.get("buyer_country")
+    is_export = inv.get("is_export", False)
+    is_outside_scope = inv.get("is_outside_scope", False)
+    tax_exempt_reason = inv.get("tax_exempt_reason")
+    
+    # Determine tax treatment statement
+    tax_treatment = inv.get("tax_treatment")
+    if not tax_treatment and not (is_reverse_charge or is_export or is_outside_scope or tax_exempt_reason):
+        tax_treatment = "Tax calculated in accordance with local regulations."
+    
     pdf_req = InvoicePDFRequest(
-        seller=inv.get("seller_name"),
-        buyer=inv.get("buyer_name"),
-        invoice_number=inv.get("invoice_number"),
-        date=inv.get("date_issued"),
-        description=inv.get("items", [{}])[0].get("description") if inv.get("items") else "",
-        amount=inv.get("total", 0),
-        payment_system=inv.get("payment_system"),
+        # Header
+        logo_url=inv.get("logo_url"),
+        invoice_number=inv.get("invoice_number", invoice_id),
+        invoice_date=inv.get("created_at", inv.get("date_issued", "")),
+        supply_date=inv.get("supply_date"),
+        currency=inv.get("currency", "EUR"),
+        
+        # Seller Information
+        seller=inv.get("seller_name", "Unknown Seller"),
+        seller_address=inv.get("seller_address"),
+        seller_country=inv.get("seller_country"),
+        seller_registration_number=inv.get("seller_registration_number"),
+        seller_vat=inv.get("seller_vat"),
+        seller_eori=inv.get("seller_eori"),
+        seller_email=inv.get("seller_email"),
+        seller_phone=inv.get("seller_phone"),
+        
+        # Buyer Information
+        buyer=inv.get("buyer_name", "Unknown Buyer"),
+        buyer_address=inv.get("buyer_address"),
+        buyer_country=inv.get("buyer_country"),
+        buyer_vat=inv.get("buyer_vat"),
+        buyer_registration_number=inv.get("buyer_registration_number"),
+        buyer_email=inv.get("buyer_email"),
+        buyer_phone=inv.get("buyer_phone"),
+        buyer_type=inv.get("buyer_type"),
+        
+        # Items (Tax-Safe Format)
+        description=inv.get("description") or (first_item.get("description") if first_item else ""),
+        quantity=first_item.get("quantity", 1),
+        unit_price=first_item.get("unit_price", inv.get("total", 0)),
+        net_amount=inv.get("subtotal"),
+        vat_rate=inv.get("vat_rate", 0),
+        vat_amount=inv.get("vat_amount", 0),
+        total_amount=inv.get("total", 0),
+        order_number=inv.get("order_number"),
+        due_date=inv.get("due_date"),
+        
+        # Tax Information (Flexible)
+        tax_treatment=tax_treatment,
+        is_reverse_charge=is_reverse_charge,
+        is_export=is_export,
+        is_outside_scope=is_outside_scope,
+        tax_exempt_reason=tax_exempt_reason,
+        
+        # Payment Information
+        payment_terms=inv.get("payment_terms"),
+        payment_system=inv.get("payment_system", "web2"),
+        payment_provider=inv.get("payment_provider"),
         blockchain_tx_id=inv.get("blockchain_tx_id"),
+        bank_name=inv.get("bank_name"),
+        iban=inv.get("iban"),
+        swift_bic=inv.get("swift_bic"),
+        alternative_payment_methods=inv.get("alternative_payment_methods"),
+        late_payment_clause=inv.get("late_payment_clause"),
+        
+        # Additional Info
+        notes=inv.get("notes"),
+        footer_statement=inv.get("footer_statement"),
+        registered_office=inv.get("registered_office"),
     )
     pdf_bytes = render_invoice_pdf(pdf_req)
     return Response(content=pdf_bytes, media_type="application/pdf")
+
+
+@app.post("/validate-vat")
+async def validate_vat_number(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """
+    Validate a VAT number using the EU VIES system.
+    
+    Request:
+    {
+        "vat_number": "DE123456789",  # Required: Country code + VAT number
+        "buyer_name": "Company Name"   # Optional: For reference
+    }
+    
+    Response:
+    {
+        "valid": true|false,
+        "vat_number": "DE123456789",
+        "country": "DE",
+        "company_name": "Company registered name" (if valid),
+        "address": "Company address" (if valid),
+        "message": "VAT number is valid and compliant" | "VAT number is not registered" | "Invalid VAT format"
+    }
+    """
+    try:
+        vat_number = (payload.get("vat_number") or "").strip().upper().replace(" ", "")
+        
+        if not vat_number:
+            raise HTTPException(status_code=400, detail="vat_number is required")
+        
+        # Validate format: should be 2-letter country code + at least 5 digits/letters
+        if len(vat_number) < 7 or not vat_number[:2].isalpha():
+            return {
+                "valid": False,
+                "vat_number": vat_number,
+                "country": vat_number[:2] if len(vat_number) >= 2 else "??",
+                "message": "Invalid VAT format. Expected format: CCNNNNNNNNN (e.g., DE123456789, FR12345678901)"
+            }
+        
+        country_code = vat_number[:2]
+        vat_nr = vat_number[2:]
+        
+        # VIES only works for EU countries, so check if it's an EU code
+        eu_countries = {'AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 
+                       'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 
+                       'RO', 'SK', 'SI', 'ES', 'SE', 'GB', 'XI', 'EL', 'GE'}
+        
+        if country_code not in eu_countries:
+            return {
+                "valid": False,
+                "vat_number": vat_number,
+                "country": country_code,
+                "message": f"VIES validation is only available for EU countries. Country '{country_code}' is not in the EU VIES system."
+            }
+        
+        # Try to connect to VIES service
+        try:
+            from zeep import Client
+            from zeep.exceptions import Fault
+            
+            wsdl_url = "https://ec.europa.eu/taxation_customs/vies/checkVatService.wsdl"
+            client = Client(wsdl=wsdl_url)
+            
+            # Call VIES checkVat service
+            response = client.service.checkVat(countryCode=country_code, vatNumber=vat_nr)
+            
+            # Extract response details
+            is_valid = getattr(response, 'valid', False)
+            company_name = getattr(response, 'name', None)
+            company_address = getattr(response, 'address', None)
+            
+            if is_valid:
+                return {
+                    "valid": True,
+                    "vat_number": vat_number,
+                    "country": country_code,
+                    "company_name": company_name or "Name not provided by VIES",
+                    "address": company_address or "Address not provided by VIES",
+                    "message": "✓ VAT number is valid and registered in the EU VIES system"
+                }
+            else:
+                return {
+                    "valid": False,
+                    "vat_number": vat_number,
+                    "country": country_code,
+                    "message": "✗ VAT number is not registered in the EU VIES system or is invalid"
+                }
+        
+        except Fault as e:
+            # VIES service fault (e.g., invalid format, temporary service issue)
+            error_msg = str(e)
+            if "INVALID_INPUT" in error_msg or "invalid" in error_msg.lower():
+                return {
+                    "valid": False,
+                    "vat_number": vat_number,
+                    "country": country_code,
+                    "message": "✗ Invalid VAT number format. The VAT number does not match the expected format for this country."
+                }
+            else:
+                return {
+                    "valid": False,
+                    "vat_number": vat_number,
+                    "country": country_code,
+                    "message": f"VIES service error: {error_msg}"
+                }
+        
+        except Exception as e:
+            # Network error, service unavailable, etc.
+            import traceback
+            traceback.print_exc()
+            return {
+                "valid": None,
+                "vat_number": vat_number,
+                "country": country_code,
+                "message": f"⚠ Could not reach VIES service. Please try again later. Error: {str(e)}"
+            }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"VAT validation error: {str(e)}")
 
 
 @app.post("/calculate-vat")
