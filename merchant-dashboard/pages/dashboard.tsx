@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
 import RevenueChart from '../components/RevenueChart';
@@ -58,6 +59,14 @@ export default function Dashboard() {
       <div className="container py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Dashboard — Invoicing Merchant</h1>
+          <div className="flex gap-2">
+            <Link href="/invoices" className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+              Invoices
+            </Link>
+            <Link href="/api-keys" className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+              API Keys
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-4 gap-4 mb-6">
