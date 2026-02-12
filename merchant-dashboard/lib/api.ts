@@ -1,3 +1,5 @@
+// API client for backend communication
+// Build: force regeneration with version marker
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.apiblockchain.io';
 
 export const api = async (path: string, method = 'GET', data?: any) => {
