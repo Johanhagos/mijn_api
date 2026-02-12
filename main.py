@@ -1738,6 +1738,33 @@ async def merchant_usage(request: Request):
     web3_total = _sum_total(web3_invoices)
     total_amount = _sum_total(my_invoices)
 
+    # Generate daily revenue for last 30 days
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    daily_revenue = {}
+    
+    for i in range(30):
+        date = today - timedelta(days=i)
+        daily_revenue[date.strftime("%Y-%m-%d")] = 0.0
+    
+    # Aggregate invoices by date
+    for inv in my_invoices:
+        try:
+            created_at = inv.get("created_at", "")
+            if created_at:
+                # Parse date (format: 2026-02-12 or 2026-02-12T...)
+                date_str = created_at.split("T")[0] if "T" in created_at else created_at[:10]
+                if date_str in daily_revenue:
+                    daily_revenue[date_str] += float(inv.get("total", 0) or 0)
+        except:
+            pass
+    
+    # Format as array for chart, sorted by date
+    revenue_data = [
+        {"date": date, "amount": round(amount, 2)}
+        for date, amount in sorted(daily_revenue.items())
+    ]
+
     return {
         "total_invoices": total_invoices,
         "web2_count": len(web2_invoices),
@@ -1745,6 +1772,7 @@ async def merchant_usage(request: Request):
         "web2_total": web2_total,
         "web3_total": web3_total,
         "total_amount": total_amount,
+        "revenue": revenue_data,
     }
 
 

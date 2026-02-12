@@ -50,7 +50,10 @@ export default function Dashboard() {
       .catch(() => alert('Failed to revoke'));
   };
 
-  const revenueData = (stats?.revenue || []).map((r: any) => ({ date: r.date, amount: r.amount }));
+  const revenueData = (stats?.revenue || []).map((r: any) => ({ 
+    date: new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), 
+    amount: r.amount 
+  }));
   const donutData = [
     { name: 'Web2', value: stats?.web2_total || 0 },
     { name: 'Web3', value: stats?.web3_total || 0 },
