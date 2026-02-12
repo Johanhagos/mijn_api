@@ -46,7 +46,7 @@ export default function Login() {
     setForgotResult(null);
     setForgotLoading(true);
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/forgot_password`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://api.apiblockchain.io'}/forgot_password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: forgotEmail }),

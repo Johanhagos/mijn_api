@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.apiblockchain.io';
 
 export const api = async (path, method = 'GET', data) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('jwt') : null;
