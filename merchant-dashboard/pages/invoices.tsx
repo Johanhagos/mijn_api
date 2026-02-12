@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Link from 'next/link';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
 import Header from '../components/Header';
@@ -157,9 +158,14 @@ export default function Invoices() {
         
         <div className="max-w-7xl mx-auto px-4 py-8">
           {/* Page Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Invoices</h1>
-            <p className="text-gray-600">Manage, view, and download your merchant invoices</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Invoices</h1>
+              <p className="text-gray-600">Manage, view, and download your merchant invoices</p>
+            </div>
+            <Link href="/dashboard" className="px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+              Dashboard
+            </Link>
           </div>
 
           {loading ? (

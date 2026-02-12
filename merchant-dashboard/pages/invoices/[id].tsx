@@ -310,6 +310,9 @@ export default function InvoiceDetail() {
 
               {/* Action Buttons */}
               <div className="flex gap-4 justify-center">
+                <Link href="/dashboard" className="inline-flex items-center px-8 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700 font-bold transition shadow hover:shadow-lg">
+                  🏠 Dashboard
+                </Link>
                 <button
                   onClick={downloadPDF}
                   disabled={downloading}

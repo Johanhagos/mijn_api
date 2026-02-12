@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
@@ -64,7 +65,12 @@ function ApiKeys() {
     <AuthGuard>
       <div className="p-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">API Keys</h1>
+        <div>
+          <h1 className="text-3xl font-bold">API Keys</h1>
+          <Link href="/dashboard" className="inline-block mt-2 px-4 py-2 rounded bg-green-600 text-white hover:bg-green-700 text-sm font-medium">
+            Dashboard
+          </Link>
+        </div>
         <div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
