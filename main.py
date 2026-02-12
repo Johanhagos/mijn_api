@@ -1002,16 +1002,16 @@ class InvoiceCreate(BaseModel):
 
 
 class InvoiceOut(BaseModel):
-    id: int
-    invoice_number: str
+    id: str
+    invoice_number: Optional[str] = None
     order_number: Optional[str] = None
-    seller_name: str
-    buyer_name: str
-    subtotal: float
-    vat_amount: float
-    total: float
-    payment_system: Optional[str]
-    blockchain_tx_id: Optional[str]
+    seller_name: Optional[str] = None
+    buyer_name: Optional[str] = None
+    subtotal: float = 0.0
+    vat_amount: float = 0.0
+    total: float = 0.0
+    payment_system: Optional[str] = None
+    blockchain_tx_id: Optional[str] = None
     pdf_url: Optional[str] = None
 
 
