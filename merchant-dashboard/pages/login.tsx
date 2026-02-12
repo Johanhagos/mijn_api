@@ -18,6 +18,7 @@ export default function Login() {
     try {
       // Send as 'name' field if it looks like a username, otherwise as 'email'
       const isEmail = identifier.includes('@');
+      console.log('Login attempt:', { isEmail, name: isEmail ? '' : identifier, email: isEmail ? identifier : undefined });
       const res: any = await api.login(isEmail ? '' : identifier, password, isEmail ? identifier : undefined);
 
       // store access token under `jwt` (used by lib/api and protectedApi)
@@ -27,6 +28,7 @@ export default function Login() {
 
       window.location.href = '/dashboard';
     } catch (err: any) {
+      console.error('Login error:', err);
       setError(err.message || 'Login failed');
     } finally {
       setLoading(false);
