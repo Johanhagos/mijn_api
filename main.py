@@ -1027,81 +1027,106 @@ def render_invoice_pdf(data: InvoicePDFRequest) -> bytes:
     invoice_date = data.invoice_date or datetime.now(timezone.utc).date().isoformat()
     currency = data.currency or "EUR"
     
-    # ========== 1️⃣ HEADER SECTION ==========
-    if data.logo_url:
-        try:
-            pdf.image(data.logo_url, x=10, y=10, w=30)
-            pdf.set_xy(45, 15)
-        except:
-            pass  # Logo failed, continue without it
-    
+    # ========== HEADER SECTION WITH TWO COLUMNS ==========
+    # Left side: Invoice title and numbers
+    # Right side: Seller company info
     pdf.set_font("Arial", "B", size=20)
     pdf.set_text_color(0, 51, 102)  # Dark blue
-    pdf.cell(0, 12, "INVOICE", ln=True)
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(3)
+    pdf.cell(100, 12, "INVOICE", ln=False)
     
-    # Invoice header info
-    pdf.set_font("Arial", size=10)
-    pdf.cell(50, 5, f"Invoice #: {data.invoice_number or 'N/A'}", ln=False)
-    pdf.cell(0, 5, f"Currency: {currency}", ln=True)
-    pdf.cell(50, 5, f"Invoice Date: {invoice_date}", ln=False)
-    if data.supply_date and data.supply_date != invoice_date:
-        pdf.cell(0, 5, f"Supply Date: {data.supply_date}", ln=True)
-    else:
-        pdf.ln(5)
-    pdf.ln(4)
-    
-    # ========== 2️⃣ SELLER INFORMATION (Legal Entity) ==========
-    pdf.set_font("Arial", "B", size=11)
+    # Seller info on right
+    pdf.set_font("Arial", "B", size=10)
     pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 6, "SELLER INFORMATION", ln=True)
-    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 6, "SELLER", ln=True, align="R")
     pdf.set_font("Arial", size=9)
+    pdf.set_text_color(0, 0, 0)
     
-    pdf.cell(0, 5, data.seller or "Unknown Seller", ln=True)
+    # Move to next line and create two-column layout
+    pdf.set_x(10)
+    pdf.set_font("Arial", size=9)
+    pdf.cell(95, 4, f"Invoice #: {data.invoice_number or 'N/A'}", ln=False)
+    pdf.set_x(110)
+    pdf.cell(0, 4, data.seller or "Unknown Seller", ln=True)
+    
+    pdf.set_x(10)
+    pdf.cell(95, 4, f"Invoice Date: {invoice_date}", ln=False)
+    pdf.set_x(110)
     if data.seller_vat:
-        pdf.cell(0, 4, f"VAT / Tax ID: {data.seller_vat}", ln=True)
+        pdf.cell(0, 4, f"VAT: {data.seller_vat}", ln=True)
+    else:
+        pdf.ln(4)
+    
+    pdf.set_x(10)
+    if data.supply_date and data.supply_date != invoice_date:
+        pdf.cell(95, 4, f"Supply Date: {data.supply_date}", ln=False)
+    else:
+        pdf.cell(95, 4, "", ln=False)
+    pdf.set_x(110)
     if data.seller_registration_number:
-        pdf.cell(0, 4, f"Company Reg: {data.seller_registration_number}", ln=True)
-    if data.seller_eori:
-        pdf.cell(0, 4, f"EORI: {data.seller_eori}", ln=True)
+        pdf.cell(0, 4, f"Reg: {data.seller_registration_number}", ln=True)
+    else:
+        pdf.ln(4)
+    
+    # Seller address
+    pdf.set_x(110)
     if data.seller_address:
-        for line in data.seller_address.split('\n'):
+        for line in data.seller_address.split('\n')[:2]:
             if line.strip():
-                pdf.cell(0, 4, line, ln=True)
+                pdf.set_x(110)
+                pdf.cell(0, 4, line.strip(), ln=True)
+    pdf.set_x(110)
     if data.seller_country:
         pdf.cell(0, 4, f"Country: {data.seller_country}", ln=True)
     if data.seller_email:
+        pdf.set_x(110)
         pdf.cell(0, 4, f"Email: {data.seller_email}", ln=True)
-    if data.seller_phone:
-        pdf.cell(0, 4, f"Phone: {data.seller_phone}", ln=True)
-    pdf.ln(3)
     
-    # ========== 3️⃣ BUYER INFORMATION ==========
+    pdf.ln(5)
+    
+    # ========== BILLING ADDRESS (LEFT) & ADDITIONAL INFO (RIGHT) ==========
     pdf.set_font("Arial", "B", size=11)
     pdf.set_text_color(0, 51, 102)
-    pdf.cell(0, 6, "BILL TO", ln=True)
+    pdf.cell(95, 6, "BILL TO", ln=False)
+    pdf.cell(0, 6, "ORDER INFORMATION", ln=True, align="R")
     pdf.set_text_color(0, 0, 0)
     pdf.set_font("Arial", size=9)
     
-    pdf.cell(0, 5, data.buyer or "Unknown Buyer", ln=True)
+    # Bill to on left
+    pdf.set_x(10)
+    pdf.cell(95, 5, data.buyer or "Unknown Buyer", ln=False)
+    
+    # Order info on right
+    pdf.set_x(110)
+    if data.order_number:
+        pdf.cell(0, 5, f"Order #: {data.order_number}", ln=True)
+    else:
+        pdf.ln(5)
+    
+    # Buyer details
     if data.buyer_vat:
-        pdf.cell(0, 4, f"VAT / Tax ID: {data.buyer_vat}", ln=True)
-    if data.buyer_registration_number:
-        pdf.cell(0, 4, f"Company Reg: {data.buyer_registration_number}", ln=True)
+        pdf.set_x(10)
+        pdf.cell(95, 4, f"VAT: {data.buyer_vat}", ln=False)
+        pdf.set_x(110)
+        if data.due_date:
+            pdf.cell(0, 4, f"Due Date: {data.due_date}", ln=True)
+        else:
+            pdf.ln(4)
+    
     if data.buyer_email:
-        pdf.cell(0, 4, f"Email: {data.buyer_email}", ln=True)
-    if data.buyer_phone:
-        pdf.cell(0, 4, f"Phone: {data.buyer_phone}", ln=True)
+        pdf.set_x(10)
+        pdf.cell(95, 4, f"Email: {data.buyer_email}", ln=False)
+        pdf.set_x(110)
+        pdf.cell(0, 4, f"Currency: {currency}", ln=True)
+    elif currency:
+        pdf.set_x(110)
+        pdf.cell(0, 4, f"Currency: {currency}", ln=True)
+    
     if data.buyer_address:
-        for line in data.buyer_address.split('\n'):
+        for line in data.buyer_address.split('\n')[:2]:
             if line.strip():
-                pdf.cell(0, 4, line, ln=True)
-    if data.buyer_country:
-        pdf.cell(0, 4, f"Country: {data.buyer_country}", ln=True)
-    if data.buyer_type:
-        pdf.cell(0, 4, f"Type: {data.buyer_type}", ln=True)
+                pdf.set_x(10)
+                pdf.cell(95, 4, line.strip(), ln=True)
+    
     pdf.ln(4)
     
     # ========== 4️⃣ DESCRIPTION TABLE (Tax-Safe Format) ==========
@@ -1592,9 +1617,9 @@ async def debug_add_api_key(payload: dict = Body(...)):
 
 
 @app.get("/invoices/{invoice_id}", response_model=InvoiceOut)
-async def get_invoice(invoice_id: int, current_user: dict = Depends(get_current_user)):
+async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
     invoices = load_invoices()
-    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
     return InvoiceOut(**{

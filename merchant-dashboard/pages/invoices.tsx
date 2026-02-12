@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
 import Header from '../components/Header';
@@ -22,6 +23,7 @@ interface Invoice {
 }
 
 export default function Invoices() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -234,7 +236,7 @@ export default function Invoices() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {invoices.map((invoice, idx) => (
-                        <tr key={invoice.id} className={`hover:bg-green-50 transition cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} onClick={() => window.location.href = `/invoices/${invoice.id}`}>
+                        <tr key={invoice.id} className={`hover:bg-green-50 transition cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} onClick={() => router.push(`/invoices/${invoice.id}`)}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Link href={`/invoices/${invoice.id}`} className="text-sm font-bold text-green-600 hover:text-green-800 hover:underline">
                               {invoice.invoice_number || invoice.id}
