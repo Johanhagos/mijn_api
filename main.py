@@ -97,8 +97,8 @@ if not READ_ONLY_FS and not (DATA_DIR / "api_keys.json").exists():
         except Exception as e:
             print(f"[WARN] Could not copy api_keys.json: {e}")
 
-# Initialize users.json from repo if not present in DATA_DIR
-if not READ_ONLY_FS and not (DATA_DIR / "users.json").exists():
+# Always copy users.json from repo to DATA_DIR on startup (ensures latest version)
+if not READ_ONLY_FS:
     repo_users = Path(__file__).parent / "users.json"
     if repo_users.exists():
         import shutil
@@ -107,9 +107,6 @@ if not READ_ONLY_FS and not (DATA_DIR / "users.json").exists():
             print(f"[INFO] Initialized users.json from repo to {DATA_DIR}")
         except Exception as e:
             print(f"[WARN] Could not copy users.json: {e}")
-            print(f"[INFO] Initialized api_keys.json from repo to {DATA_DIR}")
-        except Exception as e:
-            print(f"[WARNING] Failed to copy api_keys.json: {e}")
 
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
