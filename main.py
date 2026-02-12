@@ -119,6 +119,20 @@ if not READ_ONLY_FS and not (DATA_DIR / "invoices.json").exists():
         except Exception as e:
             print(f"[WARN] Could not copy invoices.json: {e}")
 
+# If invoices.json exists but is empty, seed from repo copy
+if not READ_ONLY_FS and (DATA_DIR / "invoices.json").exists():
+    try:
+        existing_text = (DATA_DIR / "invoices.json").read_text(encoding="utf-8").strip()
+        existing_invoices = json.loads(existing_text or "[]")
+        if not existing_invoices:
+            repo_invoices = Path(__file__).parent / "invoices.json"
+            if repo_invoices.exists():
+                import shutil
+                shutil.copy(str(repo_invoices), str(DATA_DIR / "invoices.json"))
+                print(f"[INFO] Seeded invoices.json from repo to {DATA_DIR}")
+    except Exception as e:
+        print(f"[WARN] Could not seed invoices.json: {e}")
+
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
 
