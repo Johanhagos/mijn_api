@@ -34,6 +34,14 @@ export default function InvoiceDetail() {
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
 
+  const toNumber = (value: any) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  const formatCurrency = (value: any) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(toNumber(value));
+
   useEffect(() => {
     if (!id) return;
 
@@ -245,9 +253,18 @@ export default function InvoiceDetail() {
                         invoice.items.map((item, idx) => (
                           <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                             <td className="px-8 py-4 text-sm text-gray-900">{item.description || item.name || '-'}</td>
-                            <td className="px-8 py-4 text-sm text-right text-gray-900">{item.quantity || 1}</td>
-                            <td className="px-8 py-4 text-sm text-right text-gray-900">${(item.unit_price || item.price || 0).toFixed(2)}</td>
-                            <td className="px-8 py-4 text-sm text-right font-semibold text-gray-900">${(item.amount || 0).toFixed(2)}</td>
+                            {(() => {
+                              const qty = toNumber(item.quantity ?? 1);
+                              const unitPrice = toNumber(item.unit_price ?? item.price ?? 0);
+                              const amount = item.amount ?? qty * unitPrice;
+                              return (
+                                <>
+                                  <td className="px-8 py-4 text-sm text-right text-gray-900">{qty}</td>
+                                  <td className="px-8 py-4 text-sm text-right text-gray-900">{formatCurrency(unitPrice)}</td>
+                                  <td className="px-8 py-4 text-sm text-right font-semibold text-gray-900">{formatCurrency(amount)}</td>
+                                </>
+                              );
+                            })()}
                           </tr>
                         ))
                       ) : (
@@ -268,15 +285,15 @@ export default function InvoiceDetail() {
                   <div className="w-full space-y-4">
                     <div className="flex justify-between items-center pb-4 border-b">
                       <span className="text-gray-700 font-medium">Subtotal</span>
-                      <span className="text-lg font-semibold text-gray-900">${(invoice.subtotal || 0).toFixed(2)}</span>
+                      <span className="text-lg font-semibold text-gray-900">{formatCurrency(invoice.subtotal)}</span>
                     </div>
                     <div className="flex justify-between items-center pb-4 border-b">
                       <span className="text-gray-700 font-medium">VAT / Tax</span>
-                      <span className="text-lg font-semibold text-gray-900">${(invoice.vat_amount || 0).toFixed(2)}</span>
+                      <span className="text-lg font-semibold text-gray-900">{formatCurrency(invoice.vat_amount)}</span>
                     </div>
                     <div className="flex justify-between items-center pt-4 bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
                       <span className="text-lg font-bold text-gray-900">Total Due</span>
-                      <span className="text-3xl font-bold text-green-600">${(invoice.total || 0).toFixed(2)}</span>
+                      <span className="text-3xl font-bold text-green-600">{formatCurrency(invoice.total)}</span>
                     </div>
                   </div>
                 </div>

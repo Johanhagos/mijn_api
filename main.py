@@ -1414,17 +1414,32 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
     # Auto-generate invoice number if not provided
     invoice_number = payload.invoice_number or get_next_invoice_number()
     
-    # Calculate VAT and totals
-    subtotal = payload.subtotal
-    if subtotal is None and payload.items:
+    def _to_number(value, default=0.0):
         try:
-            subtotal = sum(float(str(item.get("quantity", 1)).strip() or 1) * float(str(item.get("unit_price", 0)).strip() or 0) for item in payload.items)
+            if value is None:
+                return default
+            return float(str(value).strip())
         except (ValueError, TypeError):
-            subtotal = 0.0
-    try:
-        subtotal = float(str(subtotal or 0).strip())
-    except (ValueError, TypeError):
-        subtotal = 0.0
+            return default
+
+    # Normalize items and calculate subtotal
+    items = payload.items or []
+    normalized_items = []
+    for item in items:
+        qty = _to_number(item.get("quantity", 1), 1.0)
+        unit_price = _to_number(item.get("unit_price", 0), 0.0)
+        amount = _to_number(item.get("amount", qty * unit_price), qty * unit_price)
+        normalized_items.append({
+            **item,
+            "quantity": qty,
+            "unit_price": unit_price,
+            "amount": round(amount, 2),
+        })
+
+    subtotal = payload.subtotal
+    if subtotal is None:
+        subtotal = sum(i.get("amount", 0) for i in normalized_items)
+    subtotal = _to_number(subtotal, 0.0)
     
     # Determine VAT rate
     vat_rate = 0.0
@@ -1464,7 +1479,7 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
         "buyer_type": payload.buyer_type,
         "date_issued": payload.date_issued or datetime.now(timezone.utc).date().isoformat(),
         "due_date": payload.due_date,
-        "items": payload.items or [],
+        "items": normalized_items,
         "subtotal": round(subtotal, 2),
         "vat_rate": vat_rate,
         "vat_amount": round(vat_amount, 2),
@@ -1502,9 +1517,9 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
             buyer_address=inv.get("buyer_address"),
             buyer_country=inv.get("buyer_country"),
             buyer_type=inv.get("buyer_type"),
-            description=inv.get("description") or (payload.items[0].get("description") if payload.items else ""),
-            quantity=payload.items[0].get("quantity", 1) if payload.items else 1,
-            unit_price=payload.items[0].get("unit_price", 0) if payload.items else 0,
+            description=inv.get("description") or (normalized_items[0].get("description") if normalized_items else ""),
+            quantity=normalized_items[0].get("quantity", 1) if normalized_items else 1,
+            unit_price=normalized_items[0].get("unit_price", 0) if normalized_items else 0,
             net_amount=inv["subtotal"],
             vat_amount=inv["vat_amount"],
             vat_rate=vat_rate,
