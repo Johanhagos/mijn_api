@@ -18,8 +18,9 @@ export default function Dashboard() {
   useEffect(() => {
     let mounted = true;
 
-    const fetchData = async () => {
-      setLoading(true);
+    const fetchData = async (options?: { silent?: boolean }) => {
+      const silent = options?.silent === true;
+      if (!silent) setLoading(true);
       try {
         const [usage, keys, me] = await Promise.all([
           api.protectedApi('/merchant/usage'),
@@ -33,15 +34,13 @@ export default function Dashboard() {
       } catch (e) {
         console.error(e);
       } finally {
-        if (mounted) setLoading(false);
+        if (mounted && !silent) setLoading(false);
       }
     };
 
     fetchData();
-    const interval = setInterval(fetchData, 3000);
     return () => {
       mounted = false;
-      clearInterval(interval);
     };
   }, []);
 
@@ -82,7 +81,12 @@ export default function Dashboard() {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-white">Dashboard</h1>
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-emerald-600/30 text-emerald-200 border border-emerald-500/40">
+                      AI ENABLED
+                    </span>
+                  </div>
                   <p className="text-sm text-emerald-300 mt-1">Welcome back, {merchant?.name || 'Merchant'}</p>
                 </div>
                 <div className="flex gap-3">
@@ -108,6 +112,10 @@ export default function Dashboard() {
                     🚪 Logout
                   </button>
                 </div>
+              </div>
+              <div className="mt-4 flex items-center gap-3">
+                <span className="text-xs text-emerald-200/80">AI Assistant:</span>
+                <AIAssistant merchantData={{ stats, merchant, apiKeys }} />
               </div>
             </div>
           </header>
@@ -216,9 +224,6 @@ export default function Dashboard() {
         </main>
         </div>
       </div>
-      
-      {/* AI Assistant - positioned outside main container for proper fixed positioning */}
-      <AIAssistant merchantData={{ stats, merchant, apiKeys }} />
     </AuthGuard>
   );
 }
