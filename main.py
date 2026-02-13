@@ -23,6 +23,7 @@ app = FastAPI(title="Secure User API")
 FRONTEND_ORIGINS = [
     "https://dashboard.apiblockchain.io",
     "https://apiblockchain.io",
+    "https://api.apiblockchain.io",
 ]
 
 # Allow localhost origins when not running in production (convenience for dev)
