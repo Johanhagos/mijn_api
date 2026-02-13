@@ -1,0 +1,33 @@
+<svg viewBox="0 0 40 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="20" cy="22" r="11" stroke="#3C3C3C" stroke-width="2" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M27.5042 16.7507C27.5042 17.7164 26.7197 18.5 25.7514 18.5C24.7845 18.5 24 17.7164 24 16.7507C24 15.7836 24.7845 15 25.7514 15C26.7197 15 27.5042 15.7836 27.5042 16.7507Z"
+        fill="#3C3C3C" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M28.503 23.25C28.503 23.9405 27.9428 24.5 27.2515 24.5C26.5602 24.5 26 23.9405 26 23.25C26 22.5611 26.5602 22 27.2515 22C27.9428 22 28.503 22.5611 28.503 23.25Z"
+        fill="#3C3C3C" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M22 21.5C22 22.3286 21.3286 23 20.5 23C19.6714 23 19 22.3286 19 21.5C19 20.6733 19.6714 20 20.5 20C21.3286 20 22 20.6733 22 21.5Z"
+        fill="#3C3C3C" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M26 28C26 28.5524 25.5524 29 25 29C24.4476 29 24 28.5524 24 28C24 27.4489 24.4476 27 25 27C25.5524 27 26 27.4489 26 28Z"
+        fill="#3C3C3C" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M20 14C20 14.5524 19.5524 15 19 15C18.4476 15 18 14.5524 18 14C18 13.4489 18.4476 13 19 13C19.5524 13 20 13.4489 20 14Z"
+        fill="#3C3C3C" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M21 28.5C21 29.8809 19.8809 31 18.5 31C17.1191 31 16 29.8809 16 28.5C16 27.1222 17.1191 26 18.5 26C19.8809 26 21 27.1222 21 28.5Z"
+        fill="#3C3C3C" />
+    <path fill-rule="evenodd" clip-rule="evenodd"
+        d="M16 21C16 22.1059 15.1041 23 14 23C12.8941 23 12 22.1059 12 21C12 19.8959 12.8941 19 14 19C15.1041 19 16 19.8959 16 21Z"
+        fill="#3C3C3C" />
+    <path d="M21 1L23.6464 3.64645C23.8417 3.84171 23.8417 4.1583 23.6464 4.35356L21 7"
+        stroke="#3C3C3C" stroke-width="2" stroke-linecap="round" />
+    <path d="M1 22.75C1 12.3947 9.39466 4 19.75 4C20.9718 4 22.1664 4.11687 23.3231 4.34005"
+        stroke="#3C3C3C" stroke-width="2" stroke-linecap="round" />
+    <path d="M19 42.75L16.3536 40.1035C16.1583 39.9083 16.1583 39.5917 16.3536 39.3964L19 36.75"
+        stroke="#3C3C3C" stroke-width="2" stroke-linecap="round" />
+    <path
+        d="M39 21C39 31.3553 30.6053 39.75 20.25 39.75C19.0282 39.75 17.8336 39.6331 16.6769 39.41"
+        stroke="#3C3C3C" stroke-width="2" stroke-linecap="round" />
+</svg>
