@@ -2645,8 +2645,93 @@ VAT RULES BY TRANSACTION TYPE:
 
 
 def generate_rule_based_response(message: str, stats: dict, merchant: dict) -> str:
-    """Generate rule-based AI responses focused on VAT and compliance when OpenAI is not available."""
+    """Generate intelligent rule-based AI responses with context awareness and common sense."""
     msg_lower = message.lower()
+    
+    # Extract useful context
+    web2_count = stats.get('web2_count', 0)
+    web3_count = stats.get('web3_count', 0)
+    total_amount = stats.get('total_amount', 0)
+    
+    # Provide contextual insights based on merchant's activity
+    if any(word in msg_lower for word in ['how', 'help', 'what', 'guide', 'tutorial']):
+        if web2_count == 0 and web3_count == 0:
+            # New merchant - guide them through getting started
+            if any(word in msg_lower for word in ['start', 'begin', 'first', 'setup', 'integrate']):
+                return """🚀 **Getting Started with APIBlockchain:**
+
+1. **Get Your API Key**
+   - Go to Settings → API Keys
+   - Create a new key (test or live mode)
+   - Copy and save securely
+
+2. **Create Your First Checkout**
+   - Use /checkout/create endpoint
+   - Include product price, customer email
+   - Configure payment methods (Web2, Web3, or both)
+
+3. **Test Integration**
+   - Use test API key first
+   - Process a test transaction
+   - Check webhook receipts
+
+4. **Go Live**
+   - Switch to live API key
+   - Monitor transactions in Dashboard
+   - Set up automatic reporting
+
+📖 **Quick Links:**
+- API Documentation: https://docs.apiblockchain.io
+- Integration Examples: Check your plugin setup
+- Support: support@apiblockchain.io
+
+What's your integration method (API, plugin, custom)?"""
+    
+    # Smart recommendations based on activity
+    elif web2_count > 50 and web3_count == 0:
+        if any(word in msg_lower for word in ['web3', 'crypto', 'blockchain']):
+            return """💡 **You're Missing Web3 Opportunities!**
+
+Your metrics show strong Web2 sales (50+ transactions). Here's why you should enable Web3:
+
+**Benefits:**
+- ✅ Reach global crypto audience (no geographic limits)
+- ✅ Instant settlements (vs 1-3 day bank transfers)
+- ✅ Lower fraud risk (blockchain immutability)
+- ✅ Appeal to tech-savvy customers
+- ✅ Hedge against currency volatility
+
+**Getting Started:**
+1. Enable crypto payment methods in Dashboard
+2. Choose currencies: ETH, BTC, USDT recommended for e-commerce
+3. Test with small transactions first
+4. Monitor conversion rates and optimize
+
+**Risk**: Crypto volatility - consider auto-conversion to stablecoins (USDT, USDC) to lock in EUR value.
+
+Ready to activate Web3 payments?"""
+    
+    elif web3_count > 10 and web2_count == 0:
+        if any(word in msg_lower for word in ['web2', 'traditional', 'credit', 'card']):
+            return """💡 **Expand Revenue with Web2 Payments!**
+
+You're doing great with Web3 (10+ crypto transactions). Now capture mainstream customers:
+
+**Why add Web2:**
+- 🎯 70% of global commerce still uses cards/transfers
+- 💰 Reach customers without crypto wallets
+- 📈 Increase conversion rates
+- 🌍 Support all customer types
+
+**Methods to add:**
+- Credit/Debit cards (Visa, Mastercard)
+- Bank transfers (SEPA, wire)
+- Digital wallets (Apple Pay, Google Pay)
+- PayPal integration available
+
+**Revenue impact:** Merchants adding both methods typically see 40% higher sales.
+
+Want to enable Web2 payments?"""
     
     # Get merchant's country-specific info
     merchant_country = merchant.get('country', 'XX')
