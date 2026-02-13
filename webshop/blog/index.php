@@ -1,0 +1,286 @@
+<?php
+        try {
+            // Get the entire <head>...</head> content
+            $headContent = '<head><meta charset="utf-8"><title>Blog | apiblockchain</title><meta name="robots" content="all"><meta name="generator" content="One.com Web Editor"><meta http-equiv="Cache-Control" content="must-revalidate, max-age=0, public"><meta http-equiv="Expires" content="-1"><meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=3,user-scalable=yes" minpagewidth="1050" rendermobileview="true"><meta name="MobileOptimized" content="320"><meta name="HandheldFriendly" content="True"><meta name="format-detection" content="telephone=no"><meta property="og:type" content="website"><meta property="og:title" content="Blog | apiblockchain"><meta property="og:site_name" content="apiblockchain"><meta property="og:url" content="https://apiblockchain.io/blog/"><meta name="twitter:card" content="summary"><meta name="twitter:title" content="Blog | apiblockchain"><meta name="twitter:image:alt" content="Blog | apiblockchain"><link rel="canonical" href="https://apiblockchain.io/blog/"><style>html { word-wrap: break-word; }
+*, ::before, ::after { word-wrap: inherit; }
+html { box-sizing: border-box; }
+*, ::before, ::after { box-sizing: inherit; }
+div.code { box-sizing: content-box; }
+body, ul, ol, li, h1, h2, h3, h4, h5, h6, form, input, p, td, textarea { margin: 0; padding: 0; }
+h1, h2, h3, h4, h5, h6 { font-size: 100%; font-weight: normal; }
+ol, ul { list-style: none; }
+table { border-collapse: collapse; border-spacing: 0; }
+img { border: 0; }
+body { -moz-osx-font-smoothing: grayscale; -webkit-font-smoothing: antialiased; }</style><style>@font-face {
+    font-family: \'dropDownMenu\';
+    src:
+    url(\'data:font/woff;base64,d09GRgABAAAAAATIAAsAAAAABHwAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAABPUy8yAAABCAAAAGAAAABgCKf/                                                                           KmNtYXAAAAFoAAAAVAAAAFQXVtKIZ2FzcAAAAbwAAAAIAAAACAAAABBnbHlmAAABxAAAAHwAAAB8fskqDWhlYWQAAAJAAAAANgAAADYTD4ZFaGhlYQAAAngAAAAkAAAAJAMbAaFobXR4AAACnAAAABgAAAAYBgABN2xvY2EAAAK0AAAADgAAAA4AZgBCbWF4cAAAAsQAAAAgAAAAIAAIAAhuYW1lAAAC5AAAAcIAAAHCcs7DVXBvc3QAAASoAAAAIAAAACAAAwAAAAMCAAGQAAUAAAFMAWYAAABHAUwBZgAAAPUAGQCEAAAAAAAAAAAAAAAAAAAAARAAAAAAAAAAAAAAAAAAAAAAQAAA6QEBmf+                 aAGYBmQBmAAAAAQAAAAAAAAAAAAAAIAAAAAAAAwAAAAMAAAAcAAEAAwAAABwAAwABAAAAHAAEADgAAAAKAAgAAgACAAEAIOkB//3//wAAAAAAIOkA//3//wAB/+MXBAADAAEAAAAAAAAAAAAAAAEAAf//                                     AA8AAQAAAAAAAAAAAAIAADc5AQAAAAABAAAAAAAAAAAAAgAANzkBAAAAAAEAAAAAAAAAAAACAAA3OQEAAAAAAQCAAFABgADuAAUAADcXNxcHJ55iYh6AgO5iYh6AgAABALcAGgFVARoABQAAPwEnNxcHt2JiHoCAOGJiHoCAAAEAAAABAADh0Y3XXw889QALAgAAAAAA2TijFwAAAADZOKMXAAAAAAGAARoAAAAIAAIAAAAAAAAAAQAAAZn/                                                                                                                                mgAAAgAAAAAAAYAAAQAAAAAAAAAAAAAAAAAAAAYCAAAAAAAAAAAAAAAAAAAAAgAAgAIAALcAAAAAAAoAFAAeAC4APgAAAAEAAAAGAAYAAQAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAAAOAK4AAQAAAAAAAQAMAAAAAQAAAAAAAgAHAI0AAQAAAAAAAwAMAEUAAQAAAAAABAAMAKIAAQAAAAAABQALACQAAQAAAAAABgAMAGkAAQAAAAAACgAaAMYAAwABBAkAAQAYAAwAAwABBAkAAgAOAJQAAwABBAkAAwAYAFEAAwABBAkABAAYAK4AAwABBAkABQAWAC8AAwABBAkABgAYAHUAAwABBAkACgA0AOBkcm9wRG93bk1lbnUAZAByAG8AcABEAG8AdwBuAE0AZQBuAHVWZXJzaW9uIDEuMABWAGUAcgBzAGkAbwBuACAAMQAuADBkcm9wRG93bk1lbnUAZAByAG8AcABEAG8AdwBuAE0AZQBuAHVkcm9wRG93bk1lbnUAZAByAG8AcABEAG8AdwBuAE0AZQBuAHVSZWd1bGFyAFIAZQBnAHUAbABhAHJkcm9wRG93bk1lbnUAZAByAG8AcABEAG8AdwBuAE0AZQBuAHVGb250IGdlbmVyYXRlZCBieSBJY29Nb29uLgBGAG8AbgB0ACAAZwBlAG4AZQByAGEAdABlAGQAIABiAHkAIABJAGMAbwBNAG8AbwBuAC4AAAADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\') format(\'woff\');
+    font-weight: normal;
+    font-style: normal;
+}</style><style>.mobileV div[data-id=\'F69AEAA5-9D51-42F7-B823-673203B39B6B\'] > div:first-child {border-bottom-width: 1px !important;
+} .mobileV div[data-id=\'F69AEAA5-9D51-42F7-B823-673203B39B6B\'] > div > div > div > video {
+                    opacity: 1 !important;
+                }
+div[data-id=\'4C72790E-FFD5-44B9-8D16-85B4E57210C0\'][data-specific-kind="TEXT"] { margin: auto; }
+div[data-id=\'4C72790E-FFD5-44B9-8D16-85B4E57210C0\'] { display: flex; width: 100%; }
+ .mobileV div[data-id=\'57319200-5AF6-4DB5-B9B3-23928397F9EF\'] > div > div > div > video {
+                    opacity: 1 !important;
+                }
+
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] div.textnormal,
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] span,
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] :not(.svgContainer) a {
+                        font-size: 16px !important;
+                    }
+
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .svgContainer,
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .svgContainer a {
+                        font-size: 30px !important;
+                    }
+.mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .svgContainer { margin-bottom: 12px !important; }
+
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .svgContainer,
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .svgContainer a,
+                    .mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .svgContainer svg {
+                        width: 30px !important;
+                        height: 30px !important;
+                    }
+.mobileV div[data-id=\'573E2667-6469-4713-8EAE-0F4BEAB17C9F\'] .prefix { margin-bottom: 0px !important; }
+
+
+.mobileV div[data-id=\'D15E6699-01E9-4930-8AB2-A671298DF1DD\'] {
+    overflow: hidden;
+}
+.mobileV div[data-id=\'D15E6699-01E9-4930-8AB2-A671298DF1DD\'] .Social_container__2rWh4 {
+    justify-content: center;
+    margin-top: -8px;
+    margin-bottom: -8px;
+}
+.mobileV div[data-id=\'D15E6699-01E9-4930-8AB2-A671298DF1DD\'] .Social_container__2rWh4 a {
+    
+                margin-left: 8px;
+                margin-right: 8px;
+            
+    margin-top: 8px;
+    margin-bottom: 8px;
+    height: 32px !important;
+    width: 32px !important;
+}
+.mobileV div[data-id=\'D15E6699-01E9-4930-8AB2-A671298DF1DD\'] .Social_container__2rWh4 a svg {
+    width: 32px !important;
+    height: 32px !important;
+    position: absolute;
+}
+.mobileV div[data-id=\'3AF86E59-BC32-43DB-9929-CE4BC60143FC\'] > div:first-child {border-top-width: 1px !important;
+} .mobileV div[data-id=\'3AF86E59-BC32-43DB-9929-CE4BC60143FC\'] > div > div > div > video {
+                    opacity: 1 !important;
+                }</style><style>@media (max-width: 650px) { body { min-width: \'initial\' } body.desktopV { min-width: 1050px } }
+        @media (min-width: 651px) { body { min-width: 1050px } body.mobileV { min-width: initial } }</style><link rel="stylesheet" href="/onewebstatic/a2541772a6.css"><link href="/onewebstatic/google-fonts.php?url=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DMontserrat%253A100%252C100italic%252C200%252C200italic%252C300%252C300italic%252C500%252C500italic%252C600%252C600italic%252C700%252C700italic%252C800%252C800italic%252C900%252C900italic%252Citalic%252Cregular&amp;subset%3Dall" rel="stylesheet"><link href="/onewebstatic/google-fonts.php?url=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DLora%253A100%252C100italic%252C200%252C200italic%252C300%252C300italic%252C500%252C500italic%252C600%252C600italic%252C700%252C700italic%252C800%252C800italic%252C900%252C900italic%252Citalic%252Cregular&amp;subset%3Dall" rel="stylesheet"><link href="/onewebstatic/google-fonts.php?url=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DOpen%2520Sans%253A100%252C100italic%252C200%252C200italic%252C300%252C300italic%252C500%252C500italic%252C600%252C600italic%252C700%252C700italic%252C800%252C800italic%252C900%252C900italic%252Citalic%252Cregular&amp;subset%3Dall" rel="stylesheet"><link href="/onewebstatic/google-fonts.php?url=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DLato%253A100%252C100italic%252C200%252C200italic%252C300%252C300italic%252C500%252C500italic%252C600%252C600italic%252C700%252C700italic%252C800%252C800italic%252C900%252C900italic%252Citalic%252Cregular&amp;subset%3Dall" rel="stylesheet"><link rel="stylesheet" href="/onewebstatic/14692ef347.css"><style>.bodyBackground {
+                            
+background-image:none;
+background-color:rgba(255,255,255,1);
+                        }</style><link href="/onewebstatic/7a1cae8bb7.css" rel="stylesheet"><script data-termly-config="">window.TERMLY_CUSTOM_BLOCKING_MAP = {"one.com":"essential","cdn-one.com":"essential","group-cdn.one":"essential","usercontent.one":"essential","hostnet.nl":"essential","checkdomain.de":"essential","herold.at":"essential","uniweb.no":"essential","zoner.fi":"essential","dogado.de":"essential","webglobe.cz":"essential","webglobe.sk":"essential","api.gii.cloud":"essential"};
+                        window.TERMLY_AUTOBLOCK_ENABLED = true;</script><script src="/onewebstatic/f6790cb98d.js"></script><script src="https://app.termly.io/resource-blocker/9c0990e3-ccaa-43cf-bd8e-869b64ae6506?autoBlock=on" onload="onTermlyLoaded();"></script><script>window.WSB_PRIVACY_POLICY_PUBLISHED = true;</script><script src="/onewebstatic/e47f208c3a.js"></script><script src="/onewebstatic/f707379391.js"></script></head>';
+
+            // Prepare URL for the POST request
+            $url = 'https://blogbuilder.one.com/preview/onecom/apiblockchain.io';
+
+            // Prepare the data to be sent in the POST request
+            $data = ['forPublish' => true, 'assetPrefix' => 'https://blogbuilder.one.com', 'isHomePage' => false, 'blogPageUrlPrefix' => '', 'blogPageUrl' => '/blog', 'blogId' => '547c0976-55b2-4970-b249-a939ea3e7769', 'layout' => 'list', 'locale' => 'en', 'selectedParentTheme' => 'White', 'webspaceAssetPrefix' => 'https://impro.usercontent.one/appid/oneComBlog/domain/apiblockchain.io/media/apiblockchain.io', 'textStyleData' => [['textClass' => 'textnormal', 'moderationClass' => 'mobile-undersized-upper', 'fontSize' => 15], ['textClass' => 'textheading1', 'moderationClass' => 'mobile-oversized', 'fontSize' => 72], ['textClass' => 'textheading2', 'moderationClass' => 'mobile-oversized', 'fontSize' => 42], ['textClass' => 'textheading3', 'moderationClass' => '', 'fontSize' => 20]]];
+
+            // Add 'page' if it is a number
+            if (isset($_GET['page'])) {
+                $page = $_GET['page'];
+                if (is_numeric($page)) {
+                    $data['page'] = (int)$page;
+                }
+            }
+
+            // Add 'category' if not empty
+            if (isset($_GET['category'])) {
+                $category = htmlspecialchars($_GET['category'], ENT_QUOTES, 'UTF-8');
+                if (!empty($category)) {
+                    $data['category'] = $category;
+                }
+            }
+
+            
+    // Set up the context options for the POST request
+    $jsonData = json_encode($data);
+    $options = [
+        'http' => [
+            'timeout' => 60,
+            'method'  => 'POST',
+            'header'  =>    "Content-Type: application/json\r\n" .
+                            "Content-Length: " . strlen($jsonData) . "\r\n" .
+                            "X-Request-From: PHP-Script\r\n",
+            'content' => $jsonData
+        ]
+    ];
+
+    // Create the context resource for the request
+    $context = stream_context_create($options);
+
+    // Execute the POST request and capture the response
+    $response = @file_get_contents($url, false, $context); // Suppress default error display
+
+
+            // Redirect to post page if the HTTP response status code is 421
+            if (isset($data['category'])) {
+                
+    if (isset($http_response_header) && preg_match('#^HTTP/\d+\.\d+\s+(\d+)#', $http_response_header[0], $matches)) {
+        $statusCode = (int)$matches[1];
+        if ($statusCode === 421) {
+            // Redirect to post page
+            $parsedUrl = parse_url($_SERVER['REQUEST_URI']);
+            $postUrl = rtrim($parsedUrl['path'], '/');
+            if (headers_sent()) {
+                echo '<script>window.location.href = "' . $postUrl . '";</script>';
+            } else {
+                header("Location: $postUrl", true, 307); // 307 = temporary redirect
+            }
+            exit;
+        }
+    }
+
+            }
+
+            
+    // Decode the JSON response
+    $response = preg_replace('/\\\\uD[89AB][0-9A-F]{2}/i', '', $response); // Remove invalid Unicode escape sequences
+    $jsonResponse = json_decode($response, true);
+
+    if (!$jsonResponse) {
+        $error = error_get_last(); // Get the last PHP error
+        echo '<!-- PHP Error: ' . $error['message'] . ' -->';
+
+        $styles = [];
+        $scripts = [];
+        $content = '';
+        $metadata = [];
+        $errorAttributeValue = 'true';
+    } else {
+        $errorAttributeValue = 'false';
+        $styles = $jsonResponse['styles'];
+        $scripts = $jsonResponse['scripts'];
+        $content = $jsonResponse['content'];
+        $metadata = $jsonResponse['metadata'];
+    }
+
+
+            function getUpdatedHeadContent($html, &$metadata) {
+                return preg_replace_callback('/<head\b[^>]*>([\s\S]*?)<\/head>/im', function ($matches) use (&$metadata) {
+                    $headInnerHtml = $matches[1];
+
+                    if (isset($metadata['seoTitle'])) {
+                        // Prepare the page title suffix
+                        $websiteTitle = ' | apiblockchain';
+
+                        $metadata['seoTitle'] = $metadata['seoTitle'] . $websiteTitle;
+                        
+    $titleRegex = '/<title[^>]*>([\s\S]*?)<\/title>/i';
+    // Check if <title> tag exists
+    if (preg_match($titleRegex, $headInnerHtml)) {
+        // Replace existing title
+        $headInnerHtml = preg_replace($titleRegex, '<title>' . $metadata['seoTitle'] . '</title>', $headInnerHtml);
+    } else {
+        // Add <title> inside <head> if missing
+        $headInnerHtml = '<title>' . $metadata['seoTitle'] . '</title>' . $headInnerHtml;
+    }
+
+                    }
+
+                    $nameTagMap = [
+                        "description" => $metadata['seoDescription'] ?? '',
+                        "robots" => $metadata['robotsContent'] ?? ''
+                    ];
+
+                    $linkTagMap = [
+                        "canonical" => $metadata['canonical'] ?? '',
+                        "prev" => $metadata['prev'] ?? '',
+                        "next" => $metadata['next'] ?? ''
+                    ];
+
+                    
+    function processDataToFormTags (&$headInnerHtml, $data, $attributeKey) {
+        foreach ($data as $key => $content) {
+            if (!empty($content)) {
+                $updatedTag = "<meta $attributeKey=\"$key\" content=\"$content\">";
+                $metaRegex = '/<meta\s+' . $attributeKey . '="' . $key . '"\s+content="([^"]*)"\s*\/?>/i';
+
+                if (preg_match($metaRegex, $headInnerHtml)) {
+                    // Replace existing tag
+                    $headInnerHtml = preg_replace($metaRegex, $updatedTag, $headInnerHtml);
+                } else {
+                    // Add canonical tag inside <head> if missing
+                    $headInnerHtml .= $updatedTag;
+                }
+            }
+        }
+    }
+
+    function processDataToFormLinks (&$headInnerHtml, $data) {
+        foreach ($data as $key => $href) {
+            if (!empty($href)) {
+                $updatedTag = "<link rel=\"$key\" href=\"$href\">";
+                $linkRegex = '/<link\s+rel="' . $key . '"\s+href="([^"]+)"\s*\/?>/i';
+
+                if (preg_match($linkRegex, $headInnerHtml)) {
+                    // Replace existing tag
+                    $headInnerHtml = preg_replace($linkRegex, $updatedTag, $headInnerHtml);
+                } else {
+                    // Add link tag inside <head> if missing
+                    $headInnerHtml .= $updatedTag;
+                }
+            }
+        }
+    }
+
+    processDataToFormLinks($headInnerHtml, $linkTagMap);
+    processDataToFormTags($headInnerHtml, $nameTagMap, 'name');
+
+
+                    return $headInnerHtml;
+                }, $html);
+            }
+            
+    $updatedHeadContent = '<head>' . getUpdatedHeadContent($headContent, $metadata);
+    $updatedHeadContent .= implode('', array_map(fn($href) => '<link rel="preload" as="style" href="' . htmlspecialchars($href) . '">', $styles));
+    $updatedHeadContent .= implode('', array_map(fn($href) => '<link rel="stylesheet" href="' . htmlspecialchars($href) . '">', $styles));
+    $updatedHeadContent .= '</head>';
+
+        } catch (Throwable $e) {
+            echo '<!-- PHP Error: ' . $e->getMessage() . ' -->';
+            $styles = [];
+            $scripts = [];
+            $content = '';
+            $metadata = [];
+            $updatedHeadContent = $headContent;
+            $errorAttributeValue = 'true';
+        }
+    ?>
+<!DOCTYPE html><html prefix="og: http://ogp.me/ns#" style="height:auto !important" lang="en-GB"><?php echo $updatedHeadContent; ?><body class="Preview_body__2wDzb bodyBackground" style="overflow-y:scroll;overflow-x:hidden" data-attachments="{}"><div class="announcement-banner-container"></div><button type="button" id="consent-banner-prefs-button" aria-label="renew-consent" onclick="displayPreferenceModal();"></button><div><div data-mobile-pin="0" id="wsb-mobile-header" class="mm mm-mobile-preview"><header id="MobileHeader_container" class="MobileHeader_container__1XW3y" style="background-color:rgba(255,255,255,0.75)" data-testid="mobile-header"><div class="MobileHeader_title__1avp4 MobileHeader_pageTitle__2Od2E"><span class="MobileHeader_titleText__1M62s" style="color:rgba(60,60,60,1);font-family:Montserrat;font-weight:bold;font-style:normal">Blog</span></div><div class="MobileHeader_dummyMenuIconContainer__3mfi4"></div></header><div class="MobileHeader_menuIconContainer__lc-Zq off" id="MobileHeader_burgerMenuIcon" data-active-bgcolor="rgba(255,255,255,1)" data-inactive-bgcolor="rgba(60,60,60,1)" aria-label="Toggle menu" role="button" tabindex="0" aria-controls="mm" aria-expanded="false"><span style="background-color:rgba(60,60,60,1)"></span><span style="background-color:rgba(60,60,60,1)"></span><span style="background-color:rgba(60,60,60,1)"></span></div><div id="mm" class="MobileHeaderMenu_mobileMenu__21p7v" style="background-color:rgba(60,60,60,1)" aria-hidden="true"><ul><li><a href="/" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat" title="Home">Home</a></li><li><a href="/services" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat" title="Services">Services</a></li><li><a href="/quotation" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat" title="quotation">quotation</a></li><li><a href="/booking" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat" title="booking">booking</a></li><li><a href="/about" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat" title="About">About</a></li><li><a href="/blog/" class="MobileHeaderMenu_current__2Nelz" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat;font-weight:bold" title="Blog">Blog</a></li><li><a href="/contact" style="background-color:rgba(60,60,60,1);color:rgba(255,255,255,1);font-size:16px;line-height:3;font-family:Montserrat" title="Contact">Contact</a></li></ul></div><div id="mm-overlay" class="MobileHeaderMenu_mobileMenu_overlay__3WPnz" aria-hidden="true"></div></div></div><style>.template { visibility: hidden }
+body { overflow-x: hidden }</style><link rel="stylesheet" href="/onewebstatic/7c5106d718.css"><script>window.newSeoEnabled = true;</script><div class="template" data-mobile-view="true"><div class="Preview_row__3Fkye row" style="width:1050px"></div><div class="Preview_row__3Fkye row Preview_noSideMargin__2I-_n" style="min-height:96px;width:100%"><div data-id="F69AEAA5-9D51-42F7-B823-673203B39B6B" data-kind="SECTION" style="width:100%;min-height:96px;left:auto;margin-top:0;margin-left:0" class="Preview_componentWrapper__2i4QI"><div id="Header" data-in-template="true" data-id="F69AEAA5-9D51-42F7-B823-673203B39B6B" data-kind="Block" data-specific-kind="SECTION" data-pin="1" data-stretch="true" class="Preview_block__16Zmu"><div class="StripPreview_backgroundComponent__3YmQM Background_backgroundComponent__3_1Ea hasChildren" style="background-color:rgba(255,255,255,0.75);border-color:rgba(65,232,27,0.18);border-style:solid;border-width:0px 0px 1px 0px;background-clip:padding-box;min-height:96px;padding-bottom:28px" data-width="100" data-height="96"><div class="Preview_column__1KeVx col" style="min-height:100%;width:1050px;margin:0 auto;margin-bottom:-1px"><div class="Preview_row__3Fkye row" style="min-height:68px;width:1050px"><div class="Preview_column__1KeVx col" style="min-height:68px;width:300px;float:left"><div data-id="D034711F-F6DB-496A-9D88-35C98E6AB339" data-kind="LOGO" style="width:300px;min-height:40px;margin-top:28px;margin-left:0" class="Preview_componentWrapper__2i4QI"><div data-in-template="true" data-id="D034711F-F6DB-496A-9D88-35C98E6AB339" data-kind="Component" data-specific-kind="LOGO" class="Preview_mobileHide__9T929 Preview_component__SbiKo"><a style="text-decoration:none;display:block" href="/"><div><div style="white-space:nowrap;visibility:hidden;pointer-events:none;position:absolute;width:1px;height:1px;overflow:hidden;left:-20000px;top:-20000px" data-shadow-render-container="true"><div class="tinyMceContent textnormal"><h1 style="display:inline-block" class="textlogo White" data-shadow-render="true">apiblockchain</h1></div></div><div class="style_logoTextContainer__2ui-f" style="justify-content:flex-start" data-horizontal-alignment="left" data-logo-container="true" data-testid="logo-button-container"><div class="style_logoTextInnerContainer__3mCcI" style="height:80%;width:90%;justify-content:flex-start"><div class="tinyMceContent textnormal" style="white-space:nowrap"><h1 class="textlogo White" style="font-size:0">apiblockchain</h1></div></div></div></div></a></div></div><div style="clear:both"></div></div><div class="Preview_column__1KeVx col isExpandable" style="min-height:68px;width:750px;float:left"><div data-id="D82ED8C7-3792-4ED8-8A5D-803F61F24C2A" data-kind="MENU" style="width:560px;min-height:40px;margin-top:28px;margin-left:190px" class="Preview_componentWrapper__2i4QI"><div data-in-template="true" data-id="D82ED8C7-3792-4ED8-8A5D-803F61F24C2A" data-kind="Component" data-specific-kind="MENU" class="Preview_mobileHide__9T929 Preview_component__SbiKo"><div class="menu moreEnabled menuself menuhorizontal dropdown menuhorizontalright menuverticalmiddle White" style="width:560px;height:40px;display:none"><ul class="ThemeMenu1"><li><a class="level-0" href="/"><span>Home</span></a><div class="divider"></div></li><li><a class="level-0" href="/services"><span>Services</span></a><div class="divider"></div></li><li><a class="level-0" href="/quotation"><span>quotation</span></a><div class="divider"></div></li><li><a class="level-0" href="/booking"><span>booking</span></a><div class="divider"></div></li><li><a class="level-0" href="/about"><span>About</span></a><div class="divider"></div></li><li><a class="selected level-0" href="/blog/" aria-current="page"><span>Blog</span></a><div class="divider"></div></li><li><a class="level-0" href="/contact"><span>Contact</span></a><div class="divider"></div></li><li><a class="expandable level-0" tabindex="0" aria-haspopup="true" aria-expanded="false"><span>More</span></a><ul class="ThemeMenu2"><li class="menuhidden"><a class="level-1" tabindex="0"><span>More child</span></a></li></ul></li></ul></div></div></div><div style="clear:both"></div></div><div style="clear:both"></div></div><div style="clear:both"></div></div></div></div></div></div><div class="Preview_row__3Fkye row Preview_noSideMargin__2I-_n" style="min-height:242px;width:100%"><div data-id="57319200-5AF6-4DB5-B9B3-23928397F9EF" data-kind="SECTION" style="width:100%;min-height:242px;left:auto;margin-top:0;margin-left:0" class="Preview_componentWrapper__2i4QI"><div id="Section1" data-in-template="false" data-id="57319200-5AF6-4DB5-B9B3-23928397F9EF" data-kind="Block" data-specific-kind="SECTION" data-pin="0" data-stretch="true" class="Preview_block__16Zmu"><div class="StripPreview_backgroundComponent__3YmQM Background_backgroundComponent__3_1Ea hasChildren" style="background-color:rgba(255,255,255,1);min-height:242px;padding-bottom:26px" data-width="100" data-height="242"><div class="Preview_column__1KeVx col" style="min-height:100%;width:1050px;margin:0 auto"><div class="Preview_row__3Fkye row" style="min-height:70px;width:1050px"><div data-id="4C72790E-FFD5-44B9-8D16-85B4E57210C0" data-kind="TEXT" style="width:1050px;min-height:50px;margin-top:20px;margin-left:0" class="Preview_componentWrapper__2i4QI"><div data-in-template="false" data-id="4C72790E-FFD5-44B9-8D16-85B4E57210C0" data-kind="Component" data-specific-kind="TEXT" class="Preview_component__SbiKo text-align-null"><div class="styles_verticalAlignmentWrapper__3SDi2" style="align-items:center"><div data-mve-font-change="0" style="width:100%" class="styles_contentContainer__lrPIa textnormal styles_text__3jGMu styles_invalidateHighlightAndShadows__2W3IH White themeTextClass"><h2 class="textheading2 mobile-oversized" style="text-align: center;">Blog</h2></div></div></div></div></div><div class="Preview_row__3Fkye row" style="min-height:146px;width:1050px"><div data-id="09B71561-D8D6-4CFD-8525-6CEF6AF00114" data-kind="BLOG" style="width:1050px;min-height:100px;margin-top:46px;margin-left:0" class="Preview_componentWrapper__2i4QI"><div data-in-template="false" data-id="09B71561-D8D6-4CFD-8525-6CEF6AF00114" data-kind="Component" data-specific-kind="BLOG" class="Preview_component__SbiKo"><div id="blog_preview_547c0976-55b2-4970-b249-a939ea3e7769" data-testid="blog-preview" class="White" data-error="<?php echo $errorAttributeValue; ?>" data-theme-547c0976-55b2-4970-b249-a939ea3e7769="White" data-text-style-547c0976-55b2-4970-b249-a939ea3e7769="%5B%7B%22textClass%22:%22textnormal%22,%22moderationClass%22:%22mobile-undersized-upper%22,%22fontSize%22:15%7D,%7B%22textClass%22:%22textheading1%22,%22moderationClass%22:%22mobile-oversized%22,%22fontSize%22:72%7D,%7B%22textClass%22:%22textheading2%22,%22moderationClass%22:%22mobile-oversized%22,%22fontSize%22:42%7D,%7B%22textClass%22:%22textheading3%22,%22moderationClass%22:%22%22,%22fontSize%22:20%7D%5D" style="width:inherit;min-height:250px" data-blog-layout="list"><div class="Blog_container__BbPRW" data-content="true"><?php echo $content; ?></div><div data-testid="loading-indicator" class="LoadingIndicator_center__1PWp3 global_flexCenter__1azjn Blog_loading__2sNoa"><div class="LoadingIndicator_animatedLoadingDots-container__EoXGW LoadingIndicator_container__weKY1"><div class="LoadingIndicator_animatedLoadingDots__1fl0N"><div></div><div></div><div></div></div></div></div><div data-testid="error-message" class="Blog_errorMessageContainer__3K791 Blog_error__9T8l4 textnormal">This blog isn’t available right now. Try refreshing the page or check back later. Sorry for the inconvenience</div></div></div></div></div><div style="clear:both"></div></div></div></div></div></div><div class="Preview_row__3Fkye row Preview_noSideMargin__2I-_n" style="min-height:112px;width:100%"><div data-id="3AF86E59-BC32-43DB-9929-CE4BC60143FC" data-kind="SECTION" style="width:100%;min-height:112px;left:auto;margin-top:0;margin-left:0" class="Preview_componentWrapper__2i4QI"><div id="Footer" data-in-template="true" data-id="3AF86E59-BC32-43DB-9929-CE4BC60143FC" data-kind="Block" data-specific-kind="SECTION" data-pin="0" data-stretch="true" class="Preview_block__16Zmu"><div class="StripPreview_backgroundComponent__3YmQM Background_backgroundComponent__3_1Ea hasChildren" style="background-color:rgba(255,255,255,1);border-color:rgba(65,232,27,0.18);border-style:solid;border-width:1px 0px 0px 0px;background-clip:padding-box;min-height:112px;padding-bottom:37px" data-width="100" data-height="112"><div class="Preview_column__1KeVx col" style="min-height:100%;width:1050px;margin:0 auto;margin-top:-1px"><div class="Preview_row__3Fkye row" style="min-height:75px;width:1050px"><div class="Preview_column__1KeVx col" style="min-height:75px;width:300px;float:left"><div data-id="00F7BBE4-C3F0-4CE6-9436-DFD7A0BF60C5" data-kind="LOGO" style="width:300px;min-height:40px;margin-top:35px;margin-left:0" class="Preview_componentWrapper__2i4QI"><div data-in-template="true" data-id="00F7BBE4-C3F0-4CE6-9436-DFD7A0BF60C5" data-kind="Component" data-specific-kind="LOGO" class="Preview_component__SbiKo"><a style="text-decoration:none;display:block" href="/"><div><div style="white-space:nowrap;visibility:hidden;pointer-events:none;position:absolute;width:1px;height:1px;overflow:hidden;left:-20000px;top:-20000px" data-shadow-render-container="true"><div class="tinyMceContent textnormal"><h1 style="display:inline-block" class="textlogo White" data-shadow-render="true">apiblockchain</h1></div></div><div class="style_logoTextContainer__2ui-f" style="justify-content:flex-start" data-horizontal-alignment="left" data-logo-container="true" data-testid="logo-button-container"><div class="style_logoTextInnerContainer__3mCcI" style="height:80%;width:90%;justify-content:flex-start"><div class="tinyMceContent textnormal" style="white-space:nowrap"><h1 class="textlogo White" style="font-size:0">apiblockchain</h1></div></div></div></div></a></div></div><div style="clear:both"></div></div><div class="Preview_column__1KeVx col isExpandable" style="min-height:75px;width:350px;float:left"><div data-id="573E2667-6469-4713-8EAE-0F4BEAB17C9F" data-kind="PHONE" style="width:250px;min-height:20px;margin-top:45px;margin-left:100px" class="Preview_componentWrapper__2i4QI"><div data-in-template="true" data-id="573E2667-6469-4713-8EAE-0F4BEAB17C9F" data-kind="Component" data-specific-kind="PHONE" class="Preview_component__SbiKo"><div class="White themeTextClass" style="height:100%;width:100%"><div class="textnormal" style="word-break:break-word;height:100%;width:100%;display:flex;align-items:center;flex-direction:column"><div style="width:100%"><div class="textnormal" style="font-size:1px;white-space:pre-wrap;line-height:1.2;text-align:center;width:100%"><a class="textnormal" href="tel:+31652824245" style="font-weight:bold;font-size:16px;font-family:Montserrat;letter-spacing:0;line-height:1.2" data-preserve-whitespace="true"><span>+31652824245</span></a></div></div></div></div></div></div><div style="clear:both"></div></div><div class="Preview_column__1KeVx col" style="min-height:75px;width:400px;float:left"><div data-id="D15E6699-01E9-4930-8AB2-A671298DF1DD" data-kind="SOCIAL_LINKS" style="width:130px;height:30px;margin-top:40px;margin-left:270px" class="Preview_componentWrapper__2i4QI"><div data-in-template="true" data-id="D15E6699-01E9-4930-8AB2-A671298DF1DD" data-kind="Component" data-specific-kind="SOCIAL_LINKS" class="Preview_component__SbiKo"><div class="Social_container__2rWh4 THEME_DEFAULT" style="font-size:30px"><a target="_blank" style="width:30px;height:30px" aria-label="Visit our Facebook page"><svg viewBox="0 0 48 48" style="width:30px;height:30px"><path fill="#3c3c3c" d="M24 48C10.745 48 0 37.255 0 24S10.745 0 24 0s24 10.745 24 24-10.745 24-24 24zm4.314-23.37l.572-3.741h-3.578V18.46c0-1.023.5-2.021 2.102-2.021h1.627v-3.186S27.561 13 26.149 13c-2.947 0-4.873 1.792-4.873 5.037v2.852H18v3.742h3.276v9.046a12.955 12.955 0 004.032 0v-9.046h3.006z"></path></svg></a><a target="_blank" style="width:30px;height:30px" aria-label="Visit our X (formerly Twitter) profile"><svg viewBox="0 0 48 48" style="width:30px;height:30px"><path fill-rule="evenodd" clip-rule="evenodd" d="M24 48C37.2548 48 48 37.2548 48 24C48 10.7452 37.2548 0 24 0C10.7452 0 0 10.7452 0 24C0 37.2548 10.7452 48 24 48ZM34.6407 13.9039H31.1138L25.3023 20.5471L20.2775 13.9039H13L21.6955 25.2744L13.4542 34.6938H16.9831L23.3438 27.4259L28.9027 34.6938H36L26.9356 22.7103L34.6407 13.9039ZM31.8303 32.5828H29.876L17.1185 15.904H19.2156L31.8303 32.5828Z" fill="#3C3C3C"></path></svg></a><a target="_blank" style="width:30px;height:30px" aria-label="linkedin"><svg viewBox="0 0 48 48" style="width:30px;height:30px"><path fill="#3c3c3c" d="M24 48C10.745 48 0 37.255 0 24S10.745 0 24 0s24 10.745 24 24-10.745 24-24 24zm-2.475-28.489v13.525h4.34v-6.528c0-1.721.345-3.388 2.606-3.388 2.227 0 2.258 1.969 2.258 3.5v6.416h4.342v-7.238c0-3.554-.813-6.287-5.21-6.287-2.113 0-3.532 1.094-4.111 2.132h-.06V19.51h-4.165zm-7.525 0v13.525h4.515V19.511H14zm4.515-3.757a2.256 2.256 0 00-2.257-2.254A2.256 2.256 0 0014 15.754a2.256 2.256 0 002.258 2.254 2.256 2.256 0 002.257-2.254z"></path></svg></a></div></div></div><div style="clear:both"></div></div><div style="clear:both"></div></div><div style="clear:both"></div></div></div></div></div></div></div><div class="publishOnlyComponents"><div data-testid="empty-cart-component"></div></div><div data-testid="sticky-buttons" data-id="template-sticky-buttons" data-position="center" class="StickyButtonPreview_container__3zgoO" style="top:calc(50% - 102px)"><a class="StickyButtonPreview_stickyButton__3jBM3 button1 White primary themeButtonClass White primary themeButtonClass" href="tel:+31652824245" data-id="phone" data-type="stickyButton.phone" aria-label="Call now" data-testid="sticky-button"><span class="StickyButtonPreview_label__1q9kV">Call now</span><span data-testid="stickyButton.phone-icon" class="StickyButtonPreview_icon__3gSbZ"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19.4215 20.5C17.6072 20.5 15.7542 20.0583 13.8625 19.175C11.9708 18.2917 10.2125 17.0375 8.5875 15.4125C6.9625 13.7875 5.70833 12.0292 4.825 10.1375C3.94167 8.24583 3.5 6.39283 3.5 4.5785C3.5 4.23567 3.59167 3.97025 3.775 3.78225C3.95833 3.59408 4.21667 3.5 4.55 3.5H7.5C7.78983 3.5 8.04142 3.5875 8.25475 3.7625C8.46825 3.9375 8.625 4.16667 8.725 4.45L9.275 7.25C9.325 7.5 9.31667 7.73333 9.25 7.95C9.18333 8.16667 9.08333 8.325 8.95 8.425L6.6 10.6C7.01667 11.3333 7.46667 12.0125 7.95 12.6375C8.43333 13.2625 8.95833 13.875 9.525 14.475C10.1083 15.0417 10.725 15.5708 11.375 16.0625C12.025 16.5542 12.725 17.0083 13.475 17.425L15.95 15C16.1 14.8333 16.2343 14.7375 16.353 14.7125C16.4715 14.6875 16.6205 14.6917 16.8 14.725L19.5 15.325C19.7833 15.3917 20.0208 15.5333 20.2125 15.75C20.4042 15.9667 20.5 16.2167 20.5 16.5V19.45C20.5 19.7833 20.4059 20.0417 20.2178 20.225C20.0298 20.4083 19.7643 20.5 19.4215 20.5ZM5.975 9.35L7.775 7.75C7.85833 7.68333 7.9125 7.59167 7.9375 7.475C7.9625 7.35833 7.95833 7.25 7.925 7.15L7.5 5.25C7.46667 5.11667 7.40833 5.01667 7.325 4.95C7.24167 4.88333 7.13333 4.85 7 4.85H5.275C5.175 4.85 5.09167 4.88333 5.025 4.95C4.95833 5.01667 4.925 5.1 4.925 5.2C4.925 5.91667 5.025 6.60833 5.225 7.275C5.425 7.94167 5.675 8.63333 5.975 9.35ZM14.775 18.1C15.425 18.4333 16.1208 18.675 16.8625 18.825C17.6042 18.975 18.25 19.0667 18.8 19.1C18.9 19.1333 18.9833 19.1083 19.05 19.025C19.1167 18.9417 19.15 18.85 19.15 18.75V17C19.15 16.8667 19.1167 16.7583 19.05 16.675C18.9833 16.5917 18.8833 16.5333 18.75 16.5L17.05 16.125C16.95 16.0917 16.8625 16.0875 16.7875 16.1125C16.7125 16.1375 16.6333 16.1917 16.55 16.275L14.775 18.1Z" fill="currentColor"></path></svg></span></a><a class="StickyButtonPreview_stickyButton__3jBM3 button1 White primary themeButtonClass White primary themeButtonClass" href="mailto:info@apiblockchain.io" data-id="email" data-type="stickyButton.email" aria-label="Email us" data-testid="sticky-button"><span class="StickyButtonPreview_label__1q9kV">Email us</span><span data-testid="stickyButton.email-icon" class="StickyButtonPreview_icon__3gSbZ"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4.65 19.4508C4.03783 19.4508 3.5265 19.2454 3.116 18.8348C2.70533 18.4243 2.5 17.9129 2.5 17.3008V6.70078C2.5 6.08878 2.70533 5.57745 3.116 5.16678C3.5265 4.75611 4.03783 4.55078 4.65 4.55078H19.35C19.962 4.55078 20.4733 4.75611 20.884 5.16678C21.2947 5.57745 21.5 6.08878 21.5 6.70078V17.3008C21.5 17.9129 21.2947 18.4243 20.884 18.8348C20.4733 19.2454 19.962 19.4508 19.35 19.4508H4.65ZM20.15 7.15078L12.575 12.0508C12.4875 12.1008 12.399 12.1424 12.3095 12.1758C12.2198 12.2091 12.1167 12.2258 12 12.2258C11.8833 12.2258 11.7803 12.2091 11.6908 12.1758C11.6011 12.1424 11.5125 12.1008 11.425 12.0508L3.85 7.15078V17.3008C3.85 17.5341 3.925 17.7258 4.075 17.8758C4.225 18.0258 4.41667 18.1008 4.65 18.1008H19.35C19.5833 18.1008 19.775 18.0258 19.925 17.8758C20.075 17.7258 20.15 17.5341 20.15 17.3008V7.15078ZM12 11.0008L19.95 5.90078H4.05L12 11.0008ZM3.85 7.30078V6.27953V6.32578V6.23828V7.30078Z" fill="currentColor"></path></svg></span></a><a class="StickyButtonPreview_stickyButton__3jBM3 button1 White primary themeButtonClass White primary themeButtonClass" href="/booking" data-id="bookings" data-type="stickyButton.bookings" aria-label="Book now" data-testid="sticky-button"><span class="StickyButtonPreview_label__1q9kV">Book now</span><span data-testid="stickyButton.bookings-icon" class="StickyButtonPreview_icon__3gSbZ"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5.65 21.6004C5.03783 21.6004 4.5265 21.3951 4.116 20.9844C3.70533 20.5739 3.5 20.0626 3.5 19.4504V6.75039C3.5 6.13839 3.70533 5.62706 4.116 5.21639C4.5265 4.80572 5.03783 4.60039 5.65 4.60039H6.85V3.12539C6.85 2.92539 6.92083 2.75456 7.0625 2.61289C7.20417 2.47122 7.375 2.40039 7.575 2.40039C7.775 2.40039 7.94583 2.47122 8.0875 2.61289C8.22917 2.75456 8.3 2.92539 8.3 3.12539V4.60039H15.8V3.07539C15.8 2.89206 15.8667 2.73372 16 2.60039C16.1333 2.46706 16.2917 2.40039 16.475 2.40039C16.6583 2.40039 16.8167 2.46706 16.95 2.60039C17.0833 2.73372 17.15 2.89206 17.15 3.07539V4.60039H18.35C18.962 4.60039 19.4733 4.80572 19.884 5.21639C20.2947 5.62706 20.5 6.13839 20.5 6.75039V19.4504C20.5 20.0626 20.2947 20.5739 19.884 20.9844C19.4733 21.3951 18.962 21.6004 18.35 21.6004H5.65ZM5.65 20.2504H18.35C18.55 20.2504 18.7333 20.1671 18.9 20.0004C19.0667 19.8337 19.15 19.6504 19.15 19.4504V10.4504H4.85V19.4504C4.85 19.6504 4.93333 19.8337 5.1 20.0004C5.26667 20.1671 5.45 20.2504 5.65 20.2504ZM4.85 9.10039H19.15V6.75039C19.15 6.55039 19.0667 6.36706 18.9 6.20039C18.7333 6.03372 18.55 5.95039 18.35 5.95039H5.65C5.45 5.95039 5.26667 6.03372 5.1 6.20039C4.93333 6.36706 4.85 6.55039 4.85 6.75039V9.10039ZM12 14.5004C11.7833 14.5004 11.5875 14.4129 11.4125 14.2379C11.2375 14.0629 11.15 13.8671 11.15 13.6504C11.15 13.4337 11.2375 13.2379 11.4125 13.0629C11.5875 12.8879 11.7833 12.8004 12 12.8004C12.2167 12.8004 12.4125 12.8879 12.5875 13.0629C12.7625 13.2379 12.85 13.4337 12.85 13.6504C12.85 13.8671 12.7625 14.0629 12.5875 14.2379C12.4125 14.4129 12.2167 14.5004 12 14.5004ZM8 14.5004C7.78333 14.5004 7.5875 14.4129 7.4125 14.2379C7.2375 14.0629 7.15 13.8671 7.15 13.6504C7.15 13.4337 7.2375 13.2379 7.4125 13.0629C7.5875 12.8879 7.78333 12.8004 8 12.8004C8.21667 12.8004 8.4125 12.8879 8.5875 13.0629C8.7625 13.2379 8.85 13.4337 8.85 13.6504C8.85 13.8671 8.7625 14.0629 8.5875 14.2379C8.4125 14.4129 8.21667 14.5004 8 14.5004ZM16 14.5004C15.7833 14.5004 15.5875 14.4129 15.4125 14.2379C15.2375 14.0629 15.15 13.8671 15.15 13.6504C15.15 13.4337 15.2375 13.2379 15.4125 13.0629C15.5875 12.8879 15.7833 12.8004 16 12.8004C16.2167 12.8004 16.4125 12.8879 16.5875 13.0629C16.7625 13.2379 16.85 13.4337 16.85 13.6504C16.85 13.8671 16.7625 14.0629 16.5875 14.2379C16.4125 14.4129 16.2167 14.5004 16 14.5004ZM12 18.3004C11.7833 18.3004 11.5875 18.2129 11.4125 18.0379C11.2375 17.8629 11.15 17.6671 11.15 17.4504C11.15 17.2337 11.2375 17.0379 11.4125 16.8629C11.5875 16.6879 11.7833 16.6004 12 16.6004C12.2167 16.6004 12.4125 16.6879 12.5875 16.8629C12.7625 17.0379 12.85 17.2337 12.85 17.4504C12.85 17.6671 12.7625 17.8629 12.5875 18.0379C12.4125 18.2129 12.2167 18.3004 12 18.3004ZM8 18.3004C7.78333 18.3004 7.5875 18.2129 7.4125 18.0379C7.2375 17.8629 7.15 17.6671 7.15 17.4504C7.15 17.2337 7.2375 17.0379 7.4125 16.8629C7.5875 16.6879 7.78333 16.6004 8 16.6004C8.21667 16.6004 8.4125 16.6879 8.5875 16.8629C8.7625 17.0379 8.85 17.2337 8.85 17.4504C8.85 17.6671 8.7625 17.8629 8.5875 18.0379C8.4125 18.2129 8.21667 18.3004 8 18.3004ZM16 18.3004C15.7833 18.3004 15.5875 18.2129 15.4125 18.0379C15.2375 17.8629 15.15 17.6671 15.15 17.4504C15.15 17.2337 15.2375 17.0379 15.4125 16.8629C15.5875 16.6879 15.7833 16.6004 16 16.6004C16.2167 16.6004 16.4125 16.6879 16.5875 16.8629C16.7625 17.0379 16.85 17.2337 16.85 17.4504C16.85 17.6671 16.7625 17.8629 16.5875 18.0379C16.4125 18.2129 16.2167 18.3004 16 18.3004Z" fill="currentColor"></path></svg></span></a><a class="StickyButtonPreview_stickyButton__3jBM3 button1 White primary themeButtonClass White primary themeButtonClass" href="https://www.google.com/maps/search/?api=1&amp;query=%22Apiblockchain%2C%20G.A.%20brederodestraat%20100%2C%201132%20ST%20VOLENDAM%2C%20Netherlands%22" data-id="location" data-type="stickyButton.location" aria-label="Find us" data-testid="sticky-button"><span class="StickyButtonPreview_label__1q9kV">Find us</span><span data-testid="stickyButton.location-icon" class="StickyButtonPreview_icon__3gSbZ"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 16.6242C13.7833 15.2076 15.1166 13.8689 16 12.6082C16.8833 11.3477 17.325 10.1114 17.325 8.89922C17.325 7.89839 17.1458 7.0523 16.7875 6.36097C16.4291 5.6698 15.975 5.10755 15.425 4.67422C14.875 4.24089 14.2935 3.92422 13.6805 3.72422C13.0675 3.52422 12.507 3.42422 11.999 3.42422C11.491 3.42422 10.9308 3.52422 10.3185 3.72422C9.70612 3.92422 9.12495 4.24089 8.57495 4.67422C8.02495 5.10755 7.57078 5.6698 7.21245 6.36097C6.85412 7.0523 6.67495 7.89639 6.67495 8.89322C6.67495 10.1139 7.11662 11.3534 7.99995 12.6117C8.88328 13.8701 10.2166 15.2076 12 16.6242ZM12.0047 17.9242C11.8254 17.9242 11.6495 17.8951 11.477 17.8367C11.3043 17.7784 11.1453 17.6909 11 17.5742C9.09995 16.0076 7.67912 14.5034 6.73745 13.0617C5.79578 11.6201 5.32495 10.2326 5.32495 8.89922C5.32495 7.77505 5.52628 6.78947 5.92895 5.94247C6.33178 5.09547 6.85112 4.3833 7.48695 3.80597C8.12295 3.2288 8.83837 2.79589 9.6332 2.50722C10.4282 2.21855 11.2152 2.07422 11.9942 2.07422C12.7732 2.07422 13.561 2.21855 14.3575 2.50722C15.1541 2.79589 15.871 3.2288 16.5082 3.80597C17.1455 4.3833 17.666 5.09547 18.0697 5.94247C18.4732 6.78947 18.675 7.77505 18.675 8.89922C18.675 10.2326 18.2041 11.6201 17.2625 13.0617C16.3208 14.5034 14.9 16.0076 13 17.5742C12.8565 17.6909 12.6995 17.7784 12.5292 17.8367C12.3589 17.8951 12.184 17.9242 12.0047 17.9242ZM12 10.4242C12.4726 10.4242 12.87 10.2632 13.192 9.94122C13.514 9.61922 13.675 9.22189 13.675 8.74922C13.675 8.27655 13.514 7.87922 13.192 7.55722C12.87 7.23522 12.4726 7.07422 12 7.07422C11.5273 7.07422 11.13 7.23522 10.808 7.55722C10.486 7.87922 10.325 8.27655 10.325 8.74922C10.325 9.22189 10.486 9.61922 10.808 9.94122C11.13 10.2632 11.5273 10.4242 12 10.4242ZM5.99995 21.9242C5.81745 21.9242 5.65928 21.8572 5.52545 21.7232C5.39178 21.5894 5.32495 21.4311 5.32495 21.2482C5.32495 21.0656 5.39178 20.9076 5.52545 20.7742C5.65928 20.6409 5.81745 20.5742 5.99995 20.5742H18C18.1825 20.5742 18.3405 20.6412 18.4742 20.7752C18.608 20.9091 18.675 21.0674 18.675 21.2502C18.675 21.4329 18.608 21.5909 18.4742 21.7242C18.3405 21.8576 18.1825 21.9242 18 21.9242H5.99995Z" fill="currentColor"></path></svg></span></a></div><div data-id="template-back-to-top-button" aria-label="Back to top" class="BackToTopButtonPreview_backToTopButton__1tkHM button1 White primary themeButtonClass White primary themeButtonClass"><svg width="24" height="24" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12.006 10.5121L7.78096 14.7371C7.64762 14.8704 7.49346 14.9413 7.31846 14.9496C7.14346 14.9579 6.98096 14.8871 6.83096 14.7371C6.68096 14.5871 6.60596 14.4288 6.60596 14.2621C6.60596 14.0954 6.68096 13.9371 6.83096 13.7871L11.256 9.36211C11.4726 9.14544 11.7226 9.03711 12.006 9.03711C12.2893 9.03711 12.5393 9.14544 12.756 9.36211L17.181 13.7871C17.3143 13.9204 17.3851 14.0746 17.3935 14.2496C17.4018 14.4246 17.331 14.5871 17.181 14.7371C17.031 14.8871 16.8726 14.9621 16.706 14.9621C16.5393 14.9621 16.381 14.8871 16.231 14.7371L12.006 10.5121Z" fill="currentColor"></path></svg><script async defer src="/onewebstatic/0f3e0e446f.js"></script></div><script src="/onewebstatic/a2cf72ae9c.js"></script><script></script><script src="/onewebstatic/050fbf46bf.js"></script><script src="/onewebstatic/d8aaffab41.js"></script><script src="/onewebstatic/6499ecfb0a.js"></script><script src="/onewebstatic/a966beca17.js"></script><script src="/onewebstatic/2d470de093.js"></script><script src="/onewebstatic/782805def0.js"></script><script src="/onewebstatic/ce2aa17458.js"></script><script src="/onewebstatic/754da52d3a.js"></script><script src="/onewebstatic/6563f65d21.js"></script><script src="/onewebstatic/ae63591324.js"></script><script>window._mobileEditorData={"data":{"3AF86E59-BC32-43DB-9929-CE4BC60143FC":["00F7BBE4-C3F0-4CE6-9436-DFD7A0BF60C5","573E2667-6469-4713-8EAE-0F4BEAB17C9F","D15E6699-01E9-4930-8AB2-A671298DF1DD"],"57319200-5AF6-4DB5-B9B3-23928397F9EF":["4C72790E-FFD5-44B9-8D16-85B4E57210C0","09B71561-D8D6-4CFD-8525-6CEF6AF00114"],"1CA803DC-721A-4FA7-8E5C-B6D0289DADB6":["F69AEAA5-9D51-42F7-B823-673203B39B6B","57319200-5AF6-4DB5-B9B3-23928397F9EF","3AF86E59-BC32-43DB-9929-CE4BC60143FC"]},"wrappedCmpsMap":{"4C72790E-FFD5-44B9-8D16-85B4E57210C0":[]},"root":"1CA803DC-721A-4FA7-8E5C-B6D0289DADB6","styles":{"F69AEAA5-9D51-42F7-B823-673203B39B6B":{"visibility":"hidden","height":0},"09B71561-D8D6-4CFD-8525-6CEF6AF00114":{"marginTop":20,"marginBottom":18},"4C72790E-FFD5-44B9-8D16-85B4E57210C0":{"marginTop":35},"3AF86E59-BC32-43DB-9929-CE4BC60143FC":{"marginTop":0},"573E2667-6469-4713-8EAE-0F4BEAB17C9F":{"marginTop":20},"D15E6699-01E9-4930-8AB2-A671298DF1DD":{"marginTop":20,"marginBottom":18},"00F7BBE4-C3F0-4CE6-9436-DFD7A0BF60C5":{"marginTop":18}},"groups":{},"settings":{}}</script><script src="/onewebstatic/9c7c242bec.js"></script><script src="/onewebstatic/50a91946f6.js"></script><script src="/onewebstatic/c11b17c5d2.js"></script><script src="/onewebstatic/79575a4ba3.js"></script><script src="/onewebstatic/ee9ac9c93c.js"></script><script src="/onewebstatic/db9395ae96.js"></script><script src="/onewebstatic/ac03fb8dec.js" id="mobileBackgroundLiner" data-params="{&quot;bodyBackgroundClassName&quot;:&quot;bodyBackground&quot;,&quot;linerClassName&quot;:&quot;Preview_bodyBackgroundLiner__1bYbS&quot;,&quot;scrollEffect&quot;:null}"></script><div id="tracking-scripts-container">
+                    <script key="g-tag-load-lib-script">
+                        
+                    </script>
+                    <script key="f-pixel-script">
+                        
+                    </script>
+                    <script key="sitWit-script">
+                        
+                    </script>
+                    <script key="kliken-script">
+                        
+                    </script>
+                    </div><div></div>
+        <?php
+            echo implode('', array_map(fn($src) => '<link rel="preload" as="script" href="' . htmlspecialchars($src) . '">', $scripts));
+            echo implode('', array_map(fn($src) => '<script src="' . htmlspecialchars($src) . '" defer></script>', $scripts));
+        ?>
+        <script>
+            document.addEventListener('DOMContentLoaded', async function () {
+                await blogUtilsInPublish.updateBlog({"partnerName":"onecom","siteId":"apiblockchain.io","blogHostName":"https://blogbuilder.one.com","isHomePage":false,"blogPageUrlPrefix":"","blogPageUrl":"/blog","blogId":"547c0976-55b2-4970-b249-a939ea3e7769","layout":"list","locale":"en","selectedParentTheme":"White","webspaceAssetPrefix":"https://impro.usercontent.one/appid/oneComBlog/domain/apiblockchain.io/media/apiblockchain.io","blogEltId":"blog_preview_547c0976-55b2-4970-b249-a939ea3e7769","category":"<?php echo $category; ?>","textStyleData":[{"textClass":"textnormal","moderationClass":"mobile-undersized-upper","fontSize":15},{"textClass":"textheading1","moderationClass":"mobile-oversized","fontSize":72},{"textClass":"textheading2","moderationClass":"mobile-oversized","fontSize":42},{"textClass":"textheading3","moderationClass":"","fontSize":20}]});
+            });
+        </script>
+    <style type="text/css">#blog_preview_547c0976-55b2-4970-b249-a939ea3e7769 { --main-color: #070707 !important; --accent-color: #41e81b !important; --white-color: #ffffff !important; --black-color: #3c3c3c !important; }</style></body></html>

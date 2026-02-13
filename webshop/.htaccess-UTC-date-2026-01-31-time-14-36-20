@@ -1,0 +1,13 @@
+
+<If " %{ENV:G1_RUNTIME} == 'static' ">
+    <If " -d %{REQUEST_FILENAME} || %{REQUEST_FILENAME} =~ /.*\.php$/ ">
+        Require all denied
+    </If>
+    <If " ! -f %{REQUEST_FILENAME} ">
+        <IfModule mod_rewrite.c>
+            RewriteEngine On
+            RewriteRule .* - [R=404,L]
+        </IfModule>
+    </If>
+</If>
+    
