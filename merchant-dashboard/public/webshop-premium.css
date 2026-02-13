@@ -91,7 +91,36 @@ body {
   font-weight: 700;
   line-height: 1.15;
   letter-spacing: -0.03em;
-  text-shadow: 2px 4px 20px rgba(0, 0, 0, 0.3);
+  text-shadow: 2px 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+/* Professional Image Overlays */
+.StripPreview_bgImageContainer__MFrbA::after,
+.Background_bgImageContainer__AwuIx::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(60, 100, 198, 0.15) 0%, rgba(30, 41, 59, 0.25) 100%);
+  pointer-events: none;
+}
+
+#Home .StripPreview_bgImageContainer__MFrbA::after,
+#Home .Background_bgImageContainer__AwuIx::after {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(60, 100, 198, 0.3) 100%);
+}
+
+/* Image Quality Enhancement */
+.StripPreview_bgImageContainer__MFrbA,
+.Background_bgImageContainer__AwuIx {
+  filter: brightness(0.95) contrast(1.1) saturate(1.1);
+}
+
+#Home .StripPreview_bgImageContainer__MFrbA,
+#Home .Background_bgImageContainer__AwuIx {
+  filter: brightness(0.85) contrast(1.15) saturate(0.95);
 }
 
 /* Premium Service Cards */
@@ -106,13 +135,19 @@ body {
 
 /* Icon Enhancement */
 .Preview_component__SbiKo img[src*="svg"] {
-  filter: drop-shadow(0 4px 12px rgba(60, 100, 198, 0.2));
+  filter: drop-shadow(0 4px 12px rgba(60, 100, 198, 0.3));
   transition: all 0.3s ease;
 }
 
+/* Replace black SVG icons with brand color */
+.Preview_component__SbiKo img[src*="fill='%23070707'"],
+.Preview_component__SbiKo img[src*="fill='%233c3c3c'"] {
+  filter: brightness(0) saturate(100%) invert(35%) sepia(89%) saturate(1214%) hue-rotate(207deg) brightness(93%) contrast(87%) drop-shadow(0 4px 12px rgba(60, 100, 198, 0.3));
+}
+
 .wsb-animation:hover img[src*="svg"] {
-  transform: scale(1.1);
-  filter: drop-shadow(0 6px 16px rgba(60, 100, 198, 0.35));
+  transform: scale(1.15) rotate(5deg);
+  filter: brightness(0) saturate(100%) invert(35%) sepia(89%) saturate(1214%) hue-rotate(207deg) brightness(93%) contrast(87%) drop-shadow(0 6px 20px rgba(60, 100, 198, 0.5));
 }
 
 /* Enhanced Typography */
