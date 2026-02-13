@@ -6,7 +6,11 @@
   "framework": "nextjs",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/dashboard(.*)",
+      "destination": "/merchant-dashboard/$1"
+    },
+    {
+      "source": "/admin(.*)",
       "destination": "/merchant-dashboard/$1"
     }
   ]
