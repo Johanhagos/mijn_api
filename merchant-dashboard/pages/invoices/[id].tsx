@@ -12,9 +12,13 @@ interface Invoice {
   buyer_name?: string;
   buyer_email?: string;
   buyer_address?: string;
+  buyer_country?: string;
+  buyer_vat?: string;
+  buyer_type?: string;
   seller_address?: string;
   subtotal?: number;
   vat_amount?: number;
+  vat_rate?: number;
   total?: number;
   payment_system?: string;
   blockchain_tx_id?: string;
