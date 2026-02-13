@@ -2,14 +2,14 @@
   "env": {
     "NEXT_PUBLIC_API_URL": "https://api.apiblockchain.io"
   },
-  "rewrites": [
+  "routes": [
     {
-      "source": "/dashboard/:path*",
-      "destination": "/:path*"
+      "src": "^/dashboard(/|$)",
+      "destination": "/dashboard"
     },
     {
-      "source": "/:path((?!.*\\.).*)",
-      "destination": "/404.html"
+      "src": "^/dashboard/.*",
+      "destination": "/dashboard"
     }
   ]
 }

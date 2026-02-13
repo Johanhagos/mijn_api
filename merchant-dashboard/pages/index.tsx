@@ -1,10 +1,16 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
+import fs from 'fs';
+import path from 'path';
 
-export default function Index() {
-  const router = useRouter();
-  useEffect(() => {
-    router.replace('/dashboard');
-  }, [router]);
-  return <p>Redirecting to dashboard…</p>;
+export default function Index({ html }: { html: string }) {
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+export async function getStaticProps() {
+  const filePath = path.join(process.cwd(), 'public', 'index.html');
+  const html = fs.readFileSync(filePath, 'utf-8');
+  
+  return {
+    props: { html },
+    revalidate: 60,
+  };
 }
