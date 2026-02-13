@@ -7,6 +7,7 @@ import PaymentDonut from '../components/PaymentDonut';
 import ApiKeysList from '../components/ApiKeysList';
 import PluginSetup from '../components/PluginSetup';
 import VATChecker from '../components/VATChecker';
+import AIAssistant from '../components/AIAssistant';
 
 export default function Dashboard() {
   const [stats, setStats] = useState<any>(null);
@@ -214,6 +215,9 @@ export default function Dashboard() {
           </div>
         </main>
         </div>
+
+        {/* AI Assistant */}
+        <AIAssistant merchantData={{ stats, merchant, apiKeys }} />
       </div>
     </AuthGuard>
   );

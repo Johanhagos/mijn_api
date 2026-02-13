@@ -2305,10 +2305,616 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
         "payment_system": inv.get("payment_system"),
         "blockchain_tx_id": inv.get("blockchain_tx_id"),
         "pdf_url": inv.get("pdf_url"),
-        "status": inv.get("status"),
-        "created_at": inv.get("created_at"),
-        "due_date": inv.get("due_date"),
     })
+
+
+# --- Country-Specific VAT & Compliance Database ---
+COUNTRY_VAT_RULES = {
+    "NL": {
+        "name": "Netherlands",
+        "standard_rate": 21.0,
+        "reduced_rates": [9.0],  # Food, books, medicines
+        "oss_threshold": 10000,  # EUR
+        "currency": "EUR",
+        "tax_authority": "Belastingdienst",
+        "vat_return_frequency": "Quarterly",
+        "invoice_requirements": [
+            "Sequential invoice number",
+            "VAT identification number",
+            "Date of supply",
+            "Customer VAT number (B2B)",
+            "Reverse charge notation (EU B2B)"
+        ],
+        "reverse_charge_phrase": "Verlegd naar u - BTW-heffing bij afnemer",
+        "digital_reporting": "Yes - SAF-T required",
+        "record_retention_years": 7,
+    },
+    "DE": {
+        "name": "Germany",
+        "standard_rate": 19.0,
+        "reduced_rates": [7.0],
+        "oss_threshold": 10000,
+        "currency": "EUR",
+        "tax_authority": "Bundeszentralamt für Steuern",
+        "vat_return_frequency": "Monthly/Quarterly",
+        "invoice_requirements": [
+            "Rechnungsnummer (invoice number)",
+            "Steuernummer (tax number)",
+            "Reverse charge: 'Steuerschuldnerschaft des Leistungsempfängers'",
+            "GoBD compliant archiving"
+        ],
+        "reverse_charge_phrase": "Steuerschuldnerschaft des Leistungsempfängers gemäß §13b UStG",
+        "digital_reporting": "Yes - GoBD compliance required",
+        "record_retention_years": 10,
+    },
+    "FR": {
+        "name": "France",
+        "standard_rate": 20.0,
+        "reduced_rates": [10.0, 5.5, 2.1],
+        "oss_threshold": 10000,
+        "currency": "EUR",
+        "tax_authority": "Direction Générale des Finances Publiques (DGFiP)",
+        "vat_return_frequency": "Monthly",
+        "invoice_requirements": [
+            "Numéro de TVA intracommunautaire",
+            "Autoliquidation mention (reverse charge)",
+            "Electronic invoicing mandatory from 2026"
+        ],
+        "reverse_charge_phrase": "Autoliquidation - Article 283-2 du CGI",
+        "digital_reporting": "Yes - E-invoicing mandatory 2026",
+        "record_retention_years": 6,
+    },
+    "BE": {
+        "name": "Belgium",
+        "standard_rate": 21.0,
+        "reduced_rates": [12.0, 6.0],
+        "oss_threshold": 10000,
+        "currency": "EUR",
+        "tax_authority": "FOD Financiën / SPF Finances",
+        "vat_return_frequency": "Monthly/Quarterly",
+        "invoice_requirements": [
+            "BTW-nummer / Numéro de TVA",
+            "Sequential numbering per fiscal year",
+            "Reverse charge: 'Autoliquidation / Verlegde BTW'"
+        ],
+        "reverse_charge_phrase": "Autoliquidation / Verlegde BTW - Art. 51 §2 1° WBTW/CTVA",
+        "digital_reporting": "Yes - Mandatory listing required",
+        "record_retention_years": 7,
+    },
+    "GB": {
+        "name": "United Kingdom",
+        "standard_rate": 20.0,
+        "reduced_rates": [5.0, 0.0],
+        "oss_threshold": 0,  # Post-Brexit: no EU OSS
+        "currency": "GBP",
+        "tax_authority": "HM Revenue & Customs (HMRC)",
+        "vat_return_frequency": "Quarterly",
+        "invoice_requirements": [
+            "VAT registration number",
+            "Unique sequential invoice number",
+            "Making Tax Digital (MTD) compliance",
+            "No reverse charge for EU (post-Brexit)"
+        ],
+        "reverse_charge_phrase": "Reverse charge: Customer to account for VAT",
+        "digital_reporting": "Yes - Making Tax Digital mandatory",
+        "record_retention_years": 6,
+        "special_notes": "Post-Brexit: EU B2B treated as exports (0% VAT with proof)"
+    },
+    "US": {
+        "name": "United States",
+        "standard_rate": 0.0,  # No federal VAT
+        "reduced_rates": [],
+        "oss_threshold": 0,
+        "currency": "USD",
+        "tax_authority": "State-specific (no federal VAT)",
+        "vat_return_frequency": "State-dependent",
+        "invoice_requirements": [
+            "Sales tax varies by state",
+            "Economic nexus rules apply",
+            "Marketplace facilitator laws"
+        ],
+        "reverse_charge_phrase": "N/A - Use tax applies",
+        "digital_reporting": "State-dependent",
+        "record_retention_years": 7,
+        "special_notes": "No VAT - Sales tax system. Each state has different rates (0-10%). Economic nexus: $100k+ or 200+ transactions."
+    },
+    "ES": {
+        "name": "Spain",
+        "standard_rate": 21.0,
+        "reduced_rates": [10.0, 4.0],
+        "oss_threshold": 10000,
+        "currency": "EUR",
+        "tax_authority": "Agencia Tributaria",
+        "vat_return_frequency": "Quarterly/Monthly",
+        "invoice_requirements": [
+            "NIF (tax ID) or VAT number",
+            "Reverse charge: 'Inversión del sujeto pasivo'",
+            "SII (Immediate Supply of Information) for large companies"
+        ],
+        "reverse_charge_phrase": "Inversión del sujeto pasivo - Art. 84.Uno.2º LIVA",
+        "digital_reporting": "Yes - SII for turnover >6M EUR",
+        "record_retention_years": 4,
+    },
+    "IT": {
+        "name": "Italy",
+        "standard_rate": 22.0,
+        "reduced_rates": [10.0, 5.0, 4.0],
+        "oss_threshold": 10000,
+        "currency": "EUR",
+        "tax_authority": "Agenzia delle Entrate",
+        "vat_return_frequency": "Monthly/Quarterly",
+        "invoice_requirements": [
+            "Partita IVA (VAT number)",
+            "SDI (electronic invoicing) mandatory",
+            "Reverse charge: 'Inversione contabile - Reverse charge'"
+        ],
+        "reverse_charge_phrase": "Inversione contabile art. 17 c. 6 DPR 633/72",
+        "digital_reporting": "Yes - FatturaPA (SDI) mandatory",
+        "record_retention_years": 10,
+    },
+    "SE": {
+        "name": "Sweden",
+        "standard_rate": 25.0,
+        "reduced_rates": [12.0, 6.0],
+        "oss_threshold": 10000,
+        "currency": "SEK",
+        "tax_authority": "Skatteverket",
+        "vat_return_frequency": "Monthly",
+        "invoice_requirements": [
+            "Organisationsnummer and VAT number",
+            "Reverse charge: 'Omvänd skattskyldighet'",
+            "Electronic invoicing recommended"
+        ],
+        "reverse_charge_phrase": "Omvänd skattskyldighet enligt 1 kap. 2 § ML",
+        "digital_reporting": "Yes - SIE format for accounting",
+        "record_retention_years": 7,
+    },
+    "PL": {
+        "name": "Poland",
+        "standard_rate": 23.0,
+        "reduced_rates": [8.0, 5.0],
+        "oss_threshold": 10000,
+        "currency": "PLN",
+        "tax_authority": "Krajowa Administracja Skarbowa",
+        "vat_return_frequency": "Monthly",
+        "invoice_requirements": [
+            "NIP number (tax ID)",
+            "KSeF (structured electronic invoices) from 2024",
+            "Split payment mechanism for high-risk goods"
+        ],
+        "reverse_charge_phrase": "Odwrotne obciążenie - Art. 17 ust. 1 pkt 4 Ustawy o VAT",
+        "digital_reporting": "Yes - KSeF mandatory from 2024",
+        "record_retention_years": 5,
+    },
+}
+
+def get_country_vat_info(country_code: str) -> dict:
+    """Get VAT rules for a specific country. Returns generic EU rules if country not found."""
+    country = country_code.upper() if country_code else "XX"
+    
+    if country in COUNTRY_VAT_RULES:
+        return COUNTRY_VAT_RULES[country]
+    
+    # Default EU country rules
+    return {
+        "name": country,
+        "standard_rate": 20.0,
+        "reduced_rates": [10.0],
+        "oss_threshold": 10000,
+        "currency": "EUR",
+        "tax_authority": "Local tax authority",
+        "vat_return_frequency": "Quarterly",
+        "invoice_requirements": ["VAT number", "Sequential numbering", "Reverse charge notation for EU B2B"],
+        "reverse_charge_phrase": "Reverse charge applies - VAT payable by customer",
+        "digital_reporting": "Check local requirements",
+        "record_retention_years": 7,
+    }
+
+
+# --- AI Assistant Endpoint ---
+@app.post("/ai/chat")
+async def ai_chat(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """AI assistant endpoint for merchant dashboard help - specialized in VAT & compliance."""
+    message = payload.get("message", "").strip()
+    context = payload.get("context", {})
+    history = payload.get("history", [])
+    
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+    
+    # Build context string for AI
+    stats = context.get("stats", {})
+    merchant = context.get("merchant", {})
+    
+    # Get country-specific VAT rules
+    merchant_country = merchant.get('country', 'XX')
+    country_info = get_country_vat_info(merchant_country)
+    
+    context_info = f"""
+You are a specialized AI assistant for VAT compliance and tax regulations on the APIBlockchain payment platform.
+
+MERCHANT PROFILE:
+Name: {merchant.get('name', 'Unknown')}
+Business location: {country_info['name']} ({merchant_country})
+Address: {merchant.get('address', 'Not set')}, {merchant.get('city', '')}, {merchant.get('postal_code', '')}
+VAT Number: {merchant.get('vat_number', 'Not registered')}
+Total revenue: {country_info['currency']} {stats.get('total_amount', 0)}
+Web2 transactions: {stats.get('web2_count', 0)}
+Web3 transactions: {stats.get('web3_count', 0)}
+
+COUNTRY-SPECIFIC VAT RULES FOR {country_info['name'].upper()}:
+- Standard VAT rate: {country_info['standard_rate']}%
+- Reduced rates: {', '.join(map(str, country_info['reduced_rates']))}%
+- Tax authority: {country_info['tax_authority']}
+- VAT return frequency: {country_info['vat_return_frequency']}
+- OSS threshold: {country_info['currency']} {country_info['oss_threshold']}
+- Digital reporting: {country_info['digital_reporting']}
+- Record retention: {country_info['record_retention_years']} years
+- Reverse charge phrase: "{country_info['reverse_charge_phrase']}"
+
+YOUR EXPERTISE:
+1. Country-Specific VAT Compliance - {country_info['name']} tax laws and regulations
+2. Cross-Border Tax Rules - EU VAT, international commerce, export/import
+3. Invoice Requirements - Local legal compliance, mandatory fields per {country_info['name']} law
+4. Digital Currency Taxation - Cryptocurrency VAT treatment in {country_info['name']}
+5. Audit Preparation - {country_info['name']}-specific record keeping and documentation
+6. Tax Authority Communication - How to deal with {country_info['tax_authority']}
+
+VAT RULES YOU ENFORCE:
+- Domestic sales (same country): {country_info['standard_rate']}% VAT applies
+- EU B2B (different countries): 0% VAT (reverse charge: "{country_info['reverse_charge_phrase']}")
+- EU B2C (cross-border): Your VAT or destination VAT if sales exceed {country_info['currency']} {country_info['oss_threshold']}/year
+- Non-EU exports: 0% VAT (export documentation required)
+- Crypto payments: Same VAT rules apply (EU guidance: treat as payment method)
+
+ALWAYS provide country-specific advice for {country_info['name']}. Cite local regulations and use correct terminology.
+Be professional, precise, and prioritize legal compliance specific to {merchant_country}.
+"""
+    
+    # Simple AI responses (can be replaced with OpenAI API)
+    try:
+        # Check for OpenAI API key
+        openai_key = os.getenv("OPENAI_API_KEY")
+        
+        if openai_key:
+            # Use OpenAI if available
+            import openai
+            openai.api_key = openai_key
+            
+            messages = [
+                {"role": "system", "content": context_info},
+                *[{"role": msg["role"], "content": msg["content"]} for msg in history[-5:]],
+                {"role": "user", "content": message}
+            ]
+            
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                max_tokens=500,
+                temperature=0.7
+            )
+            
+            reply = response.choices[0].message.content
+        else:
+            # Fallback to rule-based responses
+            reply = generate_rule_based_response(message, stats, merchant)
+            
+    except Exception as e:
+        # Fallback on error
+        reply = generate_rule_based_response(message, stats, merchant)
+    
+    return {"reply": reply}
+
+
+def generate_rule_based_response(message: str, stats: dict, merchant: dict) -> str:
+    """Generate rule-based AI responses focused on VAT and compliance when OpenAI is not available."""
+    msg_lower = message.lower()
+    
+    # Get merchant's country-specific info
+    merchant_country = merchant.get('country', 'XX')
+    country_info = get_country_vat_info(merchant_country)
+    
+    # VAT calculation questions
+    if any(word in msg_lower for word in ['vat rate', 'tax rate', 'calculate vat', 'how much vat', 'vat percentage']):
+        return f"""VAT rates for {country_info['name']} and cross-border sales:
+
+**Your country ({country_info['name']}):**
+- Standard VAT rate: {country_info['standard_rate']}% (applies to domestic sales)
+- Reduced rates: {', '.join(map(str, country_info['reduced_rates']))}% (specific goods/services)
+- Currency: {country_info['currency']}
+
+**Domestic sales (B2B and B2C):** 
+Charge {country_info['standard_rate']}% VAT on all sales within {country_info['name']}.
+
+**EU Cross-border:**
+- B2B (customer has valid EU VAT number): 0% VAT
+  → Use reverse charge: "{country_info['reverse_charge_phrase']}"
+- B2C (no VAT number): Your rate ({country_info['standard_rate']}%) applies until you exceed {country_info['currency']} {country_info['oss_threshold']}/year threshold
+
+**Non-EU exports:** 0% VAT (proper export documentation required)
+
+Our system automatically calculates correct VAT based on customer location and business status."""
+    
+    # Reverse charge mechanism
+    elif any(word in msg_lower for word in ['reverse charge', 'b2b vat', 'vat exemption', 'zero vat']):
+        return f"""**Reverse Charge Mechanism for {country_info['name']}:**
+
+When you sell to an EU business (B2B) in a different country:
+1. You charge 0% VAT on the invoice
+2. You must validate their VAT number via VIES system
+3. Invoice must include the phrase:
+   📋 "{country_info['reverse_charge_phrase']}"
+4. Your customer pays VAT in their own country (self-assessment)
+5. Both parties report:
+   - You: EC Sales List to {country_info['tax_authority']}
+   - Customer: Intra-community acquisition in their country
+
+**Important for {country_info['name']}:** Submit your EC Sales List {country_info['vat_return_frequency'].lower()}.
+
+Our platform automatically applies reverse charge when customer provides valid EU VAT number."""
+    
+    # Invoice compliance
+    elif any(word in msg_lower for word in ['invoice requirement', 'legal invoice', 'invoice compliance', 'mandatory field', 'invoice law']):
+        requirements = '\n'.join([f"   • {req}" for req in country_info['invoice_requirements']])
+        return f"""**Legally Compliant Invoice Requirements for {country_info['name']}:**
+
+**Mandatory fields per {country_info['name']} law:**
+1. ✅ Sequential invoice number (no gaps allowed)
+2. ✅ Issue date and supply date
+3. ✅ Your business details (name, address, VAT number)
+4. ✅ Customer details (name, address, VAT number for B2B)
+5. ✅ Item descriptions, quantities, unit prices
+6. ✅ VAT breakdown by rate ({country_info['standard_rate']}% standard)
+7. ✅ Total amounts (subtotal, VAT, grand total in {country_info['currency']})
+8. ✅ Payment terms and due date
+
+**Country-specific requirements:**
+{requirements}
+
+**Record retention:** Keep invoices for {country_info['record_retention_years']} years per {country_info['name']} law.
+**Digital compliance:** {country_info['digital_reporting']}
+
+All our auto-generated invoices meet {country_info['name']} legal requirements."""
+    
+    # Cryptocurrency taxation
+    elif any(word in msg_lower for word in ['crypto tax', 'cryptocurrency vat', 'bitcoin tax', 'web3 tax', 'blockchain tax']):
+        return """**Cryptocurrency & Web3 Payment Taxation:**
+
+**VAT Treatment (EU guidance):**
+- Cryptocurrency is treated as a medium of payment, NOT a good
+- Same VAT rules apply as traditional payments
+- No VAT charged on the cryptocurrency itself
+- VAT applies to the goods/services being purchased
+
+**Example:** 
+- Customer pays 0.01 BTC for €500 product (21% VAT)
+- You charge: €500 + €105 VAT = €605 total
+- VAT doesn't change because payment was in crypto
+
+**Tax Reporting:**
+- Report based on EUR value at transaction time
+- Keep records of exchange rates used
+- Web3 transactions have same VAT obligations as Web2
+
+**Capital Gains:** If you hold crypto, separate capital gains tax may apply on price fluctuations (merchant's responsibility)."""
+    
+    # OSS/MOSS schemes
+    elif any(word in msg_lower for word in ['oss', 'moss', 'one stop shop', 'distance selling', 'vat threshold']):
+        if country_info['oss_threshold'] > 0:
+            return f"""**EU One-Stop Shop (OSS) Scheme for {country_info['name']}:**
+
+**When to register:**
+- Selling to EU consumers (B2C) across borders
+- Annual cross-border EU B2C sales exceed {country_info['currency']} {country_info['oss_threshold']}
+- Want to simplify multi-country VAT compliance
+
+**Benefits:**
+1. Register through {country_info['tax_authority']} ({country_info['name']})
+2. Declare all EU B2C sales in single quarterly return
+3. OSS portal distributes VAT to destination countries
+4. Avoid registering for VAT in every EU country
+
+**How it works:**
+- Below {country_info['currency']} {country_info['oss_threshold']}: Charge your rate ({country_info['standard_rate']}%)
+- Above threshold: Charge destination country's VAT rate
+- Submit quarterly return to {country_info['tax_authority']}
+- Make single payment - they distribute to other countries
+
+**Important:** B2B sales (reverse charge) are separate - NOT included in OSS.
+
+**Registration:** Contact {country_info['tax_authority']} or register online through your tax portal."""
+        else:
+            return f"""**Note for {country_info['name']}:** {'OSS (One-Stop Shop) is an EU scheme. As a non-EU country, different rules apply for cross-border sales.' if merchant_country == 'US' else 'OSS scheme details vary - consult with local tax authority.'}"""
+    
+    # VAT number validation
+    elif any(word in msg_lower for word in ['validate vat', 'vat number', 'vies', 'check vat', 'verify vat']):
+        return """**VAT Number Validation:**
+
+**Why it matters:**
+- Determines if reverse charge applies (0% VAT for valid EU B2B)
+- Legal requirement before applying reverse charge
+- Proves customer is legitimate business
+
+**How to validate:**
+1. Use EU VIES system (vat.europa.eu)
+2. Format: 2-letter country code + digits (e.g., DE123456789, NL123456789B01)
+3. API available for automated checks
+
+**Our platform:**
+- Integrates VIES validation
+- Automatically applies correct VAT rules based on validation result
+- Stores validation timestamps for audit trail
+
+**Best practice:** Validate at checkout AND keep validation records for 10 years (audit requirement)."""
+    
+    # Record keeping & audits
+    elif any(word in msg_lower for word in ['audit', 'record keeping', 'documentation', 'tax record', 'compliance check']):
+        return f"""**VAT Record Keeping & Audit Compliance for {country_info['name']}:**
+
+**Required records (keep {country_info['record_retention_years']} years per {country_info['name']} law):**
+1. ✅ All invoices (issued and received)
+2. ✅ VAT returns and calculations submitted to {country_info['tax_authority']}
+3. ✅ Credit notes and corrections
+4. ✅ Bank statements and payment proof
+5. ✅ VAT number validation confirmations (VIES for EU B2B)
+6. ✅ Export documentation (customs, shipping, proof of export)
+7. ✅ Contracts with customers/suppliers
+8. ✅ Accounting books and ledgers
+
+**{country_info['name']}-specific digital requirements:**
+{country_info['digital_reporting']}
+- Sequential numbering (no gaps allowed)
+- Tamper-proof storage (blockchain timestamps ideal)
+
+**Audit preparation checklist:**
+- Reconcile {country_info['vat_return_frequency'].lower()} VAT returns with invoices
+- Ensure all exports have customs proof
+- Verify all reverse charges have valid VAT numbers
+- Check invoice sequences are complete
+- Confirm {country_info['standard_rate']}% rate applied correctly
+
+**Tax authority contact:** {country_info['tax_authority']}
+
+Our platform automatically maintains {country_info['name']}-compliant records."""
+    
+    # Cryptocurrency specific regulations
+    elif any(word in msg_lower for word in ['crypto regulation', '5th directive', 'aml', 'kyc crypto', 'crypto compliance']):
+        return """**Cryptocurrency Compliance & Regulations:**
+
+**EU 5th Anti-Money Laundering Directive (5AMLD):**
+- Crypto businesses must register with financial authorities
+- KYC (Know Your Customer) required for transactions >€1000
+- AML (Anti-Money Laundering) screening mandatory
+- Transaction monitoring for suspicious activity
+
+**Reporting obligations:**
+- Large transactions (>€10,000) reported to authorities
+- Cross-border payments tracked
+- Maintain customer identification records
+
+**Tax transparency:**
+- DAC8 directive: Crypto platforms must report to tax authorities
+- Customer transaction history shared between EU countries
+- Automatic exchange of tax information
+
+**Your obligations as merchant:**
+- Keep records of all crypto payments
+- Report revenue correctly (at EUR value)
+- Comply with customer verification if volumes are high
+- Partner with compliant payment processors (like us!)
+
+We handle compliance infrastructure so you can focus on your business."""
+    
+    # Revenue insights with compliance context
+    elif any(word in msg_lower for word in ['revenue', 'earning', 'money', 'income', 'sales']):
+        total = float(stats.get('total_amount', 0))
+        web2 = stats.get('web2_count', 0)
+        web3 = stats.get('web3_count', 0)
+        if total > 0:
+            return f"""**Your Revenue & Tax Obligations ({country_info['name']}):**
+
+Total revenue: {country_info['currency']} {total:,.2f}
+- Web2 (traditional): {web2} transactions
+- Web3 (blockchain): {web3} transactions
+
+**Tax reminders for {country_info['name']}:**
+- All revenue is taxable (both Web2 and Web3)
+- VAT returns due: {country_info['vat_return_frequency']}
+- Submit to: {country_info['tax_authority']}
+- Standard rate: {country_info['standard_rate']}%
+- Keep records: {country_info['record_retention_years']} years
+- Crypto needs {country_info['currency']} valuation at payment time
+
+**OSS threshold check:** {f'You have exceeded the {country_info["currency"]} {country_info["oss_threshold"]} threshold - consider OSS registration' if total > country_info['oss_threshold'] else f'Below {country_info["currency"]} {country_info["oss_threshold"]} threshold - OSS optional'} for EU B2C cross-border sales.
+
+Need help with VAT compliance? Just ask!"""
+        else:
+            return f"You haven't processed any transactions yet. Once you start receiving payments, I'll help you understand {country_info['name']} VAT obligations ({country_info['standard_rate']}% standard rate), ensure compliance with {country_info['tax_authority']}, and optimize your tax reporting!"
+    
+    # Invoice generation questions
+    elif any(word in msg_lower for word in ['invoice', 'billing', 'receipt', 'create invoice']):
+        return """**Automatic Invoice Generation:**
+
+Our system creates legally compliant invoices automatically when payments complete:
+
+**Included automatically:**
+✅ Sequential invoice numbering
+✅ Your business details and VAT number
+✅ Customer information
+✅ Correct VAT calculation (based on location & B2B/B2C status)
+✅ All mandatory legal fields
+✅ Reverse charge notation (when applicable)
+✅ Tamper-proof blockchain timestamp
+
+**You can:**
+- View all invoices in the Invoices section
+- Download as PDF (legally valid)
+- Resend to customers
+- Generate credit notes if needed
+
+**Compliance guaranteed:** All invoices meet EU Directive 2014/55 requirements for electronic invoicing."""
+    
+    # General VAT explanation
+    elif any(word in msg_lower for word in ['what is vat', 'explain vat', 'vat basics', 'understand vat']):
+        return """**VAT (Value Added Tax) Basics:**
+
+**What it is:**
+- Consumption tax collected at each stage of supply chain
+- Businesses collect VAT from customers, pay to tax authorities
+- Final consumer bears the cost
+
+**How it works:**
+1. You charge VAT on sales (output VAT)
+2. You pay VAT on business purchases (input VAT)
+3. You pay difference to tax authorities: Output - Input = VAT payment
+
+**Rates:**
+- Standard rate: 15-25% (varies by country)
+- Reduced rate: 5-12% (food, books, medicines)
+- Zero rate: 0% (exports, some essentials)
+
+**Cross-border:**
+- Different rules for B2B vs B2C
+- EU has harmonized system with country variations
+- Reverse charge simplifies B2B transactions
+
+**Your responsibilities:**
+- Charge correct VAT rate
+- Issue compliant invoices
+- File quarterly VAT returns
+- Pay collected VAT to authorities
+
+Our platform automates correct VAT calculation for all scenarios."""
+    
+    # Default response focused on compliance
+    else:
+        return f"""Hi {merchant.get('name', 'there')}! I'm your VAT & compliance specialist for {country_info['name']}.
+
+**Your country details:**
+📍 Location: {country_info['name']} ({merchant_country})
+💰 Standard VAT rate: {country_info['standard_rate']}%
+🏛️ Tax authority: {country_info['tax_authority']}
+📅 VAT returns: {country_info['vat_return_frequency']}
+💱 Currency: {country_info['currency']}
+
+**I can help you with:**
+- {country_info['name']}-specific VAT rules and compliance
+- Cross-border tax (EU B2B/B2C, exports)
+- Invoice requirements per {country_info['name']} law
+- Cryptocurrency taxation in {country_info['name']}
+- Reverse charge: "{country_info['reverse_charge_phrase'][:50]}..."
+- OSS registration (threshold: {country_info['currency']} {country_info['oss_threshold']})
+- Audit preparation ({country_info['record_retention_years']} years records)
+- {country_info['tax_authority']} communication
+
+**Ask me questions like:**
+- "What VAT rate do I charge?"
+- "How does reverse charge work in {country_info['name']}?"
+- "What are {country_info['name']} invoice requirements?"
+- "Do I need OSS registration?"
+- "How is crypto taxed in {country_info['name']}?"
+
+What would you like to know?"""
 
 
 @app.get("/invoices/{invoice_id}/pdf")
