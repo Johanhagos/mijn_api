@@ -1,14 +1,14 @@
 /* Professional B2B Webshop Styling - APIBlockchain */
 
-/* Enhanced Professional Color Scheme */
+/* Enhanced Professional Color Scheme - Nature Green Theme */
 :root {
-  --ab-primary: #3c64c6;
-  --ab-dark: #3c3c3c;
+  --ab-primary: #059669;
+  --ab-dark: #064e3b;
   --ab-accent: #10b981;
-  --ab-light-bg: #f8fafc;
-  --ab-border: #e2e8f0;
-  --ab-text-dark: #1e293b;
-  --ab-text-muted: #64748b;
+  --ab-light-bg: #f0fdf4;
+  --ab-border: #d1fae5;
+  --ab-text-dark: #064e3b;
+  --ab-text-muted: #6b7280;
 }
 
 /* Premium Global Enhancements */
@@ -28,7 +28,7 @@ body {
 .textlogo {
   font-weight: 700;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, #3c64c6 0%, #5b7fd9 100%);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -66,10 +66,10 @@ body {
 /* Premium Button Styling */
 .ButtonPreview_buttonComponent__17NP0,
 .button1 {
-  background: linear-gradient(135deg, #3c64c6 0%, #5b7fd9 100%);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
   border-radius: 12px;
   font-weight: 600;
-  box-shadow: 0 4px 20px rgba(60, 100, 198, 0.3);
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.3);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   text-transform: none;
   letter-spacing: 0.01em;
@@ -77,7 +77,7 @@ body {
 
 .ButtonPreview_buttonComponent__17NP0:hover,
 .button1:hover {
-  box-shadow: 0 8px 28px rgba(60, 100, 198, 0.4);
+  box-shadow: 0 8px 28px rgba(5, 150, 105, 0.4);
   transform: translateY(-3px);
 }
 
@@ -94,7 +94,7 @@ body {
   text-shadow: 2px 4px 20px rgba(0, 0, 0, 0.5);
 }
 
-/* Professional Image Overlays */
+/* Professional Image Overlays - Nature Green */
 .StripPreview_bgImageContainer__MFrbA::after,
 .Background_bgImageContainer__AwuIx::after {
   content: '';
@@ -103,13 +103,13 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(60, 100, 198, 0.15) 0%, rgba(30, 41, 59, 0.25) 100%);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.15) 0%, rgba(5, 150, 105, 0.25) 100%);
   pointer-events: none;
 }
 
 #Home .StripPreview_bgImageContainer__MFrbA::after,
 #Home .Background_bgImageContainer__AwuIx::after {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.4) 0%, rgba(60, 100, 198, 0.3) 100%);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.4) 0%, rgba(5, 150, 105, 0.3) 100%);
 }
 
 /* Image Quality Enhancement */
@@ -135,19 +135,19 @@ body {
 
 /* Icon Enhancement */
 .Preview_component__SbiKo img[src*="svg"] {
-  filter: drop-shadow(0 4px 12px rgba(60, 100, 198, 0.3));
+  filter: drop-shadow(0 4px 12px rgba(5, 150, 105, 0.3));
   transition: all 0.3s ease;
 }
 
-/* Replace black SVG icons with brand color */
+/* Replace black SVG icons with nature green */
 .Preview_component__SbiKo img[src*="fill='%23070707'"],
 .Preview_component__SbiKo img[src*="fill='%233c3c3c'"] {
-  filter: brightness(0) saturate(100%) invert(35%) sepia(89%) saturate(1214%) hue-rotate(207deg) brightness(93%) contrast(87%) drop-shadow(0 4px 12px rgba(60, 100, 198, 0.3));
+  filter: brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(127deg) brightness(96%) contrast(97%) drop-shadow(0 4px 12px rgba(5, 150, 105, 0.3));
 }
 
 .wsb-animation:hover img[src*="svg"] {
   transform: scale(1.15) rotate(5deg);
-  filter: brightness(0) saturate(100%) invert(35%) sepia(89%) saturate(1214%) hue-rotate(207deg) brightness(93%) contrast(87%) drop-shadow(0 6px 20px rgba(60, 100, 198, 0.5));
+  filter: brightness(0) saturate(100%) invert(42%) sepia(93%) saturate(1352%) hue-rotate(127deg) brightness(96%) contrast(97%) drop-shadow(0 6px 20px rgba(5, 150, 105, 0.5));
 }
 
 /* Enhanced Typography */
@@ -215,15 +215,15 @@ body {
 
 /* Sticky Button Enhancement */
 .StickyButtonPreview_stickyButton__3jBM3 {
-  background: linear-gradient(135deg, #3c64c6 0%, #5b7fd9 100%);
-  box-shadow: 0 4px 20px rgba(60, 100, 198, 0.35);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.35);
   border-radius: 50px;
   transition: all 0.3s ease;
 }
 
 .StickyButtonPreview_stickyButton__3jBM3:hover {
   transform: translateX(-5px);
-  box-shadow: 0 8px 28px rgba(60, 100, 198, 0.5);
+  box-shadow: 0 8px 28px rgba(5, 150, 105, 0.5);
 }
 
 /* Mobile Menu Enhancement */
@@ -239,13 +239,13 @@ body {
 
 /* Back to Top Button */
 .BackToTopButtonPreview_backToTopButton__1tkHM {
-  background: linear-gradient(135deg, #3c64c6 0%, #5b7fd9 100%);
-  box-shadow: 0 4px 20px rgba(60, 100, 198, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.4);
 }
 
 .BackToTopButtonPreview_backToTopButton__1tkHM:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 28px rgba(60, 100, 198, 0.5);
+  box-shadow: 0 8px 28px rgba(5, 150, 105, 0.5);
 }
 
 /* Responsive Enhancements */
