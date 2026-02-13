@@ -215,10 +215,10 @@ export default function Dashboard() {
           </div>
         </main>
         </div>
-
-        {/* AI Assistant */}
-        <AIAssistant merchantData={{ stats, merchant, apiKeys }} />
       </div>
+      
+      {/* AI Assistant - positioned outside main container for proper fixed positioning */}
+      <AIAssistant merchantData={{ stats, merchant, apiKeys }} />
     </AuthGuard>
   );
 }
