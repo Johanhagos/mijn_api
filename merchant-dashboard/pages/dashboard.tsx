@@ -113,10 +113,6 @@ export default function Dashboard() {
                   </button>
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-3">
-                <span className="text-xs text-emerald-200/80">AI Assistant:</span>
-                <AIAssistant merchantData={{ stats, merchant, apiKeys }} inline />
-              </div>
             </div>
           </header>
 
@@ -223,6 +219,9 @@ export default function Dashboard() {
           </div>
         </main>
         </div>
+        
+        {/* AI Assistant - Fixed Bottom Right */}
+        <AIAssistant merchantData={{ stats, merchant, apiKeys }} />
       </div>
     </AuthGuard>
   );
