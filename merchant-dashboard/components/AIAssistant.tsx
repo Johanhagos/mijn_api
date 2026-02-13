@@ -7,7 +7,7 @@ interface Message {
   timestamp: Date;
 }
 
-export default function AIAssistant({ merchantData }: { merchantData?: any }) {
+export default function AIAssistant({ merchantData, inline = false }: { merchantData?: any; inline?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -82,30 +82,40 @@ export default function AIAssistant({ merchantData }: { merchantData?: any }) {
   ];
 
   return (
-    <div style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}>
+    <div
+      style={
+        inline
+          ? { position: 'static', display: 'inline-flex', alignItems: 'center', gap: '8px', zIndex: 9999 }
+          : { position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }
+      }
+    >
       {/* Floating AI Button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
           style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
+            minWidth: inline ? '140px' : '64px',
+            height: inline ? '36px' : '64px',
+            padding: inline ? '0 14px' : '0',
+            borderRadius: inline ? '18px' : '50%',
             background: 'linear-gradient(to bottom right, #10b981, #06b6d4)',
             color: 'white',
             border: 'none',
             cursor: 'pointer',
-            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3)',
-            display: 'flex',
+            boxShadow: '0 10px 20px rgba(0, 0, 0, 0.25)',
+            display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            position: 'relative'
+            gap: inline ? '8px' : '0',
+            position: 'relative',
+            fontSize: inline ? '12px' : '0'
           }}
           aria-label="Open AI Assistant"
         >
           <svg style={{ width: '32px', height: '32px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
           </svg>
+          {inline && <span style={{ fontWeight: 600 }}>Open AI Assistant</span>}
           <div style={{
             position: 'absolute',
             top: '-4px',
