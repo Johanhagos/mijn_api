@@ -44,8 +44,12 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
     try {
       const response = await api.protectedApi('/ai/chat', 'POST', {
         message: input,
-        context: merchantData,
-        history: messages.slice(-5) // Last 5 messages for context
+        context: {
+          ...merchantData,
+          dashboard_context: 'merchant_portal',
+          current_user_role: 'merchant_admin'
+        },
+        history: messages.slice(-10) // Last 10 messages for better context
       });
 
       const assistantMessage: Message = {
@@ -130,10 +134,30 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-96 h-[600px] bg-slate-900 rounded-2xl shadow-2xl border border-emerald-500/30 flex flex-col overflow-hidden">
+        <div className="fixed bottom-6 right-6 z-50 w-96 h-[650px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl shadow-2xl border border-emerald-500/30 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 p-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-emerald-600 to-cyan-600 p-4 flex items-center justify-between shadow-lg">
             <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-semibold text-sm">AI Assistant</h3>
+                <p className="text-white/70 text-xs">Always here to help</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="text-white hover:bg-white/20 p-2 rounded-lg transition"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
               <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -156,21 +180,21 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
             {messages.map((msg, idx) => (
               <div
                 key={idx}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}
               >
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                  className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                     msg.role === 'user'
-                      ? 'bg-gradient-to-br from-emerald-600 to-cyan-600 text-white'
-                      : 'bg-slate-800 text-emerald-50 border border-emerald-500/20'
+                      ? 'bg-gradient-to-br from-emerald-600 to-cyan-600 text-white shadow-lg'
+                      : 'bg-slate-800 text-slate-100 border border-emerald-500/30 shadow-md'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                  <p className="text-xs opacity-60 mt-1">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                  <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-white/60' : 'text-slate-400'}`}>
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
@@ -178,8 +202,8 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-slate-800 border border-emerald-500/20 rounded-2xl px-4 py-2">
-                  <div className="flex gap-1">
+                <div className="bg-slate-800 border border-emerald-500/30 rounded-2xl px-4 py-3 shadow-md">
+                  <div className="flex gap-2">
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
@@ -209,27 +233,28 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
           )}
 
           {/* Input */}
-          <div className="p-4 border-t border-slate-700 bg-slate-800/50">
+          <div className="p-4 border-t border-emerald-500/30 bg-slate-900 space-y-3">
             <div className="flex gap-2">
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Ask me anything..."
-                className="flex-1 px-4 py-2 bg-slate-900 border border-emerald-500/30 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Ask me anything about your dashboard..."
+                className="flex-1 px-4 py-2.5 bg-slate-800 border border-emerald-500/40 rounded-xl text-white placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
                 disabled={isLoading}
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className="px-4 py-2 bg-gradient-to-br from-emerald-600 to-cyan-600 text-white rounded-lg hover:from-emerald-700 hover:to-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                className="px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 disabled:from-slate-600 disabled:to-slate-700 text-white rounded-xl font-medium transition-all duration-200 disabled:cursor-not-allowed shadow-lg hover:shadow-emerald-500/50"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                 </svg>
               </button>
             </div>
+            <p className="text-xs text-slate-400 text-center">Available 24/7 • Powered by AI • Always learning</p>
           </div>
         </div>
       )}

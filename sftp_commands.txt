@@ -1,0 +1,4 @@
+cd public_html
+put c:/Users/gebruiker/Desktop/mijn_api/webshop_for_upload/index.html
+ls -la index.html
+bye
