@@ -1042,6 +1042,20 @@ class InvoiceOut(BaseModel):
     merchant_logo_url: Optional[str] = None
 
 
+class InvoiceUpdate(BaseModel):
+    status: Optional[str] = None  # draft, sent, paid, overdue, void, cancelled
+    due_date: Optional[str] = None
+    items: Optional[List[dict]] = None
+    vat_rate: Optional[float] = None
+    notes: Optional[str] = None
+    buyer_name: Optional[str] = None
+    buyer_email: Optional[str] = None
+    buyer_address: Optional[str] = None
+    buyer_country: Optional[str] = None
+    buyer_vat: Optional[str] = None
+    buyer_type: Optional[str] = None
+
+
 class CreditNoteCreate(BaseModel):
     invoice_id: str  # Reference to original invoice
     amount: float
@@ -2045,6 +2059,119 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
         "payment_system": inv.get("payment_system"),
         "blockchain_tx_id": inv.get("blockchain_tx_id"),
         "pdf_url": inv.get("pdf_url"),
+    })
+
+
+@app.patch("/invoices/{invoice_id}", response_model=InvoiceOut)
+async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: dict = Depends(get_current_user)):
+    """Update an invoice. Recalculates VAT if items are modified. Validates state transitions."""
+    invoices = load_invoices()
+    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    # State transition validation
+    current_status = inv.get("status", "draft")
+    new_status = payload.status or current_status
+    
+    if new_status != current_status:
+        valid_transitions = {
+            "draft": ["sent", "cancelled"],
+            "sent": ["paid", "overdue", "cancelled"],
+            "paid": ["overdue"],
+            "overdue": ["paid"],
+            "void": [],
+            "cancelled": [],
+        }
+        if new_status not in valid_transitions.get(current_status, []):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot transition from '{current_status}' to '{new_status}'"
+            )
+    
+    # Update allowed fields
+    if payload.status is not None:
+        inv["status"] = payload.status
+    if payload.due_date is not None:
+        inv["due_date"] = payload.due_date
+    if payload.notes is not None:
+        inv["notes"] = payload.notes
+    if payload.buyer_name is not None:
+        inv["buyer_name"] = payload.buyer_name
+    if payload.buyer_email is not None:
+        inv["buyer_email"] = payload.buyer_email
+    if payload.buyer_address is not None:
+        inv["buyer_address"] = payload.buyer_address
+    if payload.buyer_country is not None:
+        inv["buyer_country"] = payload.buyer_country
+    if payload.buyer_vat is not None:
+        inv["buyer_vat"] = payload.buyer_vat
+    if payload.buyer_type is not None:
+        inv["buyer_type"] = payload.buyer_type
+    
+    # Recalculate VAT if items changed
+    if payload.items is not None:
+        def _to_number(value, default=0.0):
+            try:
+                if value is None:
+                    return default
+                return float(str(value).strip())
+            except (ValueError, TypeError):
+                return default
+        
+        normalized_items = []
+        for item in payload.items:
+            qty = _to_number(item.get("quantity", 1), 1.0)
+            unit_price = _to_number(item.get("unit_price", 0), 0.0)
+            amount = _to_number(item.get("amount", qty * unit_price), qty * unit_price)
+            normalized_items.append({
+                **item,
+                "quantity": qty,
+                "unit_price": unit_price,
+                "amount": round(amount, 2),
+            })
+        
+        inv["items"] = normalized_items
+        
+        # Recalculate subtotal
+        subtotal = sum(i.get("amount", 0) for i in normalized_items)
+        inv["subtotal"] = round(subtotal, 2)
+        
+        # Recalculate VAT
+        vat_rate = payload.vat_rate if payload.vat_rate is not None else inv.get("vat_rate", 21.0)
+        vat_amount, total = calculate_vat(subtotal, vat_rate)
+        inv["vat_rate"] = vat_rate
+        inv["vat_amount"] = vat_amount
+        inv["total"] = total
+    
+    # Mark as updated
+    inv["updated_at"] = datetime.now(timezone.utc).isoformat()
+    inv["updated_by"] = current_user.get("name")
+    
+    # Persist
+    try:
+        save_invoices(invoices)
+    except RuntimeError:
+        pass
+    
+    # Log audit event
+    log_event(f"INVOICE_UPDATED id={invoice_id} status={new_status}", current_user.get("name"), "-")
+    
+    return InvoiceOut(**{
+        "id": inv.get("id"),
+        "invoice_number": inv.get("invoice_number"),
+        "order_number": inv.get("order_number"),
+        "seller_name": inv.get("seller_name"),
+        "buyer_name": inv.get("buyer_name"),
+        "subtotal": inv.get("subtotal", 0),
+        "vat_amount": inv.get("vat_amount", 0),
+        "total": inv.get("total", 0),
+        "payment_system": inv.get("payment_system"),
+        "blockchain_tx_id": inv.get("blockchain_tx_id"),
+        "pdf_url": inv.get("pdf_url"),
+        "status": inv.get("status"),
+        "created_at": inv.get("created_at"),
+        "due_date": inv.get("due_date"),
     })
 
 

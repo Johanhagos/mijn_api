@@ -33,6 +33,10 @@ export default function InvoiceDetail() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editData, setEditData] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const toNumber = (value: any) => {
     const n = Number(value);
@@ -90,6 +94,62 @@ export default function InvoiceDetail() {
     }
   };
 
+  const handleEdit = () => {
+    setEditData({
+      status: invoice?.status || 'draft',
+      due_date: invoice?.due_date || '',
+      buyer_name: invoice?.buyer_name || '',
+      buyer_email: invoice?.buyer_email || '',
+      buyer_address: invoice?.buyer_address || '',
+      buyer_country: invoice?.buyer_country || '',
+      buyer_vat: invoice?.buyer_vat || '',
+      buyer_type: invoice?.buyer_type || 'B2C',
+      notes: invoice?.notes || '',
+      vat_rate: invoice?.vat_rate || 21,
+    });
+    setIsEditMode(true);
+    setError(null);
+  };
+
+  const handleSave = async () => {
+    if (!id || !invoice) return;
+    try {
+      setSaving(true);
+      setError(null);
+      const token = typeof window !== 'undefined' ? localStorage.getItem('jwt') : null;
+      const response = await fetch(`https://api.apiblockchain.io/invoices/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(editData),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.detail || 'Failed to update invoice');
+      }
+
+      const updated = await response.json();
+      setInvoice(updated);
+      setIsEditMode(false);
+      setEditData(null);
+      alert('Invoice updated successfully');
+    } catch (err: any) {
+      console.error('Failed to save invoice:', err);
+      setError(err.message || 'Failed to save invoice');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setIsEditMode(false);
+    setEditData(null);
+    setError(null);
+  };
+
   return (
     <AuthGuard>
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">        
@@ -109,13 +169,118 @@ export default function InvoiceDetail() {
             <div className="bg-white rounded-lg shadow p-8 text-center">
               <p className="text-gray-600 text-lg">Invoice not found</p>
             </div>
+          ) : isEditMode && editData ? (
+            <div className="bg-white rounded-lg shadow p-8">
+              <h2 className="text-2xl font-bold text-gray-900 mb-6">Edit Invoice</h2>
+              
+              {error && (
+                <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                  {error}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-6 mb-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                  <select
+                    value={editData.status}
+                    onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Due Date</label>
+                  <input
+                    type="date"
+                    value={editData.due_date}
+                    onChange={(e) => setEditData({ ...editData, due_date: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Buyer Name</label>
+                  <input
+                    type="text"
+                    value={editData.buyer_name}
+                    onChange={(e) => setEditData({ ...editData, buyer_name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Buyer Email</label>
+                  <input
+                    type="email"
+                    value={editData.buyer_email}
+                    onChange={(e) => setEditData({ ...editData, buyer_email: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Buyer Country</label>
+                  <input
+                    type="text"
+                    value={editData.buyer_country}
+                    onChange={(e) => setEditData({ ...editData, buyer_country: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                    placeholder="e.g., NL, DE, FR"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Buyer VAT</label>
+                  <input
+                    type="text"
+                    value={editData.buyer_vat}
+                    onChange={(e) => setEditData({ ...editData, buyer_vat: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                <textarea
+                  value={editData.notes}
+                  onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex gap-4 justify-center">
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center px-8 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition shadow hover:shadow-lg"
+                >
+                  {saving ? '💾 Saving...' : '💾 Save Changes'}
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={saving}
+                  className="inline-flex items-center px-8 py-3 rounded-lg bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition shadow hover:shadow-lg"
+                >
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
           ) : (
             <div className="space-y-6">
               {/* Header Section */}
               <div className="bg-white rounded-lg shadow p-8">
                 <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h1 className="text-4xl font-bold text-gray-900 mb-2">Invoice</h1>
+                  <div className="pr-8">
+                    <h1 className="text-4xl font-bold text-gray-900 mb-4">Invoice</h1>
                     <p className="text-2xl font-bold text-green-600">{invoice.invoice_number || invoice.id}</p>
                   </div>
                   <div className="text-right">
@@ -323,10 +488,16 @@ export default function InvoiceDetail() {
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-4 justify-center">
+              <div className="flex gap-4 justify-center flex-wrap">
                 <Link href="/dashboard" className="inline-flex items-center px-8 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700 font-bold transition shadow hover:shadow-lg">
                   🏠 Dashboard
                 </Link>
+                <button
+                  onClick={handleEdit}
+                  className="inline-flex items-center px-8 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold transition shadow hover:shadow-lg"
+                >
+                  ✏️ Edit Invoice
+                </button>
                 <button
                   onClick={downloadPDF}
                   disabled={downloading}
@@ -404,6 +575,53 @@ export default function InvoiceDetail() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4 justify-center flex-wrap">
+                <Link href="/dashboard" className="inline-flex items-center px-8 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700 font-bold transition shadow hover:shadow-lg">
+                  🏠 Dashboard
+                </Link>
+                <button
+                  onClick={handleEdit}
+                  className="inline-flex items-center px-8 py-3 rounded-lg bg-blue-600 text-white hover:bg-blue-700 font-bold transition shadow hover:shadow-lg"
+                >
+                  ✏️ Edit Invoice
+                </button>
+                <button
+                  onClick={downloadPDF}
+                  disabled={downloading}
+                  className="inline-flex items-center px-8 py-3 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed font-bold transition shadow hover:shadow-lg"
+                >
+                  {downloading ? '⏳ Downloading PDF...' : '📄 Download as PDF'}
+                </button>
+                <button
+                  onClick={() => {
+                    const row = [
+                      invoice.invoice_number || invoice.id,
+                      invoice.buyer_name || '',
+                      invoice.subtotal || 0,
+                      invoice.vat_amount || 0,
+                      invoice.total || 0,
+                      invoice.payment_system || 'web2',
+                      invoice.status || 'unknown',
+                      invoice.created_at || ''
+                    ];
+                    const csv = '"Invoice #","Customer","Subtotal","VAT","Total","Payment System","Status","Date"\n' + row.map(cell => `"${cell}"`).join(',');
+                    const blob = new Blob([csv], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `invoice-${invoice.id}.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                  }}
+                  className="inline-flex items-center px-8 py-3 rounded-lg bg-green-600 text-white hover:bg-green-700 font-bold transition shadow hover:shadow-lg"
+                >
+                  📊 Download as CSV
+                </button>
               </div>
             </div>
           )}
