@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Head from 'next/head';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
 import RevenueChart from '../components/RevenueChart';
@@ -61,6 +62,10 @@ export default function Dashboard() {
 
   return (
     <AuthGuard>
+      <Head>
+        <title>Dashboard - Blockchain Payment Gateway & Smart Contract Invoicing</title>
+        <meta name="description" content="Merchant Dashboard - Manage your blockchain payments and smart contract invoices" />
+      </Head>
       <div className="min-h-screen bg-slate-900 relative">
         {/* Background Image with Overlay */}
         <div 
