@@ -5,8 +5,12 @@ export default function Webshop() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/webshop?page=index')
-      .then(res => res.text())
+    // Fetch the static HTML file directly from public folder
+    fetch('/index.html')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load');
+        return res.text();
+      })
       .then(data => {
         setHtml(data);
         setLoading(false);
@@ -17,13 +21,10 @@ export default function Webshop() {
       });
   }, []);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div style={{ padding: '20px' }}>Loading webshop...</div>;
+  if (!html) return <div style={{ padding: '20px' }}>Failed to load webshop</div>;
 
   return (
     <div dangerouslySetInnerHTML={{ __html: html }} />
   );
 }
-
-export const config = {
-  revalidate: 3600,
-};
