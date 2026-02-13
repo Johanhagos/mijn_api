@@ -1,17 +1,15 @@
 {
   "version": 2,
-  "buildCommand": "cd merchant-dashboard && npm install && npm run build",
-  "outputDirectory": "merchant-dashboard/.next",
-  "installCommand": "npm install --prefix ./merchant-dashboard",
-  "framework": "nextjs",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/dashboard(.*)",
-      "destination": "/merchant-dashboard/$1"
-    },
+      "src": "merchant-dashboard/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
     {
-      "source": "/admin(.*)",
-      "destination": "/merchant-dashboard/$1"
+      "src": "/(.*)",
+      "dest": "/merchant-dashboard/$1"
     }
   ]
 }
