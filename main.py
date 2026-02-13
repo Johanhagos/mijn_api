@@ -4000,3 +4000,94 @@ def get_session_status(session_id: str):
         "amount": session.get('amount'),
         "created_at": session.get('created_at'),
     }
+
+
+# === Payment Processing Endpoints ===
+
+class PaymentRequest(BaseModel):
+    paymentMethodId: str = Field(..., description="Stripe payment method ID")
+    amount: int = Field(..., description="Amount in cents")
+    currency: str = Field(default="eur", description="Currency code")
+    email: str = Field(..., description="Customer email")
+    business: str = Field(default="", description="Business name")
+
+
+@app.post('/api/process-payment')
+def process_payment(request: PaymentRequest):
+    """
+    Process a payment for webshop checkout.
+    Returns order ID and success status.
+    """
+    try:
+        import stripe
+        stripe_key = os.getenv("STRIPE_SECRET_KEY")
+        if not stripe_key:
+            return JSONResponse(
+                status_code=500, 
+                content={"error": "Payment processor not configured"}
+            )
+        
+        stripe.api_key = stripe_key
+        
+        # Create a payment intent
+        intent = stripe.PaymentIntent.create(
+            amount=request.amount,
+            currency=request.currency,
+            payment_method=request.paymentMethodId,
+            confirm=True,
+            off_session=True,
+        )
+        
+        # Log successful payment
+        order_id = f"ORD-{int(time())}-{uuid.uuid4().hex[:8].upper()}"
+        log_event(
+            f'PAYMENT_SUCCESS order_id={order_id} email={request.email} amount={request.amount/100:.2f}{request.currency.upper()}',
+            request.email,
+            '-'
+        )
+        
+        # Save order to invoices file
+        try:
+            invoices = load_invoices()
+        except Exception:
+            invoices = []
+        
+        order = {
+            'id': order_id,
+            'email': request.email,
+            'business': request.business,
+            'amount': request.amount,
+            'currency': request.currency,
+            'status': 'completed',
+            'payment_method': 'stripe',
+            'stripe_intent_id': intent.id,
+            'created_at': datetime.utcnow().isoformat(),
+            'services': [
+                'Blockchain Payment Gateway Setup',
+                'Smart Contract Invoicing Integration'
+            ],
+        }
+        invoices.append(order)
+        
+        if not READ_ONLY_FS:
+            try:
+                save_invoices(invoices)
+            except Exception as e:
+                print(f"[WARN] Could not save invoice: {e}")
+        
+        return {
+            "success": True,
+            "orderId": order_id,
+            "status": intent.status,
+            "amount": request.amount,
+            "currency": request.currency,
+            "message": "Payment processed successfully. Our team will contact you soon."
+        }
+    
+    except Exception as e:
+        error_msg = str(e)
+        log_event(f'PAYMENT_ERROR email={request.email} error={error_msg}', request.email, '-')
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"Payment failed: {error_msg}", "success": False}
+        )

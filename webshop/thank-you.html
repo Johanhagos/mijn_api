@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmed - APIBlockchain</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .thank-you-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            margin: 0 auto 30px;
+            animation: scaleIn 0.5s ease-out;
+        }
+        
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        h1 {
+            font-size: 32px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .subtitle {
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+        
+        .order-details {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: left;
+        }
+        
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .detail-row:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .detail-label {
+            color: #666;
+            font-weight: 500;
+        }
+        
+        .detail-value {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .order-id {
+            font-family: 'Courier New', monospace;
+            color: #3c64c6;
+        }
+        
+        .next-steps {
+            background: #e3f2fd;
+            border-left: 4px solid #3c64c6;
+            padding: 20px;
+            margin: 30px 0;
+            text-align: left;
+            border-radius: 4px;
+        }
+        
+        .next-steps h3 {
+            color: #3c64c6;
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+        
+        .next-steps ul {
+            list-style: none;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        .next-steps li {
+            margin-bottom: 8px;
+            padding-left: 24px;
+            position: relative;
+        }
+        
+        .next-steps li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #3c64c6;
+            font-weight: bold;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Montserrat', sans-serif;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+        
+        .contact-section {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #eee;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .contact-section a {
+            color: #3c64c6;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        
+        .contact-section a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 600px) {
+            .thank-you-container {
+                padding: 40px 25px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="thank-you-container">
+        <div class="success-icon">✓</div>
+        
+        <h1>Thank You for Your Order!</h1>
+        <p class="subtitle">Your payment has been successfully processed. We're excited to help you integrate blockchain payments into your business.</p>
+        
+        <div class="order-details">
+            <div class="detail-row">
+                <span class="detail-label">Order ID:</span>
+                <span class="detail-value order-id" id="orderId">ORD-2024-XXXXX</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Amount Paid:</span>
+                <span class="detail-value">€498.00</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Payment Status:</span>
+                <span class="detail-value" style="color: #27ae60;">✓ Confirmed</span>
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Date:</span>
+                <span class="detail-value" id="orderDate">Feb 14, 2024</span>
+            </div>
+        </div>
+        
+        <div class="next-steps">
+            <h3>What Happens Next?</h3>
+            <ul>
+                <li>Confirmation email sent to your inbox</li>
+                <li>Our team will contact you within 24 hours</li>
+                <li>We'll set up your payment gateway integration</li>
+                <li>Access your merchant dashboard to manage transactions</li>
+            </ul>
+        </div>
+        
+        <div class="button-group">
+            <button class="btn-secondary" onclick="window.location.href='/'">← Back Home</button>
+            <button class="btn-primary" onclick="window.location.href='https://dashboard.apiblockchain.io'">Go to Dashboard</button>
+        </div>
+        
+        <div class="contact-section">
+            <p>Questions? Contact our support team:</p>
+            <p>Email: <a href="mailto:support@apiblockchain.io">support@apiblockchain.io</a></p>
+            <p>Phone: <a href="tel:+31652824245">+31 (0)6 5282 4245</a></p>
+        </div>
+    </div>
+    
+    <script>
+        // Set order ID and date
+        const urlParams = new URLSearchParams(window.location.search);
+        const orderId = urlParams.get('order') || 'ORD-' + Date.now();
+        document.getElementById('orderId').textContent = orderId;
+        
+        const today = new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        });
+        document.getElementById('orderDate').textContent = today;
+    </script>
+</body>
+</html>

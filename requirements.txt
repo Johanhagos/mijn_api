@@ -17,5 +17,8 @@ bcrypt==3.2.2
 # JWT handling
 python-jose[cryptography]>=3.3.0
 
+# Payment processing
+stripe>=5.0.0
+
 # Database migrations
 alembic>=1.10.0
