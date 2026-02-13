@@ -727,6 +727,77 @@ async def add_user(user: User, admin: dict = Depends(require_admin)):
     return {"id": new_user["id"], "name": new_user["name"], "role": new_user.get("role", "user")}
 
 
+@app.post("/register")
+async def register_merchant(payload: dict = Body(...)):
+    """Public endpoint for merchant self-registration."""
+    name = payload.get("name", "").strip()
+    email = payload.get("email", "").strip()
+    password = payload.get("password", "").strip()
+    business_name = payload.get("business_name", "").strip()
+
+    if not name or not email or not password:
+        raise HTTPException(status_code=400, detail="Username, email, and password are required")
+
+    # Validate email format
+    if "@" not in email:
+        raise HTTPException(status_code=400, detail="Invalid email address")
+
+    # Enforce password length
+    pw_bytes = password.encode("utf-8")
+    if len(pw_bytes) > BCRYPT_MAX_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password is too long: maximum {BCRYPT_MAX_BYTES} bytes"
+        )
+
+    if len(password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    # Hash password
+    try:
+        hashed = _hash_password(password)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error processing password")
+
+    # Check for existing user
+    users = load_users()
+    if any(u["name"] == name for u in users):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    if any(u.get("email") == email for u in users):
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    # Generate new ID
+    new_id = max([u["id"] for u in users], default=0) + 1
+
+    # Create new user with merchant role
+    new_user = {
+        "id": new_id,
+        "name": name,
+        "email": email,
+        "password": hashed,
+        "role": "merchant",
+        "business_name": business_name or name,
+    }
+
+    users.append(new_user)
+    save_users(users)
+
+    # Auto-login: generate access token
+    access_token = create_access_token(
+        data={"sub": name, "role": "merchant"}
+    )
+
+    return {
+        "message": "Registration successful",
+        "access_token": access_token,
+        "token_type": "bearer",
+        "merchant_id": new_id,
+        "email": email
+    }
+
+
 @app.post("/login")
 async def login_for_access_token(
     request: Request,

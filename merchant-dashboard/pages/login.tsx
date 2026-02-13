@@ -91,6 +91,17 @@ export default function Login() {
         <button disabled={loading} className="bg-green-600 text-white p-2 rounded hover:bg-green-700 disabled:opacity-50">
           {loading ? 'Logging in…' : 'Login'}
         </button>
+        
+        <div className="text-center">
+          <p className="text-sm text-gray-600">Don't have an account?</p>
+          <a 
+            href="/signup" 
+            className="inline-block mt-2 text-blue-600 hover:text-blue-700 font-medium hover:underline"
+          >
+            Create Account →
+          </a>
+        </div>
+        
         <div className="mt-4 border-t pt-4">
           <h2 className="text-lg font-semibold">Forgot your password?</h2>
           <div className="flex gap-2 mt-2" role="form">
