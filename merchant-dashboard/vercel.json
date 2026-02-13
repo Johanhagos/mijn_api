@@ -2,14 +2,6 @@
   "env": {
     "NEXT_PUBLIC_API_URL": "https://api.apiblockchain.io"
   },
-  "routes": [
-    {
-      "src": "^/dashboard(/|$)",
-      "destination": "/dashboard"
-    },
-    {
-      "src": "^/dashboard/.*",
-      "destination": "/dashboard"
-    }
-  ]
+  "cleanUrls": true,
+  "trailingSlash": false
 }
