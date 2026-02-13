@@ -1830,7 +1830,71 @@ async def merchant_usage(request: Request):
 @app.get("/merchant/me")
 async def merchant_me(current_user: dict = Depends(get_current_user)):
     """Return merchant identity info (id, name, email if present)."""
-    return {"id": current_user.get("id"), "name": current_user.get("name"), "email": current_user.get("email")}
+    users = load_users()
+    user = next((u for u in users if u["id"] == current_user.get("id")), None)
+    if not user:
+        return {"id": current_user.get("id"), "name": current_user.get("name"), "email": current_user.get("email")}
+    
+    # Return full profile data
+    return {
+        "id": user.get("id"),
+        "name": user.get("name"),
+        "username": user.get("username", user.get("name")),
+        "email": user.get("email"),
+        "business_name": user.get("business_name"),
+        "phone_number": user.get("phone_number"),
+        "address": user.get("address"),
+        "city": user.get("city"),
+        "postal_code": user.get("postal_code"),
+        "country": user.get("country"),
+        "vat_number": user.get("vat_number"),
+        "business_type": user.get("business_type"),
+        "website": user.get("website"),
+        "description": user.get("description"),
+    }
+
+
+@app.put("/merchant/profile")
+async def update_merchant_profile(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Update merchant profile information."""
+    users = load_users()
+    user = next((u for u in users if u["id"] == current_user.get("id")), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update allowed fields
+    allowed_fields = [
+        "username", "business_name", "email", "phone_number",
+        "address", "city", "postal_code", "country",
+        "vat_number", "business_type", "website", "description"
+    ]
+    
+    for field in allowed_fields:
+        if field in payload:
+            # Map camelCase to snake_case
+            snake_field = field
+            camel_field = field
+            
+            # Convert camelCase keys from frontend
+            field_mapping = {
+                "businessName": "business_name",
+                "contactEmail": "email",
+                "phoneNumber": "phone_number",
+                "postalCode": "postal_code",
+                "vatNumber": "vat_number",
+                "businessType": "business_type",
+            }
+            
+            if camel_field in field_mapping:
+                snake_field = field_mapping[camel_field]
+            
+            # Check for both camelCase and snake_case
+            value = payload.get(camel_field) or payload.get(snake_field)
+            if value is not None:
+                user[snake_field] = value
+    
+    save_users(users)
+    return {"message": "Profile updated successfully", "user": user}
 
 
 @app.post("/merchant/logo")
