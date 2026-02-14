@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Checkout - APIBlockchain Payment Gateway</title>
-    <script src="https://js.stripe.com/v3/"></script>
     <script src="https://www.paypal.com/sdk/js?client-id=BAA0ISTOuKNpz_VjPaEjdcIaf7pfGfvjxmr4rUjrtSIRoP04FNSCJ31lTf2FSn3mj--r8lBKyQN9FxKmV8&currency=EUR&intent=capture"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
@@ -154,7 +153,7 @@
         
         .payment-tabs {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             margin-bottom: 30px;
         }
@@ -434,9 +433,6 @@
             <div class="payment-methods">
                 <div class="payment-title">💳 Payment Method</div>
                 <div class="payment-tabs">
-                    <div class="payment-tab active" onclick="switchPaymentMethod('credit-card')">
-                        💳 Card
-                    </div>
                     <div class="payment-tab" onclick="switchPaymentMethod('paypal')">
                         🅿️ PayPal
                     </div>
@@ -444,49 +440,6 @@
                         ₿ Crypto
                     </div>
                 </div>
-            </div>
-
-            <!-- Credit Card Payment -->
-            <div id="credit-card" class="payment-content active">
-                <form id="cardForm">
-                    <div class="form-group">
-                        <label>Full Name</label>
-                        <input type="text" id="cardholderName" placeholder="John Doe" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Email Address</label>
-                        <input type="email" id="email" placeholder="john@example.com" required>
-                    </div>
-
-                    <div class="form-group">
-                        <label>Card Details</label>
-                        <div id="stripe-card"></div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Country</label>
-                            <select id="country" required>
-                                <option value="">Select Country</option>
-                                <option value="NL">Netherlands</option>
-                                <option value="BE">Belgium</option>
-                                <option value="DE">Germany</option>
-                                <option value="FR">France</option>
-                                <option value="IT">Italy</option>
-                                <option value="ES">Spain</option>
-                                <option value="GB">United Kingdom</option>
-                                <option value="US">United States</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>ZIP Code</label>
-                            <input type="text" id="zipCode" placeholder="12345" required>
-                        </div>
-                    </div>
-
-                    <button type="submit" class="submit-btn" id="cardSubmitBtn">Pay €29.99 with Card</button>
-                </form>
             </div>
 
             <!-- PayPal Payment -->
@@ -583,24 +536,16 @@
         const displayPrice = priceAmount.toFixed(2);
         document.getElementById('planPrice').textContent = `€${displayPrice}`;
         document.getElementById('totalAmount').textContent = `€${displayPrice}`;
-        document.getElementById('cardSubmitBtn').textContent = `Pay €${displayPrice} with Card`;
+        const paypalTab = document.querySelector('.payment-tab[onclick="switchPaymentMethod(\'paypal\')"]');
+        const paypalPanel = document.getElementById('paypal');
+        if (paypalTab && paypalPanel) {
+            document.querySelectorAll('.payment-tab').forEach(tab => tab.classList.remove('active'));
+            paypalTab.classList.add('active');
+            document.querySelectorAll('.payment-content').forEach(el => el.classList.remove('active'));
+            paypalPanel.classList.add('active');
+        }
 
         let selectedCrypto = null;
-
-        // Initialize Stripe (optional - requires valid API key)
-        let stripe = null;
-        let cardElement = null;
-        try {
-            stripe = Stripe('pk_live_YOUR_STRIPE_KEY');
-            const elements = stripe.elements();
-            cardElement = elements.create('card');
-            const cardContainer = document.getElementById('stripe-card');
-            if (cardContainer) {
-                cardElement.mount('#stripe-card');
-            }
-        } catch (e) {
-            console.log('Stripe demo mode - payment form will show demo message');
-        }
 
         function switchPaymentMethod(method) {
             document.querySelectorAll('.payment-content').forEach(el => {
@@ -667,47 +612,6 @@
             }).render('#paypal-button-container');
         }
 
-        // Handle credit card form
-        document.getElementById('cardForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            if (!cardElement) {
-                showSuccess('Card payment processed! Check your email for confirmation.');
-                setTimeout(() => {
-                    window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
-                }, 2000);
-                return;
-            }
-
-            const submitBtn = document.getElementById('cardSubmitBtn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Processing...';
-
-            try {
-                const { paymentMethod, error } = await stripe.createPaymentMethod({
-                    type: 'card',
-                    card: cardElement,
-                    billing_details: {
-                        name: document.getElementById('cardholderName').value,
-                        email: document.getElementById('email').value
-                    }
-                });
-
-                if (error) {
-                    showError(error.message);
-                } else {
-                    showSuccess('Payment processed successfully!');
-                    setTimeout(() => {
-                        window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
-                    }, 2000);
-                }
-            } catch (err) {
-                showError('Payment processing failed. ' + err.message);
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.textContent = `Pay €${priceAmount.toFixed(2)} with Card`;
-            }
-        });
 
         function showSuccess(message) {
             const el = document.getElementById('successMessage');
