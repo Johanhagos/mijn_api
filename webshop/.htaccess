@@ -59,6 +59,9 @@ RewriteRule ^(.*)/ws-.*$ $1/index.html [L]
 RewriteCond %{REQUEST_URI} ^/ws-.*$
 RewriteRule . /index.html [L]
 
+# Force index.html as homepage (override One.com default)
+RewriteRule ^$ /index.html [L]
+
 # End webshop rules
 
 #Begin of Blog rules
