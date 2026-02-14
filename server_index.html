@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="-1" />
+    <meta name="cachebuster" content="2026-02-14-final-v3" />
+    <title>APIBlockchain - Blockchain Payment Gateway & Smart Contract Invoicing</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #ffffff;
+            color: #333;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid #f0f0f0;
+            padding: 1rem 0;
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-menu a {
+            text-decoration: none;
+            color: #555;
+            font-weight: 500;
+            transition: color 0.3s;
+            font-size: 14px;
+        }
+
+        .nav-menu a:hover {
+            color: #10b981;
+        }
+
+        .nav-menu .btn-checkout {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 6px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .nav-menu .btn-checkout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Mobile menu toggle */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 100px 2rem;
+            text-align: center;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(255,255,255,0.05) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 40px;
+            opacity: 0.95;
+            line-height: 1.8;
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #10b981;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 2px solid white;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 80px 2rem;
+            background: #f9f9f9;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .section-header p {
+            font-size: 1.1rem;
+            color: #666;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 35px rgba(0,0,0,0.12);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+            color: #333;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        /* Dashboard Section */
+        .dashboard-section {
+            padding: 80px 2rem;
+            background: white;
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
+            align-items: center;
+        }
+
+        .dashboard-features {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .dashboard-feature {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .dashboard-feature-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .dashboard-feature h4 {
+            font-size: 1.1rem;
+            margin-bottom: 0.3rem;
+            color: #333;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+        }
+
+        .dashboard-feature p {
+            color: #666;
+            font-size: 0.95rem;
+        }
+
+        .dashboard-preview {
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .preview-header h4 {
+            font-size: 1rem;
+            color: #333;
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+        }
+
+        .preview-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #10b981;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 0.3rem;
+        }
+
+        .transaction-item {
+            background: white;
+            padding: 0.8rem;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .transaction-info h5 {
+            font-size: 0.9rem;
+            margin: 0;
+            color: #333;
+        }
+
+        .transaction-info p {
+            font-size: 0.8rem;
+            color: #999;
+            margin: 0;
+        }
+
+        .transaction-amount {
+            font-weight: 600;
+            color: #10b981;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        /* Pricing Section */
+        .pricing {
+            padding: 80px 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .pricing-card {
+            background: white;
+            border: 2px solid #f0f0f0;
+            border-radius: 12px;
+            padding: 2.5rem;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .pricing-card.featured {
+            border-color: #10b981;
+            box-shadow: 0 10px 40px rgba(16, 185, 129, 0.2);
+            transform: scale(1.05);
+        }
+
+        .price {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: #10b981;
+            margin: 20px 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .price span {
+            font-size: 0.5em;
+            color: #999;
+        }
+
+        .features-list {
+            text-align: left;
+            margin: 30px 0;
+            list-style: none;
+        }
+
+        .features-list li {
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            color: #555;
+        }
+
+        .features-list li:before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: 700;
+            margin-right: 10px;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 60px 2rem;
+            text-align: center;
+            border-radius: 12px;
+            margin: 60px 2rem;
+            max-width: 1200px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .cta-section h2 {
+            font-size: 2.5rem;
+            margin-bottom: 20px;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .cta-section p {
+            font-size: 1.1rem;
+            margin-bottom: 30px;
+            opacity: 0.95;
+        }
+
+        /* Footer */
+        footer {
+            background: #1a1a1a;
+            color: #999;
+            padding: 40px 2rem;
+            text-align: center;
+        }
+
+        footer p {
+            margin-bottom: 10px;
+        }
+
+        footer a {
+            color: #10b981;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* AI Assistant */
+        .ai-button {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        .ai-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+        }
+
+        .chat-widget {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            width: 350px;
+            height: 500px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 40px rgba(0, 0, 0, 0.16);
+            display: none;
+            flex-direction: column;
+            z-index: 999;
+            overflow: hidden;
+        }
+
+        .chat-widget.active {
+            display: flex;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h3 {
+            margin: 0;
+            font-size: 1rem;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .chat-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.5rem;
+            padding: 0;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .chat-message {
+            display: flex;
+            margin-bottom: 0.5rem;
+        }
+
+        .chat-message.user {
+            justify-content: flex-end;
+        }
+
+        .chat-message.bot {
+            justify-content: flex-start;
+        }
+
+        .message-text {
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            max-width: 80%;
+            word-wrap: break-word;
+            font-size: 0.9rem;
+        }
+
+        .user .message-text {
+            background: #10b981;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+
+        .bot .message-text {
+            background: #f0f0f0;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+
+        .chat-input-area {
+            border-top: 1px solid #e0e0e0;
+            padding: 1rem;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 0.75rem;
+            font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+        }
+
+        .chat-send {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .chat-send:hover {
+            background: #059669;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .nav-menu {
+                display: none;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .section-header h2 {
+                font-size: 1.8rem;
+            }
+
+            .cta-buttons {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+
+            .pricing-card.featured {
+                transform: scale(1);
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .dashboard-features {
+                order: 2;
+            }
+
+            .dashboard-preview {
+                order: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo">🔗 apiblockchain</div>
+            <button class="menu-toggle">☰</button>
+            <ul class="nav-menu">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#contact">Contact</a></li>
+                <li><a href="https://dashboard.apiblockchain.io" target="_blank" class="btn-checkout">Dashboard</a></li>
+                <li><a onclick="checkout('professional', 498)" style="cursor: pointer; color: white;" class="btn-checkout">Get Started</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Blockchain Payments Made Simple</h1>
+            <p>Integrate smart contract invoicing and Web3 payments into your webshop in minutes</p>
+            <div class="cta-buttons">
+                <a href="checkout.html" class="btn btn-primary">🛒 Start Today</a>
+                <a href="#features" class="btn btn-secondary">Learn More</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="section-header">
+            <h2>Why Choose APIBlockchain?</h2>
+            <p>Everything you need to accept blockchain payments and manage invoicing securely</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">⚡</div>
+                <h3>Lightning Fast</h3>
+                <p>Process payments in seconds. Web3 and Web2 integration working together seamlessly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔒</div>
+                <h3>Secure & Compliant</h3>
+                <p>Enterprise-grade security with full tax compliance and audit trails for every transaction.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h3>Smart Invoicing</h3>
+                <p>Automated invoice generation with blockchain proof of payment and instant settlement.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🌐</div>
+                <h3>Multi-Currency</h3>
+                <p>Accept payments in stablecoins, traditional currencies, and cryptocurrencies globally.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>AI-Powered</h3>
+                <p>Intelligent merchant assistant helps optimize payments and manage compliance effortlessly.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Real Analytics</h3>
+                <p>Complete dashboard with transaction analytics, VAT reporting, and revenue insights.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Section -->
+    <section class="dashboard-section">
+        <div class="section-header">
+            <h2>Powerful Dashboard Included</h2>
+            <p>Complete control over your blockchain payments with real-time analytics</p>
+        </div>
+        <div class="dashboard-grid">
+            <div class="dashboard-features">
+                <div class="dashboard-feature">
+                    <div class="dashboard-feature-icon">💳</div>
+                    <div>
+                        <h4>Payment Management</h4>
+                        <p>Monitor all transactions in real-time with instant settlement notifications</p>
+                    </div>
+                </div>
+                <div class="dashboard-feature">
+                    <div class="dashboard-feature-icon">📋</div>
+                    <div>
+                        <h4>Invoice Tracking</h4>
+                        <p>Automated invoice generation with blockchain proof and tax compliance</p>
+                    </div>
+                </div>
+                <div class="dashboard-feature">
+                    <div class="dashboard-feature-icon">📊</div>
+                    <div>
+                        <h4>Revenue Analytics</h4>
+                        <p>Deep insights into your payment flows with custom reporting</p>
+                    </div>
+                </div>
+                <div class="dashboard-feature">
+                    <div class="dashboard-feature-icon">🔐</div>
+                    <div>
+                        <h4>Security & Compliance</h4>
+                        <p>Enterprise-grade encryption with automatic VAT & tax reporting</p>
+                    </div>
+                </div>
+                <div class="dashboard-feature">
+                    <div class="dashboard-feature-icon">🌐</div>
+                    <div>
+                        <h4>Multi-Currency</h4>
+                        <p>Handle payments in multiple blockchain networks and traditional currencies</p>
+                    </div>
+                </div>
+                <div class="dashboard-feature">
+                    <div class="dashboard-feature-icon">🤖</div>
+                    <div>
+                        <h4>AI Assistant</h4>
+                        <p>Smart recommendations for optimization and compliance management</p>
+                    </div>
+                </div>
+            </div>
+            <div class="dashboard-preview">
+                <div class="preview-header">
+                    <h4>Live Preview</h4>
+                    <span style="font-size: 0.8rem; color: #10b981; font-weight: 600;">LIVE</span>
+                </div>
+                <div class="preview-stats">
+                    <div class="stat">
+                        <div class="stat-value">€45,230</div>
+                        <div class="stat-label">Monthly Volume</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value">2,847</div>
+                        <div class="stat-label">Transactions</div>
+                    </div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <p style="font-size: 0.8rem; color: #999; margin-bottom: 0.8rem;">Recent Transactions:</p>
+                    <div class="transaction-item">
+                        <div class="transaction-info">
+                            <h5>Customer #4521</h5>
+                            <p>2 hours ago</p>
+                        </div>
+                        <div class="transaction-amount">+€320.50</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-info">
+                            <h5>Invoice #INV-2024-001</h5>
+                            <p>5 hours ago</p>
+                        </div>
+                        <div class="transaction-amount">+€1,250.00</div>
+                    </div>
+                    <div class="transaction-item">
+                        <div class="transaction-info">
+                            <h5>Subscription Renewal</h5>
+                            <p>1 day ago</p>
+                        </div>
+                        <div class="transaction-amount">+€99.99</div>
+                    </div>
+                </div>
+                <div style="background: white; padding: 1rem; border-radius: 8px; text-align: center;">
+                    <p style="font-size: 0.85rem; color: #666; margin: 0;">Quick Stats:</p>
+                    <p style="font-size: 0.9rem; color: #333; margin: 0.5rem 0;">5 Active Users • 99.8% Success Rate</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing" id="pricing">
+        <div class="section-header">
+            <h2>Simple, Transparent Pricing</h2>
+            <p>Choose the plan that fits your business needs</p>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto;">
+            <div class="pricing-card" style="visibility: visible; display: block;">
+                <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px;">Starter</h3>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€199<span style="font-size: 1rem; color: #666;">/one-time</span></div>
+                <p style="color: #666; margin-bottom: 20px; font-weight: 500;">Perfect for small businesses getting started</p>
+                <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
+                    <li style="padding: 8px 0; color: #555;">✓ Basic Payment Integration</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Up to 100 Transactions/Month</li>
+                    <li style="padding: 8px 0; color: #555;">✓ REST API Access</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Email Support</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Basic Analytics</li>
+                </ul>
+                <button onclick="checkout('starter', 199)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started</button>
+            </div>
+            <div class="pricing-card featured" style="visibility: visible; display: block; border: 2px solid #10b981; position: relative; transform: scale(1.05);">
+                <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">MOST POPULAR</div>
+                <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px; margin-top: 15px;">Professional</h3>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€498<span style="font-size: 1rem; color: #666;">/one-time</span></div>
+                <p style="color: #666; margin-bottom: 20px; font-weight: 500;">Complete solution for growing businesses</p>
+                <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
+                    <li style="padding: 8px 0; color: #555;">✓ Full Blockchain Integration</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Smart Contract Invoicing</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Unlimited Transactions</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Merchant Dashboard</li>
+                    <li style="padding: 8px 0; color: #555;">✓ 24/7 Priority Support</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Advanced Analytics</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Tax Compliance Tools</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Multi-Currency Support</li>
+                </ul>
+                <button onclick="checkout('professional', 498)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started Now</button>
+            </div>
+            <div class="pricing-card" style="visibility: visible; display: block;">
+                <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px;">Enterprise</h3>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">Custom<span style="font-size: 1rem; color: #666;">/quote</span></div>
+                <p style="color: #666; margin-bottom: 20px; font-weight: 500;">For large-scale operations and custom needs</p>
+                <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
+                    <li style="padding: 8px 0; color: #555;">✓ Everything in Professional</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Custom Integration & API</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Dedicated Account Manager</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Custom API Endpoints</li>
+                    <li style="padding: 8px 0; color: #555;">✓ White-label Solution</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Priority Features</li>
+                    <li style="padding: 8px 0; color: #555;">✓ SLA Guarantee</li>
+                </ul>
+                <button onclick="checkout('enterprise', 0)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Contact Sales</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <h2>Ready to Accept Blockchain Payments?</h2>
+        <p>Join merchants already using APIBlockchain to streamline their payment processing</p>
+        <button onclick="checkout('professional', 498)" class="btn btn-primary">Start Your Integration Today</button>
+    </section>
+
+    <!-- Footer -->
+    <footer id="contact">
+        <p><strong>APIBlockchain</strong> - Blockchain Payment Solutions</p>
+        <p>📧 Email: <a href="mailto:support@apiblockchain.io">support@apiblockchain.io</a></p>
+        <p>📞 Phone: <a href="tel:+31652824245">+31 (0)6 5282 4245</a></p>
+        <p style="margin-top: 20px; border-top: 1px solid #333; padding-top: 20px;">
+            © 2024 APIBlockchain. All rights reserved. | 
+            <a href="#">Privacy Policy</a> | 
+            <a href="#">Terms of Service</a>
+        </p>
+    </footer>
+
+    <!-- AI Assistant Widget -->
+    <button class="ai-button" onclick="toggleChat()">💬</button>
+    
+    <div class="chat-widget" id="chatWidget">
+        <div class="chat-header">
+            <h3>APIBlockchain Assistant</h3>
+            <button class="chat-close" onclick="toggleChat()">✕</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="chat-message bot">
+                <div class="message-text">Hi! 👋 I'm your APIBlockchain assistant. How can I help you today?</div>
+            </div>
+        </div>
+        <div class="chat-input-area">
+            <input type="text" class="chat-input" id="chatInput" placeholder="Type your message...">
+            <button class="chat-send" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // AI Chat Functions
+        function toggleChat() {
+            const widget = document.getElementById('chatWidget');
+            widget.classList.toggle('active');
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addMessage(message, 'user');
+            input.value = '';
+            
+            // Simulate intelligent bot response with product knowledge
+            setTimeout(() => {
+                const response = generateAIResponse(message);
+                addMessage(response, 'bot');
+            }, 500);
+        }
+        
+        function generateAIResponse(userMessage) {
+            const msg = userMessage.toLowerCase();
+            
+            // BLOCKCHAIN & PAYMENT PROCESSING CORE
+            if (msg.includes('blockchain') || msg.includes('smart contract')) {
+                return "Our smart contracts execute payment settlements automatically on multiple blockchains. They're immutable, transparent, and eliminate middlemen - reducing settlement time from 3 days to seconds!";
+            }
+            if (msg.includes('web3') || msg.includes('crypto payment') || msg.includes('cryptocurrency')) {
+                return "Web3 payments let you accept 50+ cryptocurrencies (ETH, BTC, USDT, etc.). Funds settle in minutes, bypass traditional banking fees, and your customers can pay from anywhere in the world. Perfect for global merchants!";
+            }
+            if (msg.includes('settlement') || msg.includes('when do i get paid') || msg.includes('payout')) {
+                return "With Web2 (credit cards): 1-3 business days. With Web3 (crypto): Settlement happens on-chain in minutes! Both methods show real-time status in your dashboard. Choose what works best for your business.";
+            }
+            
+            // SECURITY & COMPLIANCE
+            if (msg.includes('secure') || msg.includes('pci') || msg.includes('encryption') || msg.includes('fraud')) {
+                return "We're PCI DSS Level 1 compliant, use military-grade SSL/TLS encryption, and blockchain transactions are cryptographically verified. All customer data is encrypted end-to-end. Fraud detection uses AI machine learning.";
+            }
+            if (msg.includes('compliance') || msg.includes('tax') || msg.includes('vat') || msg.includes('audit')) {
+                return "We handle automatic VAT calculation per EU regulations, generate legally-compliant invoices, maintain 7-year audit trails, and support OSS (One-Stop Shop) for cross-border EU sales. Fully auditable blockchain records.";
+            }
+            if (msg.includes('pii') || msg.includes('privacy') || msg.includes('data protection') || msg.includes('gdpr')) {
+                return "We process minimal customer data (email + payment info). All personally-identifiable information is encrypted separately. GDPR-compliant, right-to-be-forgotten supported, and data deletion within 30 days of request.";
+            }
+            
+            // API & INTEGRATION
+            if (msg.includes('api') || msg.includes('rest') || msg.includes('developer') || msg.includes('sdk')) {
+                return "RESTful API with OAuth2 authentication. SDKs for Node.js, Python, PHP, Go, Ruby. Full webhook support for real-time events. Complete API docs at api.apiblockchain.io with sandbox for testing.";
+            }
+            if (msg.includes('integrate') || msg.includes('woocommerce') || msg.includes('shopify') || msg.includes('plugin')) {
+                return "We offer plugins for WooCommerce, Shopify, and Magento. Or use our REST API for custom integrations. White-label options available. Average integration time: 2-4 hours with developer documentation.";
+            }
+            if (msg.includes('webhook') || msg.includes('notification') || msg.includes('event') || msg.includes('real-time')) {
+                return "Real-time webhooks for all payment events: payment.started, payment.confirmed, payment.failed, invoice.created, refund.issued, etc. Retry logic with exponential backoff. Signed with HMAC-SHA256 for security.";
+            }
+            
+            // INVOICING & SMART CONTRACTS
+            if (msg.includes('invoice') || msg.includes('smart contract invoice')) {
+                return "Smart contract invoicing means your invoices are cryptographically signed and stored on-chain - permanent, tamper-proof records. Perfect for B2B accounting and audits. Legally compliant in 30+ countries.";
+            }
+            if (msg.includes('recurring') || msg.includes('subscription') || msg.includes('billing')) {
+                return "Support for recurring billing, subscriptions, and scheduled payments. Automatic retry logic for failed payments. Customer portal for managing subscriptions. Works with both Web2 and Web3 payments.";
+            }
+            
+            // MULTI-CURRENCY & LOCALIZATION
+            if (msg.includes('multi-currency') || msg.includes('currency conversion') || msg.includes('exchange rate')) {
+                return "Accept payments in 150+ fiat currencies and 50+ cryptocurrencies. Real-time exchange rates via trusted providers. Automatic conversion or lock-in rates. Settlement in your preferred currency.";
+            }
+            if (msg.includes('localization') || msg.includes('language') || msg.includes('regional') || msg.includes('international')) {
+                return "Dashboard and checkout available in 25+ languages. Regional payment methods (Alipay for China, Boleto for Brazil, etc). Local VAT/tax handling for all major markets.";
+            }
+            
+            // MERCHANT DASHBOARD
+            if (msg.includes('dashboard') || msg.includes('analytics') || msg.includes('reporting') || msg.includes('metrics')) {
+                return "Real-time dashboard showing transactions, revenue, payment breakdown (Web2 vs Web3), geographic data, customer insights, and AI-powered trend analysis. Export reports for accounting and tax preparation.";
+            }
+            if (msg.includes('customer data') || msg.includes('customer info') || msg.includes('customer list')) {
+                return "Secure customer database with transaction history, payment preferences, and retry logs. Built-in CRM features. Segmentation tools for targeted promotions. GDPR-compliant data management.";
+            }
+            
+            // PRICING & PLANS
+            if (msg.includes('starter') && (msg.includes('plan') || msg.includes('price') || msg.includes('features'))) {
+                return "Starter (€199): Up to 100 transactions/month, basic API access, email support, essential analytics. Perfect for testing or small operations. Upgrade anytime.";
+            }
+            if (msg.includes('professional') && (msg.includes('plan') || msg.includes('price') || msg.includes('features'))) {
+                return "Professional (€498): Unlimited transactions, full blockchain integration, merchant dashboard, multi-currency, smart contract invoicing, 24/7 priority support, advanced analytics. Our most popular plan!";
+            }
+            if (msg.includes('enterprise')) {
+                return "Enterprise: Custom pricing for large-scale operations. Dedicated account manager, white-label options, custom API endpoints, SLA guarantees, priority feature requests. Contact sales@apiblockchain.io";
+            }
+            
+            // PAYMENT METHODS
+            if (msg.includes('paypal') || msg.includes('stripe') || msg.includes('payment method')) {
+                return "We support Credit/Debit cards (Visa, Mastercard, Amex), Bank transfers (SEPA), PayPal, Apple Pay, Google Pay, and 50+ cryptocurrencies. Add or remove methods anytime from dashboard.";
+            }
+            if (msg.includes('crypto method') || msg.includes('which cryptocurrency') || msg.includes('bitcoin') || msg.includes('ethereum')) {
+                return "Popular crypto payments: Bitcoin (BTC) - store of value, Ethereum (ETH) - smart contract ecosystem, USDT - price stable, USDC - regulatory compliant. We recommend stablecoins for e-commerce to avoid volatility.";
+            }
+            
+            // SUPPORT & ONBOARDING
+            if (msg.includes('support') || msg.includes('help') || msg.includes('contact')) {
+                return "24/7 priority support for Pro+ customers. Email: support@apiblockchain.io | Phone: +31 (0)6 5282 4245. Live chat in dashboard. Response time: <30 minutes for urgent issues.";
+            }
+            if (msg.includes('onboarding') || msg.includes('training') || msg.includes('getting started')) {
+                return "Free onboarding session: API setup, payment configuration, testing, and first live transaction. Video tutorials, docs, and code examples. 30-day money-back guarantee if you're not satisfied.";
+            }
+            if (msg.includes('demo') || msg.includes('sandbox') || msg.includes('test')) {
+                return "Sandbox environment for risk-free testing. Use test API keys to simulate transactions without charges. Test payment webhooks, error handling, and integration flow before going live.";
+            }
+            
+            // ADVANCED FEATURES
+            if (msg.includes('refund') || msg.includes('dispute') || msg.includes('chargeback')) {
+                return "Instant refunds with one-click processing. Dispute resolution with blockchain proof-of-payment. Chargeback protection through transparent transaction records.";
+            }
+            if (msg.includes('loyalty') || msg.includes('rewards') || msg.includes('cashback')) {
+                return "Build loyalty programs with our rewards API. Award points for payments, redemption handling, and integration with your CRM. Available in Pro plan and above.";
+            }
+            if (msg.includes('fraud detection') || msg.includes('risk') || msg.includes('verification')) {
+                return "AI-powered fraud detection with real-time risk scoring. 3D Secure for card payments. Multi-factor authentication options. Biometric verification available for crypto.";
+            }
+            
+            // DEFAULT HELPFUL RESPONSES
+            const contexts = [
+                "Great! Ask me about payments, API integration, blockchain features, pricing, security, or customer support. What interests you?",
+                "I can help with Web2/Web3 payments, smart contracts, VAT compliance, API integration, merchant features, or your favorite crypto. What would you like to know?",
+                "Curious about blockchain technology, payment processing, international sales, or how our dashboard works? I'm here to help!",
+                "Need info on pricing plans, payment methods, technical integration, security features, or VAT handling? Ask away!",
+                "I'm knowledgeable about crypto payments, invoice management, analytics, compliance, and merchant tools. What's your question?"
+            ];
+            return contexts[Math.floor(Math.random() * contexts.length)];
+        }
+
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${sender}`;
+            
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            textDiv.textContent = text;
+            
+            messageDiv.appendChild(textDiv);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        // Allow Enter key to send message
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && document.getElementById('chatWidget').classList.contains('active')) {
+                sendMessage();
+            }
+        });
+
+        // Checkout function
+        function checkout(plan, price) {
+            const planInfo = {
+                'starter': { name: 'Starter Plan', price: 199 },
+                'professional': { name: 'Professional Plan', price: 498 },
+                'enterprise': { name: 'Enterprise Plan (Custom Quote)', price: 0 }
+            };
+            
+            const selected = planInfo[plan] || { name: 'Unknown Plan', price: 0 };
+            
+            if (plan === 'enterprise') {
+                alert(`Thank you for your interest in our ${selected.name}!\n\nPlease contact our sales team at sales@apiblockchain.io for a custom quote.`);
+            } else {
+                alert(`You selected: ${selected.name}\nPrice: €${selected.price}\n\nRedirecting to payment...`);
+                // In production, redirect to payment page
+                window.location.href = 'checkout.html?plan=' + plan + '&price=' + price;
+            }
+        }
+
+        // v3 - Aggressive cache bypass
+        console.log("Page loaded - checking for modern content...");
+        
+        // Wait a bit for DOM to load
+        window.addEventListener('DOMContentLoaded', function() {
+            const dashboardElement = document.querySelector('.dashboard-section');
+            console.log("Dashboard element found:", !!dashboardElement);
+            
+            if (!dashboardElement) {
+                console.warn('CACHED OLD VERSION DETECTED - FORCING RELOAD');
+                // Force reload with cache bypass
+                window.location.href = window.location.href + '?v=' + Date.now();
+            }
+        });
+    </script>
+</body>
+</html>
