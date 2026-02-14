@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "webshop/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*\\..*)",
+      "dest": "/webshop_for_upload/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/webshop_for_upload/index.html"
+    }
+  ],
+  "env": {
+    "VERCEL_URL": "@vercel/static"
+  }
+}
