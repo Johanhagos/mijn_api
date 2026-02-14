@@ -677,7 +677,7 @@
                 <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#contact">Contact</a></li>
                 <li><a href="https://dashboard.apiblockchain.io" target="_blank" class="btn-checkout">Dashboard</a></li>
-                <li><a onclick="checkout('professional', 498)" style="cursor: pointer; color: white;" class="btn-checkout">Get Started</a></li>
+                <li><a onclick="checkout('professional', 29.99)" style="cursor: pointer; color: white;" class="btn-checkout">Get Started</a></li>
             </ul>
         </div>
     </nav>
@@ -841,7 +841,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto;">
             <div class="pricing-card" style="visibility: visible; display: block;">
                 <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px;">Starter</h3>
-                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€199<span style="font-size: 1rem; color: #666;">/one-time</span></div>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€20<span style="font-size: 1rem; color: #666;">/month</span></div>
                 <p style="color: #666; margin-bottom: 20px; font-weight: 500;">Perfect for small businesses getting started</p>
                 <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
                     <li style="padding: 8px 0; color: #555;">✓ Basic Payment Integration</li>
@@ -850,12 +850,12 @@
                     <li style="padding: 8px 0; color: #555;">✓ Email Support</li>
                     <li style="padding: 8px 0; color: #555;">✓ Basic Analytics</li>
                 </ul>
-                <button onclick="checkout('starter', 199)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started</button>
+                <button onclick="checkout('starter', 20)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started</button>
             </div>
             <div class="pricing-card featured" style="visibility: visible; display: block; border: 2px solid #10b981; position: relative; transform: scale(1.05);">
                 <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">MOST POPULAR</div>
                 <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px; margin-top: 15px;">Professional</h3>
-                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€498<span style="font-size: 1rem; color: #666;">/one-time</span></div>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€29,99<span style="font-size: 1rem; color: #666;">/month</span></div>
                 <p style="color: #666; margin-bottom: 20px; font-weight: 500;">Complete solution for growing businesses</p>
                 <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
                     <li style="padding: 8px 0; color: #555;">✓ Full Blockchain Integration</li>
@@ -867,11 +867,11 @@
                     <li style="padding: 8px 0; color: #555;">✓ Tax Compliance Tools</li>
                     <li style="padding: 8px 0; color: #555;">✓ Multi-Currency Support</li>
                 </ul>
-                <button onclick="checkout('professional', 498)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started Now</button>
+                <button onclick="checkout('professional', 29.99)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started Now</button>
             </div>
             <div class="pricing-card" style="visibility: visible; display: block;">
                 <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px;">Enterprise</h3>
-                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">Custom<span style="font-size: 1rem; color: #666;">/quote</span></div>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">Custom<span style="font-size: 1rem; color: #666;">/month</span></div>
                 <p style="color: #666; margin-bottom: 20px; font-weight: 500;">For large-scale operations and custom needs</p>
                 <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
                     <li style="padding: 8px 0; color: #555;">✓ Everything in Professional</li>
@@ -891,7 +891,7 @@
     <section class="cta-section">
         <h2>Ready to Accept Blockchain Payments?</h2>
         <p>Join merchants already using APIBlockchain to streamline their payment processing</p>
-        <button onclick="checkout('professional', 498)" class="btn btn-primary">Start Your Integration Today</button>
+        <button onclick="checkout('professional', 29.99)" class="btn btn-primary">Start Your Integration Today</button>
     </section>
 
     <!-- Footer -->
@@ -1011,10 +1011,10 @@
             
             // PRICING & PLANS
             if (msg.includes('starter') && (msg.includes('plan') || msg.includes('price') || msg.includes('features'))) {
-                return "Starter (€199): Up to 100 transactions/month, basic API access, email support, essential analytics. Perfect for testing or small operations. Upgrade anytime.";
+                return "Starter (€20/month): Up to 100 transactions/month, basic API access, email support, essential analytics. Perfect for testing or small operations. Upgrade anytime.";
             }
             if (msg.includes('professional') && (msg.includes('plan') || msg.includes('price') || msg.includes('features'))) {
-                return "Professional (€498): Unlimited transactions, full blockchain integration, merchant dashboard, multi-currency, smart contract invoicing, 24/7 priority support, advanced analytics. Our most popular plan!";
+                return "Professional (€29.99/month): Unlimited transactions, full blockchain integration, merchant dashboard, multi-currency, smart contract invoicing, 24/7 priority support, advanced analytics. Our most popular plan!";
             }
             if (msg.includes('enterprise')) {
                 return "Enterprise: Custom pricing for large-scale operations. Dedicated account manager, white-label options, custom API endpoints, SLA guarantees, priority feature requests. Contact sales@apiblockchain.io";
@@ -1085,8 +1085,8 @@
         // Checkout function
         function checkout(plan, price) {
             const planInfo = {
-                'starter': { name: 'Starter Plan', price: 199 },
-                'professional': { name: 'Professional Plan', price: 498 },
+                'starter': { name: 'Starter Plan', price: 20 },
+                'professional': { name: 'Professional Plan', price: 29.99 },
                 'enterprise': { name: 'Enterprise Plan (Custom Quote)', price: 0 }
             };
             
@@ -1095,7 +1095,7 @@
             if (plan === 'enterprise') {
                 alert(`Thank you for your interest in our ${selected.name}!\n\nPlease contact our sales team at sales@apiblockchain.io for a custom quote.`);
             } else {
-                alert(`You selected: ${selected.name}\nPrice: €${selected.price}\n\nRedirecting to payment...`);
+                alert(`You selected: ${selected.name}\nPrice: €${selected.price}/month\n\nRedirecting to payment...`);
                 // In production, redirect to payment page
                 window.location.href = 'checkout.html?plan=' + plan + '&price=' + price;
             }
