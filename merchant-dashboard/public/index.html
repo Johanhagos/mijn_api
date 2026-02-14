@@ -781,13 +781,10 @@
                 alert('Thank you for your interest in our Enterprise plan!\n\nPlease contact our sales team at:\nEmail: sales@apiblockchain.io\nPhone: +31 6 52 82 42 45');
                 window.location.href = 'mailto:sales@apiblockchain.io?subject=Enterprise%20Plan%20Inquiry';
             } else {
-                // For other plans, show a checkout modal
                 const summary = plan.charAt(0).toUpperCase() + plan.slice(1);
                 const confirmed = confirm(`Complete ${summary} Plan Checkout?\n\nAmount: €${amount}\n\nClick OK to proceed to payment.`);
                 if (confirmed) {
-                    alert('Payment processing...\n\nRedirecting to secure payment gateway...\n\nYou will receive a confirmation email shortly.');
-                    // In a real app, this would redirect to a payment processor like Stripe
-                    console.log(`Checkout initiated for ${plan} plan - €${amount}`);
+                    window.location.href = `https://apiblockchain.io/checkout.html?plan=${plan}&price=${amount}`;
                 }
             }
         }
