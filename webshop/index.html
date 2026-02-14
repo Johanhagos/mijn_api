@@ -677,7 +677,7 @@
                 <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#contact">Contact</a></li>
                 <li><a href="https://dashboard.apiblockchain.io" target="_blank" class="btn-checkout">Dashboard</a></li>
-                <li><a onclick="checkout('professional', 498)" style="cursor: pointer; color: white;" class="btn-checkout">Get Started</a></li>
+                <li><a onclick="checkout('professional', 29.99)" style="cursor: pointer; color: white;" class="btn-checkout">Get Started</a></li>
             </ul>
         </div>
     </nav>
@@ -984,6 +984,16 @@
             if (msg.includes('webhook') || msg.includes('notification') || msg.includes('event') || msg.includes('real-time')) {
                 return "Real-time webhooks for all payment events: payment.started, payment.confirmed, payment.failed, invoice.created, refund.issued, etc. Retry logic with exponential backoff. Signed with HMAC-SHA256 for security.";
             }
+
+            // VAT & COMPLIANCE (EU + International)
+            if (msg.includes('vat') || msg.includes('tax') || msg.includes('oss') || msg.includes('reverse charge') || msg.includes('international')) {
+                return "VAT compliance summary: Domestic sales use your local VAT rate. EU B2B = reverse charge (customer valid VAT number). EU B2C cross-border: below €10,000 charge your local VAT; above it charge destination VAT and file via OSS. Non‑EU exports usually 0% VAT with proof. We store invoices + audit trails automatically.";
+            }
+
+            // BLOCKCHAIN TRANSACTIONS
+            if (msg.includes('blockchain transaction') || msg.includes('web3 transaction') || msg.includes('txid') || msg.includes('confirmations')) {
+                return "Blockchain transactions show an on‑chain TX ID and confirmation status. Once confirmed, settlement is final and visible in your dashboard. We record the EUR value at payment time for VAT compliance and include the TX ID on invoices for audit proof.";
+            }
             
             // INVOICING & SMART CONTRACTS
             if (msg.includes('invoice') || msg.includes('smart contract invoice')) {
@@ -1085,8 +1095,8 @@
         // Checkout function
         function checkout(plan, price) {
             const planInfo = {
-                'starter': { name: 'Starter Plan', price: 199 },
-                'professional': { name: 'Professional Plan', price: 498 },
+                'starter': { name: 'Starter Plan', price: 20 },
+                'professional': { name: 'Professional Plan', price: 29.99 },
                 'enterprise': { name: 'Enterprise Plan (Custom Quote)', price: 0 }
             };
             
@@ -1095,7 +1105,8 @@
             if (plan === 'enterprise') {
                 alert(`Thank you for your interest in our ${selected.name}!\n\nPlease contact our sales team at sales@apiblockchain.io for a custom quote.`);
             } else {
-                alert(`You selected: ${selected.name}\nPrice: €${selected.price}\n\nRedirecting to payment...`);
+                const displayPrice = Number(price ?? selected.price).toFixed(2);
+                alert(`You selected: ${selected.name}\nPrice: €${displayPrice}\n\nRedirecting to payment...`);
                 // In production, redirect to payment page
                 window.location.href = 'checkout.html?plan=' + plan + '&price=' + price;
             }

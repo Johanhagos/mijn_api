@@ -371,7 +371,7 @@
                         <div class="product-name" id="planName">Professional Plan</div>
                         <div class="product-desc">Full blockchain integration with unlimited transactions</div>
                     </div>
-                    <div class="product-price" id="planPrice">€498</div>
+                    <div class="product-price" id="planPrice">€29.99</div>
                 </div>
 
                 <div class="product-item" style="margin-top: 20px;">
@@ -408,7 +408,7 @@
 
                 <div class="order-total">
                     <span>Total Amount:</span>
-                    <span class="total-price" id="totalAmount">€498.00</span>
+                    <span class="total-price" id="totalAmount">€29.99</span>
                 </div>
             </div>
 
@@ -485,7 +485,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="submit-btn" id="cardSubmitBtn">Pay €498.00 with Card</button>
+                    <button type="submit" class="submit-btn" id="cardSubmitBtn">Pay €29.99 with Card</button>
                 </form>
             </div>
 
@@ -555,7 +555,7 @@
         // Get plan from URL params
         const params = new URLSearchParams(window.location.search);
         const plan = params.get('plan') || 'professional';
-        const price = params.get('price') || '498';
+        const price = params.get('price') || '29.99';
 
         const planNames = {
             'starter': 'Starter Plan',
@@ -564,16 +564,17 @@
         };
 
         const planPrices = {
-            'starter': 199,
-            'professional': 498,
+            'starter': 20,
+            'professional': 29.99,
             'enterprise': 0
         };
 
         // Set plan details
         document.getElementById('planName').textContent = planNames[plan] || planNames['professional'];
-        const priceAmount = planPrices[plan] || 498;
-        document.getElementById('planPrice').textContent = `€${priceAmount}`;
-        document.getElementById('totalAmount').textContent = `€${priceAmount}.00`;
+        const priceAmount = planPrices[plan] || 29.99;
+        const displayPrice = priceAmount.toFixed(2);
+        document.getElementById('planPrice').textContent = `€${displayPrice}`;
+        document.getElementById('totalAmount').textContent = `€${displayPrice}`;
 
         let selectedCrypto = null;
 
@@ -695,7 +696,7 @@
                 showError('Payment processing failed. ' + err.message);
             } finally {
                 submitBtn.disabled = false;
-                submitBtn.textContent = `Pay €${priceAmount}.00 with Card`;
+                submitBtn.textContent = `Pay €${priceAmount.toFixed(2)} with Card`;
             }
         });
 
