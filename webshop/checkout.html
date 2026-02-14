@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Secure Checkout - APIBlockchain Payment Gateway</title>
     <script src="https://js.stripe.com/v3/"></script>
-    <script src="https://www.paypal.com/sdk/js?client-id=YOUR_PAYPAL_CLIENT_ID&currency=EUR&intent=capture"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=BAA0ISTOuKNpz_VjPaEjdcIaf7pfGfvjxmr4rUjrtSIRoP04FNSCJ31lTf2FSn3mj--r8lBKyQN9FxKmV8&currency=EUR&intent=capture"></script>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         * {
@@ -571,7 +571,8 @@
 
         // Set plan details
         document.getElementById('planName').textContent = planNames[plan] || planNames['professional'];
-        const priceAmount = planPrices[plan] || 29.99;
+        const parsedPrice = Number(price);
+        const priceAmount = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : (planPrices[plan] || 29.99);
         const displayPrice = priceAmount.toFixed(2);
         document.getElementById('planPrice').textContent = `€${displayPrice}`;
         document.getElementById('totalAmount').textContent = `€${displayPrice}`;
