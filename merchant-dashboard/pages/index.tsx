@@ -32,7 +32,7 @@ export async function getStaticProps() {
     
     return {
       props: { html },
-      revalidate: 3600,
+      revalidate: 10,
     };
   } catch (error) {
     console.error('Error reading HTML:', error);
