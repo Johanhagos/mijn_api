@@ -681,21 +681,21 @@
             <div class="pricing-grid">
                 <div class="pricing-card">
                     <h3>Starter</h3>
-                    <div class="price">€199</div>
-                    <div class="period">one-time setup</div>
+                    <div class="price">€20</div>
+                    <div class="period">/month</div>
                     <ul>
                         <li>Up to 100 transactions/month</li>
                         <li>Basic invoicing</li>
                         <li>Email support</li>
                         <li>1 user account</li>
                     </ul>
-                    <button class="btn-primary" onclick="checkout('starter', 199)">Get Started</button>
+                    <button class="btn-primary" onclick="checkout('starter', 20)">Get Started</button>
                 </div>
 
                 <div class="pricing-card featured">
                     <h3>Professional</h3>
-                    <div class="price">€498</div>
-                    <div class="period">one-time setup</div>
+                    <div class="price">€29.99</div>
+                    <div class="period">/month</div>
                     <ul>
                         <li>Unlimited transactions</li>
                         <li>Advanced smart contracts</li>
@@ -706,7 +706,7 @@
                         <li>Real-time analytics</li>
                         <li>Compliance reporting</li>
                     </ul>
-                    <button class="btn-primary" onclick="checkout('professional', 498)">Choose Professional</button>
+                    <button class="btn-primary" onclick="checkout('professional', 29.99)">Choose Professional</button>
                 </div>
 
                 <div class="pricing-card">
@@ -830,15 +830,27 @@
 
             // Simulate AI response
             setTimeout(() => {
-                const responses = [
-                    'That\'s a great question! You can integrate blockchain payments into your webshop in just a few clicks.',
-                    'Our Professional plan includes unlimited transactions and priority support - perfect for growing businesses.',
-                    'Yes, we support all major stablecoins and cryptocurrencies including USDC, USDT, and ETH.',
-                    'You\'ll get instant notifications for all transactions and can access real-time analytics 24/7.',
-                    'We offer seamless API integration that works with most popular webshop platforms.'
-                ];
-                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                addMessage(randomResponse, 'assistant');
+                const lower = message.toLowerCase();
+                let response = '';
+
+                if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost') || lower.includes('plan')) {
+                    response = 'Starter is €20/month (up to 100 transactions). Professional is €29.99/month (unlimited transactions, dashboard, priority support). Enterprise is custom. Want the best plan for your volume?';
+                } else if (lower.includes('plugin') || lower.includes('woocommerce') || lower.includes('wordpress') || lower.includes('integrate')) {
+                    response = 'Install the APIBlockchain plugin, add your API key in settings, choose Web2/Web3 methods, and run a test checkout. Tell me your platform and I’ll give exact steps.';
+                } else if (lower.includes('crypto') || lower.includes('stablecoin') || lower.includes('usdt') || lower.includes('usdc')) {
+                    response = 'Yes, we support major stablecoins and cryptocurrencies including USDC, USDT, and ETH.';
+                } else if (lower.includes('api') || lower.includes('developer') || lower.includes('webhook')) {
+                    response = 'We provide a REST API with webhooks for real-time payment events and SDKs for common languages. Want a quick start guide?';
+                } else {
+                    const responses = [
+                        'That\'s a great question! You can integrate blockchain payments into your webshop in just a few clicks.',
+                        'You\'ll get instant notifications for all transactions and can access real-time analytics 24/7.',
+                        'We offer seamless API integration that works with most popular webshop platforms.'
+                    ];
+                    response = responses[Math.floor(Math.random() * responses.length)];
+                }
+
+                addMessage(response, 'assistant');
             }, 500);
         }
     </script>

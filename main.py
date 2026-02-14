@@ -2658,6 +2658,18 @@ def generate_rule_based_response(message: str, stats: dict, merchant: dict) -> s
     web3_count = stats.get('web3_count', 0)
     total_amount = stats.get('total_amount', 0)
     
+    # Plugin / integration guidance
+    if any(word in msg_lower for word in ['plugin', 'integrate', 'integration', 'woocommerce', 'wordpress', 'setup']):
+        return """**Plugin Integration (WordPress / WooCommerce):**
+
+1. Install the APIBlockchain plugin in WordPress.
+2. Go to Settings → API Keys in your dashboard and create a key.
+3. Paste the API key into the plugin settings.
+4. Choose payment methods (Web2, Web3, or both).
+5. Save and run a test checkout.
+
+If you tell me your platform (WordPress, WooCommerce, custom site), I’ll provide exact steps."""
+
     # Provide contextual insights based on merchant's activity
     if any(word in msg_lower for word in ['how', 'help', 'what', 'guide', 'tutorial']):
         if web2_count == 0 and web3_count == 0:
@@ -2905,6 +2917,22 @@ All our auto-generated invoices meet {country_info['name']} legal requirements."
 
 Our platform automatically maintains {country_info['name']}-compliant records."""
     
+    # Blockchain transactions (status, confirmations, compliance)
+    elif any(word in msg_lower for word in ['blockchain transaction', 'blockchain transactions', 'web3 transaction', 'crypto transaction', 'txid', 'transaction id', 'confirmations', 'on-chain']):
+        return """**Blockchain Transaction Guidance:**
+
+**What you’ll see:**
+- On-chain TX ID (hash) and network (e.g., ETH, BTC)
+- Confirmation status (pending → confirmed)
+- Settlement time: minutes for Web3, 1–3 days for cards
+
+**Compliance basics:**
+- Treat crypto as a payment method; VAT applies like Web2
+- Record the EUR value at payment time
+- Keep TX ID as audit evidence
+
+Need help reconciling a specific transaction? Share the TX ID."""
+
     # Cryptocurrency specific regulations
     elif any(word in msg_lower for word in ['crypto regulation', '5th directive', 'aml', 'kyc crypto', 'crypto compliance']):
         return """**Cryptocurrency Compliance & Regulations:**
@@ -2933,6 +2961,37 @@ Our platform automatically maintains {country_info['name']}-compliant records.""
 
 We handle compliance infrastructure so you can focus on your business."""
     
+    # EU reverse charge & cross-border VAT/OSS
+    elif any(word in msg_lower for word in ['reverse charge', 'oss', 'one stop shop', 'cross-border', 'international vat', 'eu vat']):
+        return f"""**International VAT (EU) Summary for {country_info['name']}:**
+
+**Domestic sales:** Charge {country_info['standard_rate']}% VAT.
+
+**EU B2B:** Reverse charge applies if customer has a valid EU VAT number.
+Use the phrase: "{country_info['reverse_charge_phrase']}".
+
+**EU B2C (cross‑border):**
+- Below {country_info['currency']} {country_info['oss_threshold']}: charge your local rate
+- Above threshold: charge destination country VAT
+- Use OSS to file a single quarterly return via {country_info['tax_authority']}
+
+**Exports (non‑EU):** Usually 0% VAT with proof of export.
+
+I can explain any scenario in detail if you share customer country + B2B/B2C."""
+
+    # Revenue trend insights (requires time-series data)
+    elif any(word in msg_lower for word in ['trend', 'over time', 'growth', 'month', 'monthly', 'week', 'weekly', 'daily']):
+        total = float(stats.get('total_amount', 0))
+        web2 = stats.get('web2_count', 0)
+        web3 = stats.get('web3_count', 0)
+        return f"""**Revenue Trend Overview ({country_info['name']}):**
+
+I can’t calculate a true trend without time-series data (daily/weekly/monthly totals). Right now I only have your current snapshot:
+- Total revenue: {country_info['currency']} {total:,.2f}
+- Web2 (traditional): {web2} transactions
+- Web3 (blockchain): {web3} transactions
+
+If you want a trend breakdown, share a date range (e.g., last 30/90 days) or enable analytics time-series in the dashboard, and I’ll analyze direction, volatility, and mix shifts."""
     # Revenue insights with compliance context
     elif any(word in msg_lower for word in ['revenue', 'earning', 'money', 'income', 'sales']):
         total = float(stats.get('total_amount', 0))
