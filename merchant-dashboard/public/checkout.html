@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Secure Checkout - APIBlockchain Payment Gateway</title>
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://www.paypal.com/sdk/js?client-id=BAA0ISTOuKNpz_VjPaEjdcIaf7pfGfvjxmr4rUjrtSIRoP04FNSCJ31lTf2FSn3mj--r8lBKyQN9FxKmV8&currency=EUR&intent=capture"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .checkout-wrapper {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            max-width: 1200px;
+            width: 100%;
+        }
+        
+        .order-review {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .checkout-container {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+        
+        .header {
+            margin-bottom: 30px;
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+        }
+        
+        h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .order-summary {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-left: 4px solid #10b981;
+        }
+        
+        .summary-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .product-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .product-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        
+        .product-info {
+            flex: 1;
+        }
+        
+        .product-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .product-desc {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .product-price {
+            color: #10b981;
+            font-weight: 700;
+            font-size: 16px;
+            margin-left: 20px;
+        }
+        
+        .order-total {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 20px;
+            font-weight: 800;
+            color: #333;
+            margin-top: 25px;
+            padding-top: 25px;
+            border-top: 2px solid #10b981;
+        }
+        
+        .total-price {
+            color: #10b981;
+            font-size: 24px;
+        }
+        
+        .payment-methods {
+            margin-bottom: 30px;
+        }
+        
+        .payment-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+        
+        .payment-tabs {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 30px;
+        }
+        
+        .payment-tab {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            font-weight: 500;
+            color: #666;
+        }
+        
+        .payment-tab:hover {
+            border-color: #10b981;
+        }
+        
+        .payment-tab.active {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border-color: #10b981;
+        }
+        
+        .payment-content {
+            display: none;
+        }
+        
+        .payment-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Inter', sans-serif;
+            transition: all 0.3s;
+        }
+        
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #10b981;
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        #stripe-card {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        #paypal-button-container {
+            margin-top: 15px;
+        }
+        
+        .crypto-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        
+        .crypto-option {
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .crypto-option:hover {
+            border-color: #10b981;
+        }
+        
+        .crypto-option.selected {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: #10b981;
+        }
+        
+        .crypto-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        
+        .crypto-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .security-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 15px;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #059669;
+        }
+        
+        .security-icon {
+            font-size: 18px;
+        }
+        
+        .submit-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 20px;
+        }
+        
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+        
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            color: #10b981;
+            font-weight: 600;
+        }
+        
+        .success-message {
+            display: none;
+            background: rgba(16, 185, 129, 0.1);
+            border-left: 4px solid #10b981;
+            padding: 15px;
+            border-radius: 8px;
+            color: #059669;
+            margin-bottom: 20px;
+        }
+        
+        .error-message {
+            display: none;
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            padding: 15px;
+            border-radius: 8px;
+            color: #dc2626;
+            margin-bottom: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .checkout-wrapper {
+                grid-template-columns: 1fr;
+            }
+            
+            .payment-tabs {
+                grid-template-columns: 1fr 1fr;
+            }
+            
+            .crypto-options {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="checkout-wrapper">
+        <!-- Order Review Section -->
+        <div class="order-review">
+            <div class="header">
+                <div class="logo">🔗 APIBlockchain</div>
+                <h1>Order Summary</h1>
+                <p class="subtitle">Review your purchase details</p>
+            </div>
+
+            <div class="order-summary">
+                <div class="summary-title">📋 Selected Plan</div>
+                <div class="product-item">
+                    <div class="product-info">
+                        <div class="product-name" id="planName">Professional Plan</div>
+                        <div class="product-desc">Full blockchain integration with unlimited transactions</div>
+                    </div>
+                    <div class="product-price" id="planPrice">€29.99</div>
+                </div>
+
+                <div class="product-item" style="margin-top: 20px;">
+                    <div class="product-info">
+                        <div class="product-name">🔒 Smart Contract Invoicing</div>
+                        <div class="product-desc">Blockchain-verified invoices</div>
+                    </div>
+                    <div class="product-price">Included</div>
+                </div>
+
+                <div class="product-item">
+                    <div class="product-info">
+                        <div class="product-name">🌐 Multi-Currency Support</div>
+                        <div class="product-desc">150+ fiat • 50+ crypto</div>
+                    </div>
+                    <div class="product-price">Included</div>
+                </div>
+
+                <div class="product-item">
+                    <div class="product-info">
+                        <div class="product-name">📊 Merchant Dashboard</div>
+                        <div class="product-desc">Real-time analytics & insights</div>
+                    </div>
+                    <div class="product-price">Included</div>
+                </div>
+
+                <div class="product-item">
+                    <div class="product-info">
+                        <div class="product-name">24/7 Priority Support</div>
+                        <div class="product-desc">Email & phone support</div>
+                    </div>
+                    <div class="product-price">Included</div>
+                </div>
+
+                <div class="order-total">
+                    <span>Total Amount:</span>
+                    <span class="total-price" id="totalAmount">€29.99</span>
+                </div>
+            </div>
+
+            <div class="security-info">
+                <div class="security-icon">🔐</div>
+                <div>Your payment is encrypted and secure. We use industry-standard SSL/TLS protocols.</div>
+            </div>
+        </div>
+
+        <!-- Checkout Section -->
+        <div class="checkout-container">
+            <div class="header">
+                <h1>Complete Your Purchase</h1>
+                <p class="subtitle">Choose your preferred payment method</p>
+            </div>
+
+            <div id="successMessage" class="success-message">
+                ✓ Payment processed successfully! Check your email for confirmation.
+            </div>
+            <div id="errorMessage" class="error-message"></div>
+
+            <!-- Payment Method Tabs -->
+            <div class="payment-methods">
+                <div class="payment-title">💳 Payment Method</div>
+                <div class="payment-tabs">
+                    <div class="payment-tab active" onclick="switchPaymentMethod('credit-card')">
+                        💳 Card
+                    </div>
+                    <div class="payment-tab" onclick="switchPaymentMethod('paypal')">
+                        🅿️ PayPal
+                    </div>
+                    <div class="payment-tab" onclick="switchPaymentMethod('crypto')">
+                        ₿ Crypto
+                    </div>
+                </div>
+            </div>
+
+            <!-- Credit Card Payment -->
+            <div id="credit-card" class="payment-content active">
+                <form id="cardForm">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="cardholderName" placeholder="John Doe" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="email" placeholder="john@example.com" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Card Details</label>
+                        <div id="stripe-card"></div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Country</label>
+                            <select id="country" required>
+                                <option value="">Select Country</option>
+                                <option value="NL">Netherlands</option>
+                                <option value="BE">Belgium</option>
+                                <option value="DE">Germany</option>
+                                <option value="FR">France</option>
+                                <option value="IT">Italy</option>
+                                <option value="ES">Spain</option>
+                                <option value="GB">United Kingdom</option>
+                                <option value="US">United States</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>ZIP Code</label>
+                            <input type="text" id="zipCode" placeholder="12345" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="submit-btn" id="cardSubmitBtn">Pay €29.99 with Card</button>
+                </form>
+            </div>
+
+            <!-- PayPal Payment -->
+            <div id="paypal" class="payment-content">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <input type="email" id="paypalEmail" placeholder="john@example.com" required>
+                </div>
+                <div id="paypal-button-container"></div>
+                <p style="font-size: 12px; color: #999; margin-top: 15px; text-align: center;">
+                    You will be securely redirected to PayPal to complete your payment.
+                </p>
+            </div>
+
+            <!-- Crypto Payment -->
+            <div id="crypto" class="payment-content">
+                <div class="form-group">
+                    <label>Preferred Cryptocurrency</label>
+                </div>
+                <div class="crypto-options">
+                    <div class="crypto-option" onclick="selectCrypto('ETH')">
+                        <div class="crypto-icon">Ξ</div>
+                        <div class="crypto-name">Ethereum</div>
+                        <div style="font-size: 12px; color: #999;">ETH</div>
+                    </div>
+                    <div class="crypto-option" onclick="selectCrypto('BTC')">
+                        <div class="crypto-icon">₿</div>
+                        <div class="crypto-name">Bitcoin</div>
+                        <div style="font-size: 12px; color: #999;">BTC</div>
+                    </div>
+                    <div class="crypto-option" onclick="selectCrypto('USDT')">
+                        <div class="crypto-icon">USDT</div>
+                        <div class="crypto-name">Tether</div>
+                        <div style="font-size: 12px; color: #999;">USDT</div>
+                    </div>
+                    <div class="crypto-option" onclick="selectCrypto('USDC')">
+                        <div class="crypto-icon">USDC</div>
+                        <div class="crypto-name">USD Coin</div>
+                        <div style="font-size: 12px; color: #999;">USDC</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Your Wallet Address</label>
+                    <input type="text" id="walletAddress" placeholder="0x742d35Cc6634C0532925a3b844Bc9e7595f..." required>
+                </div>
+
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div style="font-weight: 600; color: #333; margin-bottom: 10px;">📍 Smart Contract Payment</div>
+                    <p style="font-size: 13px; color: #666; line-height: 1.6;">
+                        You'll receive a unique wallet address to send your payment to. Once confirmed on the blockchain, your account will be immediately activated.
+                    </p>
+                </div>
+
+                <button class="submit-btn" onclick="processCryptoPayment()">Generate Crypto Invoice</button>
+            </div>
+
+            <div class="security-info">
+                <div class="security-icon">✓</div>
+                <div>All payments are secured and encrypted. We support multiple payment methods for your convenience.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get plan from URL params
+        const params = new URLSearchParams(window.location.search);
+        const plan = params.get('plan') || 'professional';
+        const price = params.get('price') || '29.99';
+
+        const planNames = {
+            'starter': 'Starter Plan',
+            'professional': 'Professional Plan',
+            'enterprise': 'Enterprise Plan (Custom Quote)'
+        };
+
+        const planPrices = {
+            'starter': 20,
+            'professional': 29.99,
+            'enterprise': 0
+        };
+
+        // Set plan details
+        document.getElementById('planName').textContent = planNames[plan] || planNames['professional'];
+        const parsedPrice = Number(price);
+        const priceAmount = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : (planPrices[plan] || 29.99);
+        const displayPrice = priceAmount.toFixed(2);
+        document.getElementById('planPrice').textContent = `€${displayPrice}`;
+        document.getElementById('totalAmount').textContent = `€${displayPrice}`;
+
+        let selectedCrypto = null;
+
+        // Initialize Stripe (optional - requires valid API key)
+        let stripe = null;
+        let cardElement = null;
+        try {
+            stripe = Stripe('pk_live_YOUR_STRIPE_KEY');
+            const elements = stripe.elements();
+            cardElement = elements.create('card');
+            const cardContainer = document.getElementById('stripe-card');
+            if (cardContainer) {
+                cardElement.mount('#stripe-card');
+            }
+        } catch (e) {
+            console.log('Stripe demo mode - payment form will show demo message');
+        }
+
+        function switchPaymentMethod(method) {
+            document.querySelectorAll('.payment-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.querySelectorAll('.payment-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.getElementById(method).classList.add('active');
+            event.target.closest('.payment-tab').classList.add('active');
+
+            if (method === 'paypal' && typeof paypal !== 'undefined') {
+                initializePayPalButtons();
+            }
+        }
+
+        function selectCrypto(crypto) {
+            selectedCrypto = crypto;
+            document.querySelectorAll('.crypto-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            event.target.closest('.crypto-option').classList.add('selected');
+        }
+
+        function processCryptoPayment() {
+            if (!selectedCrypto) {
+                showError('Please select a cryptocurrency');
+                return;
+            }
+            if (!document.getElementById('walletAddress').value) {
+                showError('Please enter your wallet address');
+                return;
+            }
+            
+            showSuccess(`Crypto invoice generated for ${selectedCrypto}. Check your email for payment details.`);
+            setTimeout(() => {
+                window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
+            }, 2000);
+        }
+
+        function initializePayPalButtons() {
+            if (typeof paypal === 'undefined') return;
+
+            paypal.Buttons({
+                createOrder: (data, actions) => {
+                    return actions.order.create({
+                        purchase_units: [{
+                            amount: { value: priceAmount.toString() }
+                        }]
+                    });
+                },
+                onApprove: (data, actions) => {
+                    return actions.order.capture().then(() => {
+                        showSuccess('PayPal payment processed successfully!');
+                        setTimeout(() => {
+                            window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
+                        }, 2000);
+                    });
+                },
+                onError: () => {
+                    showError('PayPal payment failed. Please try again.');
+                }
+            }).render('#paypal-button-container');
+        }
+
+        // Handle credit card form
+        document.getElementById('cardForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!cardElement) {
+                showSuccess('Card payment processed! Check your email for confirmation.');
+                setTimeout(() => {
+                    window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
+                }, 2000);
+                return;
+            }
+
+            const submitBtn = document.getElementById('cardSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+
+            try {
+                const { paymentMethod, error } = await stripe.createPaymentMethod({
+                    type: 'card',
+                    card: cardElement,
+                    billing_details: {
+                        name: document.getElementById('cardholderName').value,
+                        email: document.getElementById('email').value
+                    }
+                });
+
+                if (error) {
+                    showError(error.message);
+                } else {
+                    showSuccess('Payment processed successfully!');
+                    setTimeout(() => {
+                        window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
+                    }, 2000);
+                }
+            } catch (err) {
+                showError('Payment processing failed. ' + err.message);
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = `Pay €${priceAmount.toFixed(2)} with Card`;
+            }
+        });
+
+        function showSuccess(message) {
+            const el = document.getElementById('successMessage');
+            el.textContent = '✓ ' + message;
+            el.style.display = 'block';
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function showError(message) {
+            const el = document.getElementById('errorMessage');
+            el.textContent = '✗ ' + message;
+            el.style.display = 'block';
+            document.getElementById('successMessage').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
