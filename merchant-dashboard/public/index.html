@@ -784,7 +784,7 @@
                 const summary = plan.charAt(0).toUpperCase() + plan.slice(1);
                 const confirmed = confirm(`Complete ${summary} Plan Checkout?\n\nAmount: €${amount}\n\nClick OK to proceed to payment.`);
                 if (confirmed) {
-                    window.location.href = `https://apiblockchain.io/checkout.html?plan=${plan}&price=${amount}`;
+                    window.location.href = `https://apiblockchain-webshop.vercel.app/checkout.html?plan=${plan}&price=${amount}`;
                 }
             }
         }
