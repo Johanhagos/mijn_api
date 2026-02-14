@@ -2,21 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "webshop/**",
-      "use": "@vercel/static"
+      "src": "merchant-dashboard/package.json",
+      "use": "@vercel/next"
     }
   ],
   "routes": [
     {
-      "src": "/(.*\\..*)",
-      "dest": "/webshop_for_upload/$1"
-    },
-    {
       "src": "/(.*)",
-      "dest": "/webshop_for_upload/index.html"
+      "dest": "/merchant-dashboard/$1"
     }
-  ],
-  "env": {
-    "VERCEL_URL": "@vercel/static"
-  }
+  ]
 }
