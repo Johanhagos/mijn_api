@@ -153,6 +153,11 @@ REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
+# PayPal configuration
+PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "BAA0ISTOuKNpz_VjPaEjdcIaf7pfGfvjxmr4rUjrtSIRoP04FNSCJ31lTf2FSn3mj--r8lBKyQN9FxKmV8")
+PAYPAL_SECRET = os.getenv("PAYPAL_SECRET", "EDpVfkShOT0lnfla4G221mvPeVtMsDGTpw-GrN4q6iv0yiLMwX4UehjE8g5URfJH04Zluu1_vsJTqsYt")
+PAYPAL_MODE = os.getenv("PAYPAL_MODE", "live")  # "sandbox" or "live"
+
 # Brute-force protection
 MAX_ATTEMPTS = 5
 LOCK_TIME_SECONDS = 15 * 60  # 15 minutes
@@ -3812,6 +3817,89 @@ def webhook_stripe(payload: dict = Body(...), request: Request = None):
         return JSONResponse(status_code=500, content={"error": "Failed to persist"})
     
     log_event(f'WEBHOOK_STRIPE_SUCCESS session_id={session_id[:8]} amount={session.get("amount")}', '-', '-')
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "invoice": invoice,
+        "api_key_generated": api_key.get('id'),
+        "customer_access": access_link,
+    }
+
+
+@app.post('/webhooks/paypal')
+def webhook_paypal(payload: dict = Body(...), request: Request = None):
+    """PayPal webhook: PAYMENT.CAPTURE.COMPLETED -> mark session PAID."""
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
+    
+    event_type = payload.get('event_type', '')
+    if event_type != 'PAYMENT.CAPTURE.COMPLETED':
+        log_event(f'WEBHOOK_PAYPAL_IGNORED event_type={event_type}', '-', '-')
+        return {"received": True}
+    
+    resource = payload.get('resource', {})
+    session_id = resource.get('custom_id') or resource.get('invoice_id', '')
+    
+    if not session_id:
+        log_event('WEBHOOK_PAYPAL_NO_SESSION_ID', '-', '-')
+        return JSONResponse(status_code=400, content={"error": "No session_id in webhook"})
+    
+    try:
+        sessions = load_sessions()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+    session = next((s for s in sessions if s.get('id') == session_id), None)
+    if not session:
+        log_event(f'WEBHOOK_PAYPAL_SESSION_NOT_FOUND session_id={session_id[:8]}', '-', '-')
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    
+    if session.get('status') in ['paid', 'failed']:
+        return {"success": True, "message": f"Session already in terminal state: {session.get('status')}"}
+    
+    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
+        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
+    
+    session['status'] = 'paid'
+    session['payment_status'] = 'completed'
+    session['paid_at'] = datetime.utcnow().isoformat()
+    session['payment_provider'] = 'paypal'
+    session['paypal_capture_id'] = resource.get('id')
+    session['metadata']['webhook_sources'].append('paypal')
+    
+    try:
+        invoices = load_invoices()
+    except Exception:
+        invoices = []
+    
+    amount_value = float(resource.get('amount', {}).get('value', session.get('amount', 0)))
+    
+    invoice = {
+        'id': str(uuid.uuid4()),
+        'session_id': session_id,
+        'merchant_id': session.get('merchant_id'),
+        'amount': amount_value,
+        'currency': resource.get('amount', {}).get('currency_code', 'EUR'),
+        'mode': session.get('mode', 'test'),
+        'status': 'paid',
+        'payment_provider': 'paypal',
+        'paypal_capture_id': resource.get('id'),
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    invoices.append(invoice)
+    
+    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
+    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
+    
+    try:
+        save_sessions(sessions)
+        save_invoices(invoices)
+    except Exception as e:
+        log_event(f'WEBHOOK_PAYPAL_PERSIST_FAILED {str(e)[:50]}', '-', '-')
+        return JSONResponse(status_code=500, content={"error": "Failed to persist"})
+    
+    log_event(f'WEBHOOK_PAYPAL_SUCCESS session_id={session_id[:8]} amount={amount_value}', '-', '-')
     
     return {
         "success": True,
