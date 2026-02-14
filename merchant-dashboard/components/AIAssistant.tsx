@@ -82,7 +82,11 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
     'Explain my revenue trend',
     'How do I integrate the plugin?',
     'What are Web3 transactions?',
-    'Show me my top metrics'
+    'Show me my top metrics',
+    'How do I enable multi-currency?',
+    'What is smart contract invoicing?',
+    'Help with VAT compliance',
+    'API integration guide'
   ];
 
   return (
