@@ -28,6 +28,9 @@ RedirectMatch 301 (.*)/index$ $1/
 # Prevent mod_dir from appending a slash to directories
 DirectorySlash Off
 
+# Force root to serve index.html FIRST
+DirectoryIndex index.html
+
 # Handle URLs without .html extension
 RewriteCond %{REQUEST_METHOD} ^(GET) [NC]
 RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI}.html -f
