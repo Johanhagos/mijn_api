@@ -369,7 +369,7 @@
                 <div class="product-item">
                     <div class="product-info">
                         <div class="product-name" id="planName">Professional Plan</div>
-                        <div class="product-desc">Full blockchain integration with unlimited transactions</div>
+                        <div class="product-desc" id="planDesc">Full blockchain integration with unlimited transactions</div>
                     </div>
                     <div class="product-price" id="planPrice">€29.99</div>
                 </div>
@@ -563,6 +563,12 @@
             'enterprise': 'Enterprise Plan (Custom Quote)'
         };
 
+        const planDescriptions = {
+            'starter': 'Basic payment integration with up to 100 transactions/month',
+            'professional': 'Full blockchain integration with unlimited transactions',
+            'enterprise': 'Custom integrations and enterprise support'
+        };
+
         const planPrices = {
             'starter': 20,
             'professional': 29.99,
@@ -571,11 +577,13 @@
 
         // Set plan details
         document.getElementById('planName').textContent = planNames[plan] || planNames['professional'];
+        document.getElementById('planDesc').textContent = planDescriptions[plan] || planDescriptions['professional'];
         const parsedPrice = Number(price);
         const priceAmount = Number.isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : (planPrices[plan] || 29.99);
         const displayPrice = priceAmount.toFixed(2);
         document.getElementById('planPrice').textContent = `€${displayPrice}`;
         document.getElementById('totalAmount').textContent = `€${displayPrice}`;
+        document.getElementById('cardSubmitBtn').textContent = `Pay €${displayPrice} with Card`;
 
         let selectedCrypto = null;
 
