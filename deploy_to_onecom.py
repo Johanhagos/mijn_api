@@ -35,10 +35,13 @@ try:
     # Open SFTP session
     sftp = ssh.open_sftp()
     
-    # Files to upload
+    # Files to upload - all HTML files and .htaccess
     files_to_upload = [
         "index.html",
         "checkout.html",
+        "about.html",
+        "contact.html",
+        "thank-you.html",
         ".htaccess",
     ]
     

@@ -28,6 +28,9 @@ RedirectMatch 301 (.*)/index$ $1/
 # Prevent mod_dir from appending a slash to directories
 DirectorySlash Off
 
+# Force root to serve index.html FIRST
+DirectoryIndex index.html
+
 # Handle URLs without .html extension
 RewriteCond %{REQUEST_METHOD} ^(GET) [NC]
 RewriteCond %{DOCUMENT_ROOT}%{REQUEST_URI}.html -f
@@ -58,6 +61,9 @@ RewriteRule ^(.*)/ws-.*$ $1/index.html [L]
 
 RewriteCond %{REQUEST_URI} ^/ws-.*$
 RewriteRule . /index.html [L]
+
+# Force index.html as homepage (override One.com default)
+RewriteRule ^$ /index.html [L]
 
 # End webshop rules
 
