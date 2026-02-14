@@ -677,8 +677,8 @@
                 <li><a href="#features">Features</a></li>
                 <li><a href="#pricing">Pricing</a></li>
                 <li><a href="#contact">Contact</a></li>
-                <li><a href="https://dashboard.apiblockchain.io" class="btn-checkout">Dashboard</a></li>
-                <li><a href="checkout.html" class="btn-checkout">Get Started</a></li>
+                <li><a href="https://dashboard.apiblockchain.io" target="_blank" class="btn-checkout">Dashboard</a></li>
+                <li><a onclick="checkout('professional', 498)" style="cursor: pointer; color: white;" class="btn-checkout">Get Started</a></li>
             </ul>
         </div>
     </nav>
@@ -840,49 +840,50 @@
             <p>Choose the plan that fits your business needs</p>
         </div>
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; max-width: 1200px; margin: 0 auto;">
-            <div class="pricing-card">
-                <h3>Starter</h3>
-                <div class="price">€199<span>/one-time</span></div>
-                <p style="color: #666; margin-bottom: 20px;">Perfect for small businesses getting started</p>
-                <ul class="features-list">
-                    <li>Basic Payment Integration</li>
-                    <li>Up to 100 Transactions/Month</li>
-                    <li>API Access</li>
-                    <li>Email Support</li>
-                    <li>Basic Analytics</li>
+            <div class="pricing-card" style="visibility: visible; display: block;">
+                <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px;">Starter</h3>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€199<span style="font-size: 1rem; color: #666;">/one-time</span></div>
+                <p style="color: #666; margin-bottom: 20px; font-weight: 500;">Perfect for small businesses getting started</p>
+                <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
+                    <li style="padding: 8px 0; color: #555;">✓ Basic Payment Integration</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Up to 100 Transactions/Month</li>
+                    <li style="padding: 8px 0; color: #555;">✓ REST API Access</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Email Support</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Basic Analytics</li>
                 </ul>
-                <button onclick="checkout('starter', 199)" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Get Started</button>
+                <button onclick="checkout('starter', 199)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started</button>
             </div>
-            <div class="pricing-card featured">
-                <h3>Professional</h3>
-                <div class="price">€498<span>/one-time</span></div>
-                <p style="color: #666; margin-bottom: 20px;">Complete solution for growing businesses</p>
-                <ul class="features-list">
-                    <li>Full Blockchain Integration</li>
-                    <li>Smart Contract Invoicing</li>
-                    <li>Unlimited Transactions</li>
-                    <li>Merchant Dashboard</li>
-                    <li>24/7 Priority Support</li>
-                    <li>Advanced Analytics</li>
-                    <li>Tax Compliance Tools</li>
-                    <li>Multi-Currency Support</li>
+            <div class="pricing-card featured" style="visibility: visible; display: block; border: 2px solid #10b981; position: relative; transform: scale(1.05);">
+                <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: 600;">MOST POPULAR</div>
+                <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px; margin-top: 15px;">Professional</h3>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">€498<span style="font-size: 1rem; color: #666;">/one-time</span></div>
+                <p style="color: #666; margin-bottom: 20px; font-weight: 500;">Complete solution for growing businesses</p>
+                <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
+                    <li style="padding: 8px 0; color: #555;">✓ Full Blockchain Integration</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Smart Contract Invoicing</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Unlimited Transactions</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Merchant Dashboard</li>
+                    <li style="padding: 8px 0; color: #555;">✓ 24/7 Priority Support</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Advanced Analytics</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Tax Compliance Tools</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Multi-Currency Support</li>
                 </ul>
-                <button onclick="checkout('professional', 498)" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Get Started Now</button>
+                <button onclick="checkout('professional', 498)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Get Started Now</button>
             </div>
-            <div class="pricing-card">
-                <h3>Enterprise</h3>
-                <div class="price">Custom<span>/quote</span></div>
-                <p style="color: #666; margin-bottom: 20px;">For large-scale operations and custom needs</p>
-                <ul class="features-list">
-                    <li>Everything in Professional</li>
-                    <li>Custom Integration</li>
-                    <li>Dedicated Account Manager</li>
-                    <li>Custom API Endpoints</li>
-                    <li>White-label Solution</li>
-                    <li>Priority Features</li>
-                    <li>SLA Guarantee</li>
+            <div class="pricing-card" style="visibility: visible; display: block;">
+                <h3 style="font-size: 1.5rem; color: #10b981; margin-bottom: 10px;">Enterprise</h3>
+                <div class="price" style="font-size: 2.5rem; color: #059669; margin-bottom: 10px;">Custom<span style="font-size: 1rem; color: #666;">/quote</span></div>
+                <p style="color: #666; margin-bottom: 20px; font-weight: 500;">For large-scale operations and custom needs</p>
+                <ul class="features-list" style="list-style: none; margin-bottom: 20px;">
+                    <li style="padding: 8px 0; color: #555;">✓ Everything in Professional</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Custom Integration & API</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Dedicated Account Manager</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Custom API Endpoints</li>
+                    <li style="padding: 8px 0; color: #555;">✓ White-label Solution</li>
+                    <li style="padding: 8px 0; color: #555;">✓ Priority Features</li>
+                    <li style="padding: 8px 0; color: #555;">✓ SLA Guarantee</li>
                 </ul>
-                <button onclick="checkout('enterprise', 0)" class="btn btn-primary" style="width: 100%; margin-top: 20px;">Contact Sales</button>
+                <button onclick="checkout('enterprise', 0)" class="btn btn-primary" style="width: 100%; margin-top: 20px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 1rem;">Contact Sales</button>
             </div>
         </div>
     </section>
@@ -942,21 +943,77 @@
             addMessage(message, 'user');
             input.value = '';
             
-            // Simulate bot response
+            // Simulate intelligent bot response with product knowledge
             setTimeout(() => {
-                const responses = [
-                    "Great question! Our blockchain payment system is designed to be simple and secure.",
-                    "We support multiple cryptocurrencies and traditional payment methods.",
-                    "You can get started with our Starter plan for just €199.",
-                    "Our AI-powered dashboard helps you manage all your transactions in one place.",
-                    "Interested in learning more? Check out our pricing section!",
-                    "We provide 24/7 support for all our customers.",
-                    "Tax compliance and automated invoicing are included in all plans.",
-                    "Would you like to schedule a demo or get started today?"
-                ];
-                const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-                addMessage(randomResponse, 'bot');
+                const response = generateAIResponse(message);
+                addMessage(response, 'bot');
             }, 500);
+        }
+        
+        function generateAIResponse(userMessage) {
+            const msg = userMessage.toLowerCase();
+            
+            // Payment & Integration questions
+            if (msg.includes('payment') || msg.includes('accept')) {
+                return "We support both Web2 (credit cards, bank transfers) and Web3 (ETH, BTC, USDT) payments. Our REST API integrates with your website in minutes. Would you like to know about our Starter or Professional plan?";
+            }
+            if (msg.includes('crypto') || msg.includes('blockchain') || msg.includes('ethereum') || msg.includes('bitcoin')) {
+                return "Great! We offer full blockchain integration with support for 50+ cryptocurrencies including ETH, BTC, USDT, and more. All transactions are verified on-chain with smart contracts.";
+            }
+            if (msg.includes('integrate') || msg.includes('api')) {
+                return "Our API is REST-based and extremely developer-friendly. We provide SDKs for Node.js, Python, PHP, and more. Check our docs at api.apiblockchain.io or contact our team for white-glove integration support.";
+            }
+            
+            // Pricing & Plans questions
+            if (msg.includes('price') || msg.includes('cost') || msg.includes('plan')) {
+                return "We offer three plans: Starter (€199) for small businesses, Professional (€498) with unlimited transactions and dashboard, and Enterprise (custom quote). All include 24/7 support!";
+            }
+            if (msg.includes('starter') && msg.includes('limit')) {
+                return "Our Starter plan supports up to 100 transactions/month with basic API access and email support. Perfect for testing or small operations.";
+            }
+            if (msg.includes('professional') || msg.includes('unlimited')) {
+                return "The Professional plan is our most popular! You get unlimited transactions, smart contract invoicing, multi-currency support, merchant dashboard, and 24/7 priority support.";
+            }
+            
+            // Invoicing & Compliance questions
+            if (msg.includes('invoice') || msg.includes('tax') || msg.includes('vat')) {
+                return "All our plans include automatic VAT calculation and smart contract invoicing. We handle tax compliance automatically based on your customer's location and your business country.";
+            }
+            if (msg.includes('compliance') || msg.includes('audit') || msg.includes('report')) {
+                return "We provide automatic tax reporting, audit trails, and compliance documentation for your business location. All transactions are blockchain-verified for permanent records.";
+            }
+            
+            // Features questions
+            if (msg.includes('feature') || msg.includes('dashboard') || msg.includes('analytics')) {
+                return "Our Merchant Dashboard (included in Professional plan) shows real-time revenue tracking, payment method breakdown, geographic insights, and AI-powered transaction analysis.";
+            }
+            if (msg.includes('multi-currency') || msg.includes('currency')) {
+                return "We support 150+ fiat currencies and 50+ cryptocurrencies. All conversions happen at real-time rates with transparent fee display.";
+            }
+            if (msg.includes('security') || msg.includes('safe')) {
+                return "Security is our top priority. We use blockchain verification, OAuth2 authentication, PCI compliance, and encrypted webhooks. All transactions are immutable on-chain.";
+            }
+            
+            // Support & Getting Started
+            if (msg.includes('support') || msg.includes('help') || msg.includes('contact')) {
+                return "We're here to help! The Professional plan includes 24/7 priority support. Email: support@apiblockchain.io | Phone: +31 (0)6 5282 4245 | Dashboard access at dashboard.apiblockchain.io";
+            }
+            if (msg.includes('started') || msg.includes('begin') || msg.includes('setup')) {
+                return "Getting started is easy! Click 'Get Started' to choose your plan. Our onboarding wizard will guide you through API setup, payment configuration, and first transaction in about 10 minutes.";
+            }
+            if (msg.includes('demo') || msg.includes('test')) {
+                return "We have a full sandbox environment for testing. Use your test API keys to simulate transactions without charges. Perfect for development and integration testing.";
+            }
+            
+            // Default helpful responses
+            const defaultResponses = [
+                "That's a great question! Is there something specific about payments, pricing, invoicing, or integration you'd like to know?",
+                "I'd be happy to help! Are you interested in learning about our payment features, pricing plans, or how to get started?",
+                "We're here to help you accept blockchain and traditional payments seamlessly. What would you like to know more about?",
+                "Excellent! Our platform combines Web2 and Web3 payments with automatic tax compliance. What interests you most?",
+                "Feel free to ask about our plans, API integration, smart invoicing, or dashboard features!"
+            ];
+            return defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
         }
 
         function addMessage(text, sender) {
