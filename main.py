@@ -2850,6 +2850,72 @@ def generate_rule_based_response(message: str, stats: dict, merchant: dict) -> s
     web2_count = stats.get('web2_count', 0)
     web3_count = stats.get('web3_count', 0)
     total_amount = stats.get('total_amount', 0)
+    merchant_name = merchant.get('name', 'there')
+    merchant_country = merchant.get('country', 'XX')
+    country_info = get_country_vat_info(merchant_country)
+    
+    # === NATURAL CONVERSATION FIRST ===
+    # Casual greetings
+    if any(word in msg_lower for word in ['hey', 'hello', 'hi ', 'yo', 'sup', 'howdy', "what's up", "how you doing", "how are you", "how do you do", "how's it going"]):
+        responses = [
+            f"Hey {merchant_name}! 👋 Doing great, thanks for asking! I'm here to help you with payments, taxes, invoicing, or anything else. What's on your mind?",
+            f"Hi {merchant_name}! 😊 All good here. Ready to help you with your business - whether it's VAT questions, payment setup, or just general advice. What do you need?",
+            f"Hey there! 🎉 I'm doing well, happy to help! Whether you have questions about your sales, tax compliance, or how to optimize your payments - I'm here for it.",
+            f"Sup {merchant_name}! 👍 Feeling productive today. Ask me anything about your shop, taxes, invoicing, payment methods - you name it!",
+        ]
+        import random
+        return random.choice(responses)
+    
+    # Small talk / How's business?
+    if any(word in msg_lower for word in ['how\'s business', 'how are sales', 'how\'s it going', 'how\'re things', 'any sales yet', 'making money', 'getting orders']):
+        if total_amount > 0:
+            return f"📊 Business looks good! You've processed €{total_amount:,.2f} across {web2_count + web3_count} transactions ({web2_count} traditional, {web3_count} crypto). Keep it up! 🚀 Want insights on your sales or ideas to boost revenue?"
+        else:
+            return f"Ready for your first sale! 🎯 Once you get orders flowing, I'll help you track metrics, optimize tax reporting, and scale globally. In the meantime, want help with setup or compliance questions?"
+    
+    # Thanks / Gratitude
+    if any(word in msg_lower for word in ['thanks', 'thank you', 'appreciate', 'awesome', 'great job', 'you\'re the best', 'love it', 'perfect']):
+        responses = [
+            "You're welcome! Happy to help. 😊 Got any other questions?",
+            "No problem at all! That's what I'm here for. 💪 Anything else I can help with?",
+            "Glad I could help! Feel free to ask anytime. We've got this! 🚀",
+            "My pleasure! Let me know if you need anything else. 👍",
+        ]
+        import random
+        return random.choice(responses)
+    
+    # Casual product/feature questions
+    if msg_lower in ['what can you do?', 'what do you do?', 'tell me about you', 'who are you?']:
+        return f"""👋 I'm your AI business assistant! Here's what I handle:
+
+**💰 Payments & Settlement**
+- Web2 (cards, transfers) & Web3 (crypto) payments
+- Real-time transaction tracking
+- Settlement & payout management
+
+**📋 Tax & Compliance ({country_info['name']})**
+- VAT/tax rates & calculations
+- Invoice requirements & compliance
+- Filing deadlines (maandelijks/kwartaal/jaarlijks)
+- EU B2B reverse charge & export rules
+- Audit trail & record keeping
+
+**📊 Invoicing & Analytics**
+- Smart invoice generation
+- Revenue insights & trends
+- Customer & transaction reporting
+
+**🌍 International**
+- 60+ countries supported
+- Automatic tax per location
+- Multi-currency handling
+
+**🤖 Just Chat**
+- Answer questions
+- Give advice
+- Help troubleshoot
+
+What would you like to explore?"""
     
     # Plugin / integration guidance
     if any(word in msg_lower for word in ['plugin', 'integrate', 'integration', 'woocommerce', 'wordpress', 'setup']):
@@ -2942,10 +3008,6 @@ You're doing great with Web3 (10+ crypto transactions). Now capture mainstream c
 **Revenue impact:** Merchants adding both methods typically see 40% higher sales.
 
 Want to enable Web2 payments?"""
-    
-    # Get merchant's country-specific info
-    merchant_country = merchant.get('country', 'XX')
-    country_info = get_country_vat_info(merchant_country)
     
     # VAT calculation questions
     if any(word in msg_lower for word in ['vat rate', 'tax rate', 'calculate vat', 'how much vat', 'vat percentage']):
