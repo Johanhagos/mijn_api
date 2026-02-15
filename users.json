@@ -1,74 +1,87 @@
 [
-    {
-        "id": 5,
-        "name": "Duudee",
-        "password": "f75778f7425be4db0369d09af37a6c2b9a83dea0e53e7bd57412e4b060e607f7"
-    },
-    {
-        "id": 20,
-        "name": "VerifyUser",
-        "password": "$2b$12$ThIYSgfXjIyGyprcVkMKsuI.D2K.fL/9ikGW2vLucAvYVGZq2wjx6"
-    },
-    {
-        "id": 4,
-        "name": "Hihhi",
-        "password": "$2b$12$JjLQR/WwIWO8/EDH4DIQ3OF0/Ib7fOosVYp.INkGIazEsZ..eKSzq"
-    },
-    {
-        "id": 10,
-        "name": "AliceAdmin",
-        "password": "$2b$12$5dqJ.jYxy4VyhrjPwDjBcum3RcVp/Ubg0vgXj22mKheWLQ5g.tv6y"
-    },
-    {
-        "id": 11,
-        "name": "PMTest",
-        "password": "$2b$12$Hm9kKzjDSMOQAIJV64eqBOvxjk.uAMNDXaP4rrCG1HmFml/4ehiOm"
-    },
-    {
-        "id": 12,
-        "name": "NewAdmin",
-        "password": "$2b$12$xTYJMl6hO.UzZnJRR8fz.Ow5z8V9CzRxRw8K.1tP4994EAFFvC/wm"
-    },
-    {
-        "id": 1,
-        "name": "NewkomAdmin",
-        "password": "$2b$12$G6LggwgbhE3BI/GErUO8G.QyxvWlIHpoFLROsoUaj3SfHTJoerCja"
-    },
-    {
-        "id": 15,
-        "name": "NewAdminjoij",
-        "password": "$2b$12$ISD2YXk/lmspJd5vukyBV.RGT.ex5gofKOy1l94GEir.FQlKGeMBC",
-        "role": "admin"
-    },
-    {
-        "id": 19,
-        "name": "NewAdminnator",
-        "password": "$2b$12$zaebq7RKPiumj4g6c5rZU.EVJPC1ldAxRo6UnwdnkbyxT8GWZm3xC",
-        "role": "admin"
-    },
-    {
-        "id": 21,
-        "name": "Postman",
-        "password": "$2b$12$W3hRZeph5BlnRxHCqZCv5uOiAh..SBXeJ/YjfPUrZtsPVxkSh17GS",
-        "role": "admin"
-    },
-    {
-        "id": 22,
-        "name": "uiuser",
-        "password": "sha256$fee39c23856e3d9dd500861a30903548b8878994291b2fef7fff2f53b3073c0c",
-        "role": "admin"
-    },
-    {
-        "id": 99,
-        "name": "merchant_test@example.com",
-        "password": "sha256$0e3183c45e8ef9bc95fc8a2dc83f040149d2c7193312aa0740da9c0d50b1f439",
-        "role": "merchant"
-    },
-    {
-        "id": 100,
-        "name": "merchantuser",
-        "password": "$2b$12$voJg8X0iZeUrovDdaskY8uBwMfiCaOAYCDvOw4bEMWr1O2.iF5tHW",
-        "role": "admin",
-        "email": "merchant@apiblockchain.io"
-    }
+  {
+    "id": 5,
+    "name": "Duudee",
+    "password": "f75778f7425be4db0369d09af37a6c2b9a83dea0e53e7bd57412e4b060e607f7",
+    "country": "NL"
+  },
+  {
+    "id": 20,
+    "name": "VerifyUser",
+    "password": "$2b$12$ThIYSgfXjIyGyprcVkMKsuI.D2K.fL/9ikGW2vLucAvYVGZq2wjx6",
+    "country": "NL"
+  },
+  {
+    "id": 4,
+    "name": "Hihhi",
+    "password": "$2b$12$JjLQR/WwIWO8/EDH4DIQ3OF0/Ib7fOosVYp.INkGIazEsZ..eKSzq",
+    "country": "NL"
+  },
+  {
+    "id": 10,
+    "name": "AliceAdmin",
+    "password": "$2b$12$5dqJ.jYxy4VyhrjPwDjBcum3RcVp/Ubg0vgXj22mKheWLQ5g.tv6y",
+    "country": "NL"
+  },
+  {
+    "id": 11,
+    "name": "PMTest",
+    "password": "$2b$12$Hm9kKzjDSMOQAIJV64eqBOvxjk.uAMNDXaP4rrCG1HmFml/4ehiOm",
+    "country": "NL"
+  },
+  {
+    "id": 12,
+    "name": "NewAdmin",
+    "password": "$2b$12$xTYJMl6hO.UzZnJRR8fz.Ow5z8V9CzRxRw8K.1tP4994EAFFvC/wm",
+    "country": "NL"
+  },
+  {
+    "id": 1,
+    "name": "NewkomAdmin",
+    "password": "$2b$12$G6LggwgbhE3BI/GErUO8G.QyxvWlIHpoFLROsoUaj3SfHTJoerCja",
+    "country": "NL"
+  },
+  {
+    "id": 15,
+    "name": "NewAdminjoij",
+    "password": "$2b$12$ISD2YXk/lmspJd5vukyBV.RGT.ex5gofKOy1l94GEir.FQlKGeMBC",
+    "role": "admin",
+    "country": "NL"
+  },
+  {
+    "id": 19,
+    "name": "NewAdminnator",
+    "password": "$2b$12$zaebq7RKPiumj4g6c5rZU.EVJPC1ldAxRo6UnwdnkbyxT8GWZm3xC",
+    "role": "admin",
+    "country": "NL"
+  },
+  {
+    "id": 21,
+    "name": "Postman",
+    "password": "$2b$12$W3hRZeph5BlnRxHCqZCv5uOiAh..SBXeJ/YjfPUrZtsPVxkSh17GS",
+    "role": "admin",
+    "country": "NL"
+  },
+  {
+    "id": 22,
+    "name": "uiuser",
+    "password": "sha256$fee39c23856e3d9dd500861a30903548b8878994291b2fef7fff2f53b3073c0c",
+    "role": "admin",
+    "country": "NL"
+  },
+  {
+    "id": 99,
+    "name": "merchant_test@example.com",
+    "password": "sha256$0e3183c45e8ef9bc95fc8a2dc83f040149d2c7193312aa0740da9c0d50b1f439",
+    "role": "merchant",
+    "country": "NL"
+  },
+  {
+    "id": 100,
+    "name": "merchantuser",
+    "password": "$2b$12$voJg8X0iZeUrovDdaskY8uBwMfiCaOAYCDvOw4bEMWr1O2.iF5tHW",
+    "role": "admin",
+    "email": "merchant@apiblockchain.io",
+    "country": "NL"
+  }
 ]
