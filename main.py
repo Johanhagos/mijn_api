@@ -17,46 +17,169 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 import threading
 
-# EU country codes and standard VAT rates (2026)
+# INTERNATIONAL TAX RATES DATABASE (2026)
+# Format: 'COUNTRY_CODE': tax_rate_percentage
+
+# EU countries - VAT rates
 EU_COUNTRIES = {
-    'AT': 20.0,  # Austria
-    'BE': 21.0,  # Belgium
-    'BG': 20.0,  # Bulgaria
-    'HR': 25.0,  # Croatia
-    'CY': 19.0,  # Cyprus
-    'CZ': 21.0,  # Czech Republic
-    'DK': 25.0,  # Denmark
-    'EE': 22.0,  # Estonia
-    'FI': 25.5,  # Finland
-    'FR': 20.0,  # France
-    'DE': 19.0,  # Germany
-    'GR': 24.0,  # Greece
-    'HU': 27.0,  # Hungary
-    'IE': 23.0,  # Ireland
-    'IT': 22.0,  # Italy
-    'LV': 21.0,  # Latvia
-    'LT': 21.0,  # Lithuania
-    'LU': 17.0,  # Luxembourg
-    'MT': 18.0,  # Malta
-    'NL': 21.0,  # Netherlands
-    'PL': 23.0,  # Poland
-    'PT': 23.0,  # Portugal
-    'RO': 19.0,  # Romania
-    'SK': 20.0,  # Slovakia
-    'SI': 22.0,  # Slovenia
-    'ES': 21.0,  # Spain
-    'SE': 25.0,  # Sweden
+    'AT': 20.0,  'BE': 21.0,  'BG': 20.0,  'HR': 25.0,  'CY': 19.0,
+    'CZ': 21.0,  'DK': 25.0,  'EE': 22.0,  'FI': 25.5,  'FR': 20.0,
+    'DE': 19.0,  'GR': 24.0,  'HU': 27.0,  'IE': 23.0,  'IT': 22.0,
+    'LV': 21.0,  'LT': 21.0,  'LU': 17.0,  'MT': 18.0,  'NL': 21.0,
+    'PL': 23.0,  'PT': 23.0,  'RO': 19.0,  'SK': 20.0,  'SI': 22.0,
+    'ES': 21.0,  'SE': 25.0,
 }
 
-def determine_vat_rate(seller_country: str, buyer_country: str, buyer_vat_number: str = None) -> tuple:
+# Non-EU Europe
+NON_EU_EUROPE = {
+    'GB': 20.0,   # United Kingdom (post-Brexit)
+    'CH': 7.7,    # Switzerland
+    'NO': 25.0,   # Norway
+    'IS': 24.0,   # Iceland
+    'UA': 20.0,   # Ukraine
+    'RU': 18.0,   # Russia
+    'TR': 18.0,   # Turkey
+}
+
+# Americas
+AMERICAS = {
+    'US': 0.0,    # No federal sales tax (state-level handling)
+    'CA': 5.0,    # Canada GST (plus PST per province)
+    'MX': 16.0,   # Mexico
+    'BR': 15.0,   # Brazil (ICMS average)
+    'AR': 21.0,   # Argentina
+    'CL': 19.0,   # Chile
+    'CO': 19.0,   # Colombia
+}
+
+# Asia-Pacific
+ASIA_PACIFIC = {
+    'AU': 10.0,   # Australia GST
+    'NZ': 15.0,   # New Zealand GST
+    'JP': 10.0,   # Japan Consumption Tax
+    'KR': 10.0,   # South Korea
+    'CN': 13.0,   # China (VAT average)
+    'IN': 18.0,   # India (CGST average)
+    'SG': 8.0,    # Singapore GST
+    'TH': 7.0,    # Thailand VAT
+    'ID': 11.0,   # Indonesia
+    'MY': 6.0,    # Malaysia SST
+}
+
+# Middle East & Africa
+MIDDLE_EAST_AFRICA = {
+    'AE': 5.0,    # UAE VAT
+    'SA': 15.0,   # Saudi Arabia VAT
+    'EG': 14.0,   # Egypt VAT
+    'ZA': 15.0,   # South Africa VAT
+    'NG': 7.5,    # Nigeria VAT
+}
+
+# Combine all into global tax database
+GLOBAL_TAX_RATES = {
+    **EU_COUNTRIES,
+    **NON_EU_EUROPE,
+    **AMERICAS,
+    **ASIA_PACIFIC,
+    **MIDDLE_EAST_AFRICA,
+}
+
+# Regions for tax rule determination
+TAX_REGIONS = {
+    'EU': set(EU_COUNTRIES.keys()),
+    'ECEA': set(NON_EU_EUROPE.keys()),  # Europe, Caucasus, Central Asia
+    'AMERICAS': set(AMERICAS.keys()),
+    'ASIA_PACIFIC': set(ASIA_PACIFIC.keys()),
+    'MIDDLE_EAST_AFRICA': set(MIDDLE_EAST_AFRICA.keys()),
+}
+
+def get_region_for_country(country_code: str) -> str:
+    """Get region for a country code"""
+    country = country_code.upper() if country_code else 'NL'
+    for region, countries in TAX_REGIONS.items():
+        if country in countries:
+            return region
+    return 'OTHER'
+
+def get_tax_rate(country: str) -> float:
+    """Get standard tax rate for a country"""
+    return GLOBAL_TAX_RATES.get(country.upper(), 0.0)
+
+def determine_tax_rate(seller_country: str, buyer_country: str, buyer_tax_id: str = None) -> tuple:
     """
-    Determine VAT rate and reason based on seller/buyer countries.
+    Determine tax rate and reason based on seller/buyer countries (INTERNATIONAL).
+    
+    Applies correct tax rules for:
+    - EU: VAT rules (same country, intra-EU, export, B2B reverse charge)
+    - Other regions: Tax rules based on seller's country (destination tax, origin tax, etc.)
     
     Returns:
-        (vat_rate, is_reverse_charge, explanation)
+        (tax_rate, is_reverse_charge, explanation)
     """
     seller = seller_country.upper() if seller_country else 'NL'
     buyer = buyer_country.upper() if buyer_country else seller
+    
+    seller_region = get_region_for_country(seller)
+    buyer_region = get_region_for_country(buyer)
+    
+    # === EU RULES ===
+    if seller_region == 'EU' and buyer_region == 'EU':
+        # Intra-EU transaction
+        if seller == buyer:
+            # Same country - charge local VAT
+            rate = EU_COUNTRIES.get(seller, 21.0)
+            return rate, False, f"Domestic (EU) - {seller} VAT {rate}%"
+        else:
+            # Different EU countries
+            if buyer_tax_id:
+                # B2B with VAT number - reverse charge (0%)
+                return 0.0, True, f"EU B2B Reverse Charge - {seller} to {buyer}"
+            else:
+                # B2C - charge seller's VAT
+                rate = EU_COUNTRIES.get(seller, 21.0)
+                return rate, False, f"EU B2C - {seller} VAT {rate}%"
+    
+    elif seller_region == 'EU':
+        # EU seller selling to non-EU
+        return 0.0, False, f"Export from {seller} - 0% VAT"
+    
+    elif buyer_region == 'EU':
+        # Non-EU seller selling to EU
+        rate = EU_COUNTRIES.get(buyer, 21.0)
+        return rate, False, f"Import to {buyer} - {buyer} VAT {rate}%"
+    
+    # === US RULES (simplified - destination tax per state) ===
+    elif seller == 'US' and buyer == 'US':
+        # Same country - would need state code
+        return 0.0, False, "US - Sales tax applies per state (state code required)"
+    elif seller == 'US':
+        # US seller to non-US
+        return 0.0, False, "US Export - 0% tax"
+    elif buyer == 'US':
+        # Non-US to US
+        return 0.0, False, "Import to US - federal 0% (state tax may apply)"
+    
+    # === CANADA RULES ===
+    elif seller == 'CA' and buyer == 'CA':
+        # Same country - GST + PST (simplified to GST only)
+        return 5.0, False, "Canada Domestic - GST applies"
+    elif seller == 'CA':
+        # Canadian seller to non-Canada
+        return 0.0, False, "Canadian Export - 0% tax"
+    elif buyer == 'CA':
+        # Non-Canada to Canada
+        return 5.0, False, "Import to Canada - GST 5%"
+    
+    # === DEFAULT: Same country or seller's rate ===
+    else:
+        if seller == buyer:
+            rate = get_tax_rate(seller)
+            return rate, False, f"Domestic - {seller} rate {rate}%"
+        else:
+            # Different countries outside EU/CA/US
+            # Apply seller's local rate (origin tax principle)
+            seller_rate = get_tax_rate(seller)
+            return seller_rate, False, f"International - {seller} rate applies {seller_rate}%"
     
     # Same country - always charge local VAT
     if seller == buyer:
@@ -4015,12 +4138,10 @@ def webhook_paypal(payload: dict = Body(...), request: Request = None):
     buyer_country = session.get('metadata', {}).get('buyer_country') or session.get('metadata', {}).get('country') or 'NL'
     buyer_vat = session.get('metadata', {}).get('buyer_vat_number') or session.get('metadata', {}).get('vat_number')
     
-    # Calculate VAT
-    vat_rate, is_reverse_charge, vat_explanation = determine_vat_rate(seller_country, buyer_country, buyer_vat)
+    # Calculate tax (international)
+    vat_rate, is_reverse_charge, vat_explanation = determine_tax_rate(seller_country, buyer_country, buyer_vat)
     subtotal = amount_value / (1 + vat_rate / 100) if vat_rate > 0 else amount_value
     vat_amount = amount_value - subtotal
-    
-    invoice = {
         'id': str(uuid.uuid4()),
         'session_id': session_id,
         'merchant_id': session.get('merchant_id'),
@@ -4219,8 +4340,8 @@ async def webhook_coinbase(request: Request):
     buyer_country = session.get('metadata', {}).get('buyer_country') or session.get('metadata', {}).get('country') or 'NL'
     buyer_vat = session.get('metadata', {}).get('buyer_vat_number') or session.get('metadata', {}).get('vat_number')
     
-    # Calculate VAT
-    vat_rate, is_reverse_charge, vat_explanation = determine_vat_rate(seller_country, buyer_country, buyer_vat)
+    # Calculate tax (international)
+    vat_rate, is_reverse_charge, vat_explanation = determine_tax_rate(seller_country, buyer_country, buyer_vat)
     subtotal = amount_value / (1 + vat_rate / 100) if vat_rate > 0 else amount_value
     vat_amount = amount_value - subtotal
     
