@@ -109,8 +109,150 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
     if (msg.includes('secure') || msg.includes('pci') || msg.includes('encryption') || msg.includes('fraud')) {
       return "We're PCI DSS Level 1 compliant, use military-grade SSL/TLS encryption, and blockchain transactions are cryptographically verified. All customer data is encrypted end-to-end. Fraud detection uses AI machine learning.";
     }
-    if (msg.includes('compliance') || msg.includes('tax') || msg.includes('vat') || msg.includes('audit')) {
-      return "We handle automatic VAT calculation per EU regulations, generate legally-compliant invoices, maintain 7-year audit trails, and support OSS (One-Stop Shop) for cross-border EU sales. Fully auditable blockchain records.";
+    
+    // INTERNATIONAL TAX & COMPLIANCE SYSTEM (60+ COUNTRIES)
+    if (msg.includes('international tax') || msg.includes('global tax') || msg.includes('tax compliance') || msg.includes('worldwide tax')) {
+      return "Our system supports 60+ countries across 5 regions (EU, Americas, Asia-Pacific, Middle East/Africa, Europe). Automatic tax calculation based on seller/buyer countries. Works for any seller location with local compliance rules.";
+    }
+    if (msg.includes('vat') || msg.includes('tax') || msg.includes('compliance')) {
+      return `VAT & TAX COMPLIANCE WORLDWIDE:
+🇪🇺 EU (27 countries): 17-27% VAT. B2B reverse charge supported. EU B2C cross-border handled automatically.
+🇬🇧 UK: 20% VAT, Switzerland: 7.7%, Norway: 25%, Iceland: 24%
+🇺🇸 Americas: USA (0% federal), Canada (5% GST + provincial), Mexico 16%, Brazil 15%, Argentina 21%
+🇯🇵 Asia-Pacific: Japan 10%, Australia 10% GST, China 13%, India 18%, Singapore 8%
+🇦🇪 Middle East & Africa: UAE 5%, Saudi Arabia 15%, South Africa 15%, Nigeria 7.5%
+✅ Same country sales use seller's local rate
+✅ Cross-border exports automatically 0% when applicable
+✅ B2B reverse charges calculated for EU`;
+    }
+    
+    // REGIONAL TAX DETAILS
+    if (msg.includes('eu vat') || msg.includes('european vat') || msg.includes('vat rate')) {
+      return `EU VAT RATES (27 countries, automatic application):
+Austria 20% | Belgium 21% | Bulgaria 20% | Croatia 25% | Cyprus 19% | Czech Rep 21% | Denmark 25% | Estonia 20% | Finland 24% | France 20% | Germany 19% | Greece 24% | Hungary 27% | Ireland 23% | Italy 22% | Latvia 21% | Lithuania 21% | Luxembourg 17% | Malta 18% | Netherlands 21% | Poland 23% | Portugal 23% | Romania 19% | Slovakia 20% | Slovenia 22% | Spain 21% | Sweden 25%
+
+Key Rules:
+• Same country (seller=buyer): Apply seller's VAT rate
+• EU B2C cross-border: Apply seller's VAT rate
+• EU B2B (with valid VAT ID): 0% + Reverse charge note
+• EU to non-EU exports: 0% VAT (with export proof)
+✅ We handle all combinations automatically`;
+    }
+    
+    // US & AMERICAS TAX
+    if (msg.includes('us tax') || msg.includes('sales tax') || msg.includes('usa tax') || msg.includes('americas tax')) {
+      return `AMERICAS TAX SYSTEM:
+🇺🇸 USA: 0% federal (varies by state). We track seller state for compliance.
+🇨🇦 Canada: 5% federal GST + Provincial PST (varies by province 0-15%)
+🇲🇽 Mexico: 16% IVA standard rate
+🇧🇷 Brazil: 15% ICMS (varies by state and product)
+🇦🇷 Argentina: 21% IVA, reduced rates (5-10.5%) for essentials
+🇨🇱 Chile: 19% IVA
+🇨🇴 Colombia: 19% IVA, 5% reduced rate for basic goods
+
+For multi-state US sales, merchant can provide state code for compliance tracking.`;
+    }
+    
+    // ASIA-PACIFIC TAX
+    if (msg.includes('asia tax') || msg.includes('asia pacific') || msg.includes('japan tax') || msg.includes('australia tax') || msg.includes('china tax')) {
+      return `ASIA-PACIFIC TAX SYSTEM:
+🇯🇵 Japan: 10% standard, 8% reduced (food)
+🇦🇺 Australia: 10% GST (same rate nationwide)
+🇳🇿 New Zealand: 15% GST
+🇰🇷 South Korea: 10% standard VAT
+🇨🇳 China: 13% standard, 9% (transport), 6% (services)
+🇮🇳 India: 18% standard GST, 12% (certain goods), 5% (essentials)
+🇸🇬 Singapore: 8% GST
+🇹🇭 Thailand: 7% VAT
+🇮🇩 Indonesia: 11% PPN (Value Added Tax)
+🇲🇾 Malaysia: 6% SST (Sales & Service Tax)
+
+All rates applied automatically based on seller/buyer location.`;
+    }
+    
+    // MIDDLE EAST & AFRICA TAX
+    if (msg.includes('middle east tax') || msg.includes('africa tax') || msg.includes('uae tax') || msg.includes('saudi tax')) {
+      return `MIDDLE EAST & AFRICA TAX SYSTEM:
+🇦🇪 UAE: 5% VAT (implemented 2018)
+🇸🇦 Saudi Arabia: 15% VAT
+🇪🇬 Egypt: 14% standard VAT
+🇿🇦 South Africa: 15% VAT
+🇳🇬 Nigeria: 7.5% VAT
+🇰🇪 Kenya: 16% VAT
+🇴🇲 Oman: 5% VAT
+🇶🇦 Qatar: No VAT currently (exemptions apply)
+
+These regions are rapidly implementing digital tax systems, and we're ready for compliance tracking.`;
+    }
+    
+    // REVERSE CHARGE & B2B
+    if (msg.includes('reverse charge') || msg.includes('b2b') || msg.includes('vat id') || msg.includes('business to business')) {
+      return `REVERSE CHARGE & B2B COMPLIANCE:
+When seller & buyer are both in EU with valid business VAT numbers:
+• Invoice shows 0% VAT
+• Note: "VAT Reverse Charge - Customer liable" 
+• Buyer country VAT ID validated & stored
+• Seller reports as zero-rated export
+• Buyer reports as import + self-billing
+
+We automatically:
+✅ Detect B2B transactions (VAT ID format validation)
+✅ Apply 0% rate instead of standard VAT
+✅ Add reverse charge note to invoice
+✅ Flag for audit trail (7-year retention)`;
+    }
+    
+    // EXPORT & ZERO RATE
+    if (msg.includes('export') || msg.includes('zero rate') || msg.includes('zero rated')) {
+      return `ZERO-RATED EXPORTS (0% TAX):
+When EU seller ships to non-EU country:
+• 0% VAT applied (export rule)
+• Proof of export required (shipping address, VAT ID if B2B)
+• Invoice marked: "Services/goods export - VAT exempt"
+
+Non-EU sellers selling to non-residents typically charge their local tax rate.
+
+We handle the export rules automatically when buyer country ≠ seller country.`;
+    }
+    
+    // INVOICE COMPLIANCE
+    if (msg.includes('invoice') || msg.includes('invoicing') || msg.includes('audit trail') || msg.includes('record keeping')) {
+      return `COMPLIANT INVOICING (ALL COUNTRIES):
+Every invoice automatically includes:
+✅ Seller country & tax ID
+✅ Buyer country & location
+✅ Applicable tax rate & calculation
+✅ Tax amount breakdown
+✅ Reverse charge flag (if applicable)
+✅ Timestamp & blockchain proof-of-payment
+✅ Transaction ID (payment/crypto)
+
+All invoices stored 7+ years for audit. GDPR-compliant. Accessible via dashboard & API.`;
+    }
+    
+    // TAX REPORTING
+    if (msg.includes('tax reporting') || msg.includes('tax report') || msg.includes('tax filing') || msg.includes('belastingaangifte')) {
+      return `AUTOMATIC TAX REPORTING:
+Export your transactions by:
+• Country pairs (seller→buyer)
+• Tax rate applied
+• Invoice date range
+• Sum totals for tax authorities
+
+Perfect for:
+🇳🇱 Netherlands: IB & aangifte VAT
+🇩🇪 Germany: Umsatzsteuer-Voranmeldung
+🇫🇷 France: TVA monthly/quarterly
+🇪🇸 Spain: Modelo 390 (annual)
+🇮🇹 Italy: Esterometro (foreign sales)
+🇧🇪 Belgium: INTRASTAT & VAT reporting
++ 54 other countries
+
+The system handles international combinations so you stay compliant everywhere.`;
+    }
+    
+    if (msg.includes('compliance') || msg.includes('tax')) {
+      return "We handle automatic VAT/tax calculation per international regulations, generate legally-compliant invoices, maintain 7-year audit trails, and support OSS (One-Stop Shop) for cross-border EU sales. Fully auditable blockchain records. Works for 60+ countries.";
     }
     if (msg.includes('pii') || msg.includes('privacy') || msg.includes('data protection') || msg.includes('gdpr')) {
       return "We process minimal customer data (email + payment info). All personally-identifiable information is encrypted separately. GDPR-compliant, right-to-be-forgotten supported, and data deletion within 30 days of request.";
