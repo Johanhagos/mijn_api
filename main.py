@@ -4142,6 +4142,8 @@ def webhook_paypal(payload: dict = Body(...), request: Request = None):
     vat_rate, is_reverse_charge, vat_explanation = determine_tax_rate(seller_country, buyer_country, buyer_vat)
     subtotal = amount_value / (1 + vat_rate / 100) if vat_rate > 0 else amount_value
     vat_amount = amount_value - subtotal
+    
+    invoice = {
         'id': str(uuid.uuid4()),
         'session_id': session_id,
         'merchant_id': session.get('merchant_id'),
