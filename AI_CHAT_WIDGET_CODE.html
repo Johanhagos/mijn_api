@@ -1,0 +1,271 @@
+<!-- ========================================== -->
+<!-- AI CHAT WIDGET - COPY THIS ENTIRE BLOCK -->
+<!-- Paste this code BEFORE </body> tag -->
+<!-- ========================================== -->
+
+<style>
+/* AI Assistant Styles */
+.ai-button {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    transition: all 0.3s;
+    z-index: 9999;
+}
+
+.ai-button:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6);
+}
+
+.chat-widget {
+    position: fixed;
+    bottom: 100px;
+    right: 30px;
+    width: 350px;
+    height: 500px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 40px rgba(0, 0, 0, 0.16);
+    display: none;
+    flex-direction: column;
+    z-index: 9999;
+    overflow: hidden;
+}
+
+.chat-widget.active {
+    display: flex;
+}
+
+.chat-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: white;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-header h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.chat-close {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.5rem;
+    padding: 0;
+}
+
+.chat-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    background: #f9f9f9;
+}
+
+.chat-message {
+    display: flex;
+    margin-bottom: 0.5rem;
+}
+
+.chat-message.user {
+    justify-content: flex-end;
+}
+
+.chat-message.bot {
+    justify-content: flex-start;
+}
+
+.message-text {
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+    max-width: 80%;
+    word-wrap: break-word;
+    font-size: 0.9rem;
+}
+
+.user .message-text {
+    background: #10b981;
+    color: white;
+    border-bottom-right-radius: 2px;
+}
+
+.bot .message-text {
+    background: white;
+    color: #333;
+    border-bottom-left-radius: 2px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.chat-input-area {
+    border-top: 1px solid #e0e0e0;
+    padding: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    background: white;
+}
+
+.chat-input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem;
+    font-size: 0.9rem;
+    font-family: 'Inter', 'Arial', sans-serif;
+}
+
+.chat-input:focus {
+    outline: none;
+    border-color: #10b981;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+}
+
+.chat-send {
+    background: #10b981;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.chat-send:hover {
+    background: #059669;
+}
+
+@media (max-width: 480px) {
+    .chat-widget {
+        width: calc(100vw - 40px);
+        right: 20px;
+    }
+}
+</style>
+
+<!-- AI Assistant Widget HTML -->
+<button class="ai-button" onclick="toggleAPIBlockchainChat()">💬</button>
+
+<div class="chat-widget" id="apiblockchainChatWidget">
+    <div class="chat-header">
+        <h3>APIBlockchain Assistant</h3>
+        <button class="chat-close" onclick="toggleAPIBlockchainChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="apiblockchainChatMessages">
+        <div class="chat-message bot">
+            <div class="message-text">Hi! 👋 I'm your APIBlockchain assistant. Ask me about payments, blockchain, or how we can help your business!</div>
+        </div>
+    </div>
+    <div class="chat-input-area">
+        <input type="text" class="chat-input" id="apiblockchainChatInput" placeholder="Type your message..." onkeypress="if(event.key==='Enter') sendAPIBlockchainMessage()">
+        <button class="chat-send" onclick="sendAPIBlockchainMessage()">Send</button>
+    </div>
+</div>
+
+<script>
+// AI Chat Functions
+function toggleAPIBlockchainChat() {
+    const widget = document.getElementById('apiblockchainChatWidget');
+    widget.classList.toggle('active');
+}
+
+function sendAPIBlockchainMessage() {
+    const input = document.getElementById('apiblockchainChatInput');
+    const message = input.value.trim();
+    
+    if (!message) return;
+    
+    // Add user message
+    addAPIBlockchainMessage(message, 'user');
+    input.value = '';
+    
+    // Simulate intelligent bot response
+    setTimeout(() => {
+        const response = generateAPIBlockchainAIResponse(message);
+        addAPIBlockchainMessage(response, 'bot');
+    }, 500);
+}
+
+function generateAPIBlockchainAIResponse(userMessage) {
+    const msg = userMessage.toLowerCase();
+    
+    // BLOCKCHAIN & PAYMENTS
+    if (msg.includes('blockchain') || msg.includes('smart contract')) {
+        return "Our smart contracts execute payment settlements automatically on multiple blockchains. They're immutable, transparent, and eliminate middlemen - reducing settlement time from 3 days to seconds!";
+    }
+    if (msg.includes('web3') || msg.includes('crypto') || msg.includes('cryptocurrency')) {
+        return "Web3 payments let you accept 50+ cryptocurrencies (ETH, BTC, USDT, etc.). Funds settle in minutes, bypass traditional banking fees, and your customers can pay from anywhere in the world!";
+    }
+    if (msg.includes('price') || msg.includes('pricing') || msg.includes('cost')) {
+        return "We have 3 plans: Starter (€199) for small businesses, Professional (€498 - most popular!) with unlimited transactions, and Enterprise (custom pricing) for large operations. All include smart contract invoicing!";
+    }
+    if (msg.includes('security') || msg.includes('secure') || msg.includes('safe')) {
+        return "We're PCI DSS Level 1 compliant, use military-grade SSL/TLS encryption, and blockchain transactions are cryptographically verified. All customer data is encrypted end-to-end.";
+    }
+    if (msg.includes('invoice') || msg.includes('invoicing')) {
+        return "Smart contract invoicing means your invoices are cryptographically signed and stored on-chain - permanent, tamper-proof records. Perfect for B2B accounting and audits!";
+    }
+    if (msg.includes('api') || msg.includes('integrate')) {
+        return "RESTful API with OAuth2 authentication. SDKs for Node.js, Python, PHP, Go, Ruby. Full webhook support. Complete API docs with sandbox for testing. Average integration: 2-4 hours!";
+    }
+    if (msg.includes('vat') || msg.includes('tax') || msg.includes('compliance')) {
+        return "We handle automatic VAT calculation per EU regulations, generate legally-compliant invoices, maintain 7-year audit trails, and support OSS (One-Stop Shop) for cross-border EU sales!";
+    }
+    if (msg.includes('support') || msg.includes('help') || msg.includes('contact')) {
+        return "24/7 priority support! Email: support@apiblockchain.io | Phone: +31 (0)6 5282 4245. Response time: <30 minutes for urgent issues. We're here to help!";
+    }
+    if (msg.includes('dashboard')) {
+        return "Real-time dashboard with transaction analytics, revenue breakdown (Web2 vs Web3), VAT reporting, customer insights, and AI-powered trend analysis. Export reports for accounting!";
+    }
+    if (msg.includes('start') || msg.includes('begin') || msg.includes('get started')) {
+        return "Getting started is easy! 1) Choose your plan 2) Get API keys 3) Integrate our SDK 4) Test in sandbox 5) Go live! Free onboarding session included. 30-day money-back guarantee!";
+    }
+    
+    // DEFAULT RESPONSES
+    const contexts = [
+        "Great question! Ask me about blockchain payments, pricing, API integration, security, VAT compliance, or how to get started. What interests you?",
+        "I can help with Web2/Web3 payments, smart contracts, invoicing, merchant features, or pricing. What would you like to know?",
+        "Curious about our technology, payment processing, or how we help businesses? I'm here to assist!",
+        "Need info on pricing plans, payment methods, integration, security, or support? Fire away!",
+        "I'm knowledgeable about crypto payments, invoice management, analytics, and compliance. How can I help?"
+    ];
+    return contexts[Math.floor(Math.random() * contexts.length)];
+}
+
+function addAPIBlockchainMessage(text, sender) {
+    const messagesDiv = document.getElementById('apiblockchainChatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${sender}`;
+    
+    const textDiv = document.createElement('div');
+    textDiv.className = 'message-text';
+    textDiv.textContent = text;
+    
+    messageDiv.appendChild(textDiv);
+    messagesDiv.appendChild(messageDiv);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+}
+</script>
+
+<!-- ========================================== -->
+<!-- END OF AI CHAT WIDGET CODE -->
+<!-- ========================================== -->
