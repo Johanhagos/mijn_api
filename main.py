@@ -17,6 +17,69 @@ from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 import threading
 
+# EU country codes and standard VAT rates (2026)
+EU_COUNTRIES = {
+    'AT': 20.0,  # Austria
+    'BE': 21.0,  # Belgium
+    'BG': 20.0,  # Bulgaria
+    'HR': 25.0,  # Croatia
+    'CY': 19.0,  # Cyprus
+    'CZ': 21.0,  # Czech Republic
+    'DK': 25.0,  # Denmark
+    'EE': 22.0,  # Estonia
+    'FI': 25.5,  # Finland
+    'FR': 20.0,  # France
+    'DE': 19.0,  # Germany
+    'GR': 24.0,  # Greece
+    'HU': 27.0,  # Hungary
+    'IE': 23.0,  # Ireland
+    'IT': 22.0,  # Italy
+    'LV': 21.0,  # Latvia
+    'LT': 21.0,  # Lithuania
+    'LU': 17.0,  # Luxembourg
+    'MT': 18.0,  # Malta
+    'NL': 21.0,  # Netherlands
+    'PL': 23.0,  # Poland
+    'PT': 23.0,  # Portugal
+    'RO': 19.0,  # Romania
+    'SK': 20.0,  # Slovakia
+    'SI': 22.0,  # Slovenia
+    'ES': 21.0,  # Spain
+    'SE': 25.0,  # Sweden
+}
+
+def determine_vat_rate(seller_country: str, buyer_country: str, buyer_vat_number: str = None) -> tuple:
+    """
+    Determine VAT rate and reason based on seller/buyer countries.
+    
+    Returns:
+        (vat_rate, is_reverse_charge, explanation)
+    """
+    seller = seller_country.upper() if seller_country else 'NL'
+    buyer = buyer_country.upper() if buyer_country else seller
+    
+    # Same country - always charge local VAT
+    if seller == buyer:
+        rate = EU_COUNTRIES.get(seller, 21.0)
+        return rate, False, f"Domestic sale - {seller} VAT"
+    
+    # Check if both in EU
+    seller_in_eu = seller in EU_COUNTRIES
+    buyer_in_eu = buyer in EU_COUNTRIES
+    
+    if seller_in_eu and buyer_in_eu:
+        # EU cross-border
+        if buyer_vat_number:
+            # B2B with valid VAT number - reverse charge
+            return 0.0, True, "EU B2B - Reverse charge (customer pays VAT)"
+        else:
+            # B2C - charge seller's VAT
+            rate = EU_COUNTRIES.get(seller, 21.0)
+            return rate, False, f"EU B2C - {seller} VAT applies"
+    else:
+        # Export outside EU - 0% VAT
+        return 0.0, False, "Export outside EU - 0% VAT"
+
 app = FastAPI(title="Secure User API")
 
 # CORS configuration: lock down to known frontend origins in production, allow localhost in non-prod
@@ -743,6 +806,7 @@ async def register_merchant(payload: dict = Body(...)):
     email = payload.get("email", "").strip()
     password = payload.get("password", "").strip()
     business_name = payload.get("business_name", "").strip()
+    country = payload.get("country", "NL").strip().upper()  # Country code for VAT calculation
 
     if not name or not email or not password:
         raise HTTPException(status_code=400, detail="Username, email, and password are required")
@@ -788,6 +852,7 @@ async def register_merchant(payload: dict = Body(...)):
         "password": hashed,
         "role": "merchant",
         "business_name": business_name or name,
+        "country": country,  # For automatic VAT calculation
     }
 
     users.append(new_user)
@@ -803,7 +868,8 @@ async def register_merchant(payload: dict = Body(...)):
         "access_token": access_token,
         "token_type": "bearer",
         "merchant_id": new_id,
-        "email": email
+        "email": email,
+        "country": country
     }
 
 
@@ -3567,6 +3633,8 @@ def create_session(
         "metadata": {
             "customer_email": payload.get("customer_email"),
             "customer_name": payload.get("customer_name"),
+            "buyer_country": payload.get("buyer_country") or payload.get("country"),  # For VAT calculation
+            "buyer_vat_number": payload.get("buyer_vat_number") or payload.get("vat_number"),  # For B2B reverse charge
             "webhook_sources": [],
         }
     }
@@ -3938,17 +4006,40 @@ def webhook_paypal(payload: dict = Body(...), request: Request = None):
     
     amount_value = float(resource.get('amount', {}).get('value', session.get('amount', 0)))
     
+    # Get merchant and buyer countries for VAT calculation
+    merchant_id = session.get('merchant_id')
+    users = load_users()
+    merchant = next((u for u in users if u.get('id') == merchant_id), None)
+    seller_country = merchant.get('country', 'NL') if merchant else 'NL'
+    
+    buyer_country = session.get('metadata', {}).get('buyer_country') or session.get('metadata', {}).get('country') or 'NL'
+    buyer_vat = session.get('metadata', {}).get('buyer_vat_number') or session.get('metadata', {}).get('vat_number')
+    
+    # Calculate VAT
+    vat_rate, is_reverse_charge, vat_explanation = determine_vat_rate(seller_country, buyer_country, buyer_vat)
+    subtotal = amount_value / (1 + vat_rate / 100) if vat_rate > 0 else amount_value
+    vat_amount = amount_value - subtotal
+    
     invoice = {
         'id': str(uuid.uuid4()),
         'session_id': session_id,
         'merchant_id': session.get('merchant_id'),
+        'subtotal': round(subtotal, 2),
+        'vat_rate': vat_rate,
+        'vat_amount': round(vat_amount, 2),
+        'total': amount_value,
         'amount': amount_value,
         'currency': resource.get('amount', {}).get('currency_code', 'EUR'),
+        'seller_country': seller_country,
+        'buyer_country': buyer_country,
+        'buyer_vat': buyer_vat,
+        'is_reverse_charge': is_reverse_charge,
         'mode': session.get('mode', 'test'),
         'status': 'paid',
         'payment_provider': 'paypal',
         'paypal_capture_id': resource.get('id'),
         'created_at': datetime.utcnow().isoformat(),
+        'notes': vat_explanation,
     }
     invoices.append(invoice)
     
@@ -4119,6 +4210,20 @@ async def webhook_coinbase(request: Request):
     payments = event_data.get('payments', [])
     crypto_payment = payments[0] if payments else {}
     
+    # Get merchant and buyer countries for VAT calculation
+    merchant_id = session.get('merchant_id')
+    users = load_users()
+    merchant = next((u for u in users if u.get('id') == merchant_id), None)
+    seller_country = merchant.get('country', 'NL') if merchant else 'NL'
+    
+    buyer_country = session.get('metadata', {}).get('buyer_country') or session.get('metadata', {}).get('country') or 'NL'
+    buyer_vat = session.get('metadata', {}).get('buyer_vat_number') or session.get('metadata', {}).get('vat_number')
+    
+    # Calculate VAT
+    vat_rate, is_reverse_charge, vat_explanation = determine_vat_rate(seller_country, buyer_country, buyer_vat)
+    subtotal = amount_value / (1 + vat_rate / 100) if vat_rate > 0 else amount_value
+    vat_amount = amount_value - subtotal
+    
     try:
         invoices = load_invoices()
     except Exception:
@@ -4128,8 +4233,16 @@ async def webhook_coinbase(request: Request):
         'id': str(uuid.uuid4()),
         'session_id': session_id,
         'merchant_id': session.get('merchant_id'),
+        'subtotal': round(subtotal, 2),
+        'vat_rate': vat_rate,
+        'vat_amount': round(vat_amount, 2),
+        'total': amount_value,
         'amount': amount_value,
         'currency': currency,
+        'seller_country': seller_country,
+        'buyer_country': buyer_country,
+        'buyer_vat': buyer_vat,
+        'is_reverse_charge': is_reverse_charge,
         'mode': session.get('mode', 'live'),
         'status': 'paid',
         'payment_provider': 'coinbase',
@@ -4138,6 +4251,7 @@ async def webhook_coinbase(request: Request):
         'crypto_currency': crypto_payment.get('value', {}).get('crypto', {}).get('currency'),
         'transaction_id': crypto_payment.get('transaction_id'),
         'created_at': datetime.utcnow().isoformat(),
+        'notes': vat_explanation,
     }
     invoices.append(invoice)
     
