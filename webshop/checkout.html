@@ -571,20 +571,53 @@
             event.target.closest('.crypto-option').classList.add('selected');
         }
 
-        function processCryptoPayment() {
-            if (!selectedCrypto) {
-                showError('Please select a cryptocurrency');
-                return;
-            }
+        async function processCryptoPayment() {
             if (!document.getElementById('walletAddress').value) {
-                showError('Please enter your wallet address');
+                showError('Please enter your wallet address for confirmation receipts');
                 return;
             }
             
-            showSuccess(`Crypto invoice generated for ${selectedCrypto}. Check your email for payment details.`);
-            setTimeout(() => {
-                window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
-            }, 2000);
+            // Disable button to prevent double-clicks
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Creating payment...';
+            
+            try {
+                // Create a session ID for this payment
+                const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                
+                // Call backend to create Coinbase Commerce charge
+                const response = await fetch('https://api.apiblockchain.io/api/coinbase/create-charge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        amount: priceAmount,
+                        currency: 'EUR',
+                        name: `${planName} Plan - API Blockchain`,
+                        description: planDesc
+                    })
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to create crypto payment');
+                }
+                
+                const data = await response.json();
+                
+                if (data.hosted_url) {
+                    // Redirect to Coinbase Commerce hosted checkout
+                    window.location.href = data.hosted_url;
+                } else {
+                    throw new Error('No payment URL received');
+                }
+            } catch (error) {
+                console.error('Crypto payment error:', error);
+                showError(error.message || 'Failed to create crypto payment. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Generate Crypto Invoice';
+            }
         }
 
         function initializePayPalButtons() {

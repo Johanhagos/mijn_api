@@ -158,6 +158,10 @@ PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "BAA0ISTOuKNpz_VjPaEjdcIaf7pfGf
 PAYPAL_SECRET = os.getenv("PAYPAL_SECRET", "EDpVfkShOT0lnfla4G221mvPeVtMsDGTpw-GrN4q6iv0yiLMwX4UehjE8g5URfJH04Zluu1_vsJTqsYt")
 PAYPAL_MODE = os.getenv("PAYPAL_MODE", "live")  # "sandbox" or "live"
 
+# Coinbase Commerce configuration
+COINBASE_COMMERCE_API_KEY = os.getenv("COINBASE_COMMERCE_API_KEY", "837cb701-982d-435a-8abd-724b723a3883")
+COINBASE_WEBHOOK_SECRET = os.getenv("COINBASE_WEBHOOK_SECRET", "")
+
 # Brute-force protection
 MAX_ATTEMPTS = 5
 LOCK_TIME_SECONDS = 15 * 60  # 15 minutes
@@ -3967,6 +3971,196 @@ def webhook_paypal(payload: dict = Body(...), request: Request = None):
         "api_key_generated": api_key.get('id'),
         "customer_access": access_link,
     }
+
+
+@app.post('/api/coinbase/create-charge')
+def create_coinbase_charge(data: dict = Body(...)):
+    """
+    Create a Coinbase Commerce charge for crypto payment.
+    Expects: { session_id, amount, currency, name, description }
+    Returns: { hosted_url, charge_id }
+    """
+    import requests
+    
+    if not COINBASE_COMMERCE_API_KEY:
+        return JSONResponse(status_code=503, content={"error": "Coinbase Commerce not configured"})
+    
+    session_id = data.get('session_id')
+    amount = data.get('amount')
+    currency = data.get('currency', 'EUR')
+    name = data.get('name', 'API Blockchain Subscription')
+    description = data.get('description', 'Monthly subscription')
+    
+    if not session_id or not amount:
+        return JSONResponse(status_code=400, content={"error": "session_id and amount required"})
+    
+    # Create Coinbase Commerce charge
+    charge_data = {
+        "name": name,
+        "description": description,
+        "pricing_type": "fixed_price",
+        "local_price": {
+            "amount": str(amount),
+            "currency": currency
+        },
+        "metadata": {
+            "session_id": session_id
+        },
+        "redirect_url": "https://dashboard.apiblockchain.io/success",
+        "cancel_url": "https://dashboard.apiblockchain.io/checkout.html"
+    }
+    
+    try:
+        response = requests.post(
+            'https://api.commerce.coinbase.com/charges',
+            json=charge_data,
+            headers={
+                'X-CC-Api-Key': COINBASE_COMMERCE_API_KEY,
+                'X-CC-Version': '2018-03-22',
+                'Content-Type': 'application/json'
+            },
+            timeout=10
+        )
+        response.raise_for_status()
+        charge = response.json().get('data', {})
+        
+        log_event(f'COINBASE_CHARGE_CREATED session_id={session_id[:8]} charge_id={charge.get("id", "")[:8]}', '-', '-')
+        
+        return {
+            "success": True,
+            "hosted_url": charge.get('hosted_url'),
+            "charge_id": charge.get('id'),
+            "expires_at": charge.get('expires_at')
+        }
+    except requests.exceptions.RequestException as e:
+        log_event(f'COINBASE_CHARGE_FAILED {str(e)[:100]}', '-', '-')
+        return JSONResponse(status_code=500, content={"error": f"Failed to create charge: {str(e)}"})
+
+
+@app.post('/webhooks/coinbase')
+async def webhook_coinbase(request: Request):
+    """
+    Coinbase Commerce webhook handler.
+    Handles charge:confirmed, charge:failed, charge:pending events.
+    """
+    if READ_ONLY_FS:
+        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
+    
+    import hmac
+    import hashlib
+    
+    # Get raw body for signature verification
+    body = await request.body()
+    
+    # Verify webhook signature if secret is configured
+    if COINBASE_WEBHOOK_SECRET:
+        signature = request.headers.get('X-CC-Webhook-Signature', '')
+        expected_sig = hmac.new(
+            COINBASE_WEBHOOK_SECRET.encode('utf-8'),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(signature, expected_sig):
+            log_event('WEBHOOK_COINBASE_INVALID_SIGNATURE', '-', '-')
+            return JSONResponse(status_code=401, content={"error": "Invalid signature"})
+    
+    try:
+        payload = json.loads(body.decode('utf-8'))
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Invalid JSON: {str(e)}"})
+    
+    event_type = payload.get('event', {}).get('type', '')
+    event_data = payload.get('event', {}).get('data', {})
+    
+    # Only process confirmed charges
+    if event_type != 'charge:confirmed':
+        log_event(f'WEBHOOK_COINBASE_IGNORED event_type={event_type}', '-', '-')
+        return {"received": True}
+    
+    metadata = event_data.get('metadata', {})
+    session_id = metadata.get('session_id', '')
+    
+    if not session_id:
+        log_event('WEBHOOK_COINBASE_NO_SESSION_ID', '-', '-')
+        return JSONResponse(status_code=400, content={"error": "No session_id in metadata"})
+    
+    try:
+        sessions = load_sessions()
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
+    
+    session = next((s for s in sessions if s.get('id') == session_id), None)
+    if not session:
+        log_event(f'WEBHOOK_COINBASE_SESSION_NOT_FOUND session_id={session_id[:8]}', '-', '-')
+        return JSONResponse(status_code=404, content={"error": "Session not found"})
+    
+    if session.get('status') in ['paid', 'failed']:
+        return {"success": True, "message": f"Session already in terminal state: {session.get('status')}"}
+    
+    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
+        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
+    
+    # Update session
+    session['status'] = 'paid'
+    session['payment_status'] = 'completed'
+    session['paid_at'] = datetime.utcnow().isoformat()
+    session['payment_provider'] = 'coinbase'
+    session['coinbase_charge_id'] = event_data.get('id')
+    session['metadata']['webhook_sources'].append('coinbase')
+    
+    # Get payment details
+    pricing = event_data.get('pricing', {})
+    local_price = pricing.get('local', {})
+    amount_value = float(local_price.get('amount', session.get('amount', 0)))
+    currency = local_price.get('currency', 'EUR')
+    
+    # Get crypto payment details
+    payments = event_data.get('payments', [])
+    crypto_payment = payments[0] if payments else {}
+    
+    try:
+        invoices = load_invoices()
+    except Exception:
+        invoices = []
+    
+    invoice = {
+        'id': str(uuid.uuid4()),
+        'session_id': session_id,
+        'merchant_id': session.get('merchant_id'),
+        'amount': amount_value,
+        'currency': currency,
+        'mode': session.get('mode', 'live'),
+        'status': 'paid',
+        'payment_provider': 'coinbase',
+        'coinbase_charge_id': event_data.get('id'),
+        'crypto_amount': crypto_payment.get('value', {}).get('crypto', {}).get('amount'),
+        'crypto_currency': crypto_payment.get('value', {}).get('crypto', {}).get('currency'),
+        'transaction_id': crypto_payment.get('transaction_id'),
+        'created_at': datetime.utcnow().isoformat(),
+    }
+    invoices.append(invoice)
+    
+    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
+    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
+    
+    try:
+        save_sessions(sessions)
+        save_invoices(invoices)
+    except Exception as e:
+        log_event(f'WEBHOOK_COINBASE_PERSIST_FAILED {str(e)[:50]}', '-', '-')
+        return JSONResponse(status_code=500, content={"error": "Failed to persist"})
+    
+    log_event(f'WEBHOOK_COINBASE_SUCCESS session_id={session_id[:8]} amount={amount_value} {currency}', '-', '-')
+    
+    return {
+        "success": True,
+        "session_id": session_id,
+        "invoice": invoice,
+        "api_key_generated": api_key.get('id'),
+        "customer_access": access_link,
+    }
+
 
 
 @app.post('/webhooks/onecom')

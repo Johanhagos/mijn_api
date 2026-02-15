@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "name": "apiblockchain",
+  "builds": [
+    {
+      "src": "webshop_for_upload/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/",
+      "dest": "/webshop_for_upload/index.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/webshop_for_upload/$1"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*).html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache, no-store, must-revalidate"
+        }
+      ]
+    }
+  ]
+}
