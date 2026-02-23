@@ -26,10 +26,16 @@ export const getStaticPaths: GetStaticPaths = async () => {
 
 export const getStaticProps: GetStaticProps = async ({ params }) => {
   try {
-    const slug = (params?.slug as string[])?.[0] || 'index';
-    const filePath = join(process.cwd(), 'public', `${slug}.html`);
+    const slugParts = (params?.slug as string[]) || [];
+    // If no slug provided, serve the index page
+    let slug = slugParts.length > 0 ? slugParts.join('/') : 'index';
+
+    // If the slug already contains a .html extension, don't append another
+    let filename = slug.endsWith('.html') ? slug : `${slug}.html`;
+
+    const filePath = join(process.cwd(), 'public', filename);
     const html = readFileSync(filePath, 'utf-8');
-    
+
     return {
       props: { html },
       revalidate: 3600,
