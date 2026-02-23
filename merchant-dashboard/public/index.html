@@ -776,26 +776,40 @@
     </div>
 
     <script>
-                // MetaMask integration
+                // Wallet connection: safe MetaMask detection + friendly fallback
                 async function connectWallet() {
                     const statusDiv = document.getElementById('walletStatus');
                     statusDiv.style.display = 'block';
-                    if (typeof window.ethereum === 'undefined') {
-                        statusDiv.textContent = 'MetaMask not found. Please install the MetaMask extension to connect your wallet.';
-                        return;
+
+                    // Prefer injected provider (MetaMask) if available
+                    if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
+                        try {
+                            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                            statusDiv.textContent = 'Connected: ' + accounts[0];
+                            return { provider: window.ethereum, account: accounts[0] };
+                        } catch (err) {
+                            statusDiv.textContent = 'Connection failed: ' + (err.message || err);
+                            console.error('MetaMask connection error', err);
+                            return null;
+                        }
                     }
-                    try {
-                        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                        statusDiv.textContent = 'Connected: ' + accounts[0];
-                    } catch (err) {
-                        statusDiv.textContent = 'Connection failed: ' + (err.message || err);
-                    }
+
+                    // No MetaMask detected — show a friendly install prompt and WalletConnect option
+                    const installUrl = 'https://metamask.io/download.html';
+                    statusDiv.innerHTML = '' +
+                        'MetaMask not detected. <a href="' + installUrl + '" target="_blank" rel="noopener">Install MetaMask</a> or use WalletConnect.';
+
+                    // Optional: integrate WalletConnect here. For now, provide user instructions.
+                    // If you want WalletConnect support, add the WalletConnect SDK and initialize it instead of showing this message.
+                    return null;
                 }
-                // Hide wallet status after 5 seconds
+
+                // Hide wallet status after 6 seconds (unless it contains a link)
                 document.getElementById('connectWalletBtn').addEventListener('click', () => {
                     setTimeout(() => {
-                        document.getElementById('walletStatus').style.display = 'none';
-                    }, 5000);
+                        const s = document.getElementById('walletStatus');
+                        if (s && s.querySelector('a') === null) s.style.display = 'none';
+                    }, 6000);
                 });
         function checkout(plan, amount) {
             if (plan === 'enterprise') {
