@@ -3135,7 +3135,7 @@ What would you like to know?"""
    - Monitor transactions in Dashboard
    - Set up automatic reporting
 
-📖 **Quick Links:**
+**Quick Links:**
 - API Documentation: https://docs.apiblockchain.io
 - Integration Examples: Check your plugin setup
 - Support: support@apiblockchain.io
