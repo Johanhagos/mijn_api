@@ -953,6 +953,11 @@
         function generateAIResponse(userMessage) {
             const msg = userMessage.toLowerCase();
             
+            // === WELCOMING FIRST-TIME MESSAGE ===
+            if (msg === 'hi' || msg === 'hello' || msg === 'help' || msg === 'start' || msg === 'begin') {
+                return "👋 Welcome! I'm here to help you with your payment and invoice questions.\n\n**I can answer:**\n\n💰 **Payment Questions**\n• How to pay (credit card, bank transfer, crypto)\n• Payment methods and security\n• Transaction status\n\n📄 **Invoice & Charges**\n• Why you're being charged\n• What's on your invoice\n• Tax/VAT explanations\n• Lost invoice help\n\n🪙 **Cryptocurrency**\n• How to pay with Bitcoin/Ethereum\n• Crypto payment step-by-step\n• Wallet and network guidance\n\n⚖️ **Tax Information**\n• Why tax is charged\n• Tax rates by country\n• VAT rules\n• Compliance details\n\n🔄 **Refunds & Disputes**\n• Refund process\n• Dispute resolution\n• Chargeback information\n\n**Just ask!** For example:\n• 'How do I pay?'\n• 'Why is there a tax charge?'\n• 'How do I pay with crypto?'\n• 'I need my invoice'\n• 'Can I get a refund?'\n\nWhat can I help you with?";
+            }
+            
             // === CUSTOMER SUPPORT (for people who received invoices/payments) ===
             if (msg.includes('i received') || msg.includes('i got an invoice') || msg.includes('i was charged') || msg.includes('why do i have to pay') || msg.includes('what is this charge') || msg.includes('i need to pay')) {
                 return "👋 Hi! I'm here to help with your invoice or payment.\n\n💳 Payment Options: We accept credit cards, bank transfers, and cryptocurrency (Bitcoin, Ethereum, USDC). All payments are secure and you'll get a confirmation email.\n\n📄 About Your Invoice: Tax charges follow your country's regulations. The merchant uses our international payment platform to ensure compliance.\n\n🔍 Need Help? Ask me about:\n• Crypto payment instructions\n• Tax/VAT explanations\n• Invoice details\n• Payment issues\n\nWhat can I help you with?";

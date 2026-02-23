@@ -3078,12 +3078,42 @@ What would you like to explore?"""
 
 If you tell me your platform (WordPress, WooCommerce, custom site), I’ll provide exact steps."""
 
-    # Provide contextual insights based on merchant's activity
-    if any(word in msg_lower for word in ['how', 'help', 'what', 'guide', 'tutorial']):
-        if web2_count == 0 and web3_count == 0:
-            # New merchant - guide them through getting started
-            if any(word in msg_lower for word in ['start', 'begin', 'first', 'setup', 'integrate']):
-                return """🚀 **Getting Started with APIBlockchain:**
+    # === WELCOMING FIRST-TIME MESSAGE ===
+    # If no specific match, give helpful introduction
+    if msg_lower in ['hi', 'hello', 'help', 'what can you do', 'who are you', 'start', 'begin']:
+        return f"""👋 Welcome! I'm your AI business assistant for APIBlockchain.
+
+**I can help you with:**
+
+💰 **Payments & Transactions**
+- Track your Web2 (cards, transfers) and Web3 (crypto) payments
+- View settlement times and transaction history
+- Answer questions about payment methods
+
+📋 **Tax & Compliance** 
+- Explain VAT/tax rates for any country (60+ supported)
+- Help with invoice requirements
+- Guide you on tax filing deadlines
+- EU B2B reverse charge rules
+
+🧾 **Invoicing**
+- Generate compliant invoices
+- Understand invoice details
+- Check audit trail records
+
+🌍 **International Business**
+- Multi-country tax support
+- Cross-border payment rules
+- Currency and rate information
+
+**Just ask me anything!** For example:
+- "How much tax applies to my sale?"
+- "How do I pay with crypto?"
+- "What's on my invoice?"
+- "Why am I charged tax?"
+- "Help me understand VAT"
+
+What would you like to know?"""
 
 1. **Get Your API Key**
    - Go to Settings → API Keys

@@ -94,6 +94,58 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
   const generateAIResponse = (userMessage: string) => {
     const msg = userMessage.toLowerCase();
 
+    // === WELCOMING FIRST-TIME MESSAGE ===
+    if (msg === 'hi' || msg === 'hello' || msg === 'help' || msg === 'start' || msg === 'begin') {
+      return `👋 Welcome to APIBlockchain AI Assistant!
+
+**I'm here to help you with:**
+
+📊 **Dashboard & Metrics**
+• Understand your revenue trends
+• Analyze transaction data
+• Track Web2 vs Web3 sales
+• Monitor payment performance
+
+💰 **Payment Setup**
+• Configure payment methods
+• Enable Web3 (crypto) payments
+• Understand settlement times
+• Troubleshoot payment issues
+
+📋 **Tax & Compliance** 
+• Explain VAT/tax rates (60+ countries)
+• Help with invoice requirements
+• Guide on tax filing deadlines
+• EU B2B reverse charge rules
+
+🧾 **Invoicing & Customers**
+• Generate compliant invoices
+• Answer customer questions
+• Explain tax charges
+• Handle refund requests
+
+🪙 **Crypto & Web3**
+• Bitcoin, Ethereum, USDC payments
+• Multi-blockchain support
+• Settlement tracking
+• Rate & fee explanations
+
+🌍 **International Business**
+• Multi-country tax support
+• Currency conversion info
+• Cross-border payment rules
+• Compliance by region
+
+**Quick Examples:**
+• "How do I enable crypto payments?"
+• "What tax applies to my sales?"
+• "How do I explain charges to customers?"
+• "Why is my revenue low?"
+• "Help with EU VAT"
+
+**What would you like help with?**`;
+    }
+
     // === CUSTOMER SUPPORT (help merchants answer customer questions) ===
     if (msg.includes('customer ask') || msg.includes('customer wants') || msg.includes('customer question') || msg.includes('how do i tell customer') || msg.includes('customer received invoice')) {
       return `🙋‍♂️ HELPING YOUR CUSTOMERS:
