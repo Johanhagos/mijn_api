@@ -66,7 +66,7 @@ export default function Dashboard() {
         <title>Dashboard - Blockchain Payment Gateway & Smart Contract Invoicing</title>
         <meta name="description" content="Merchant Dashboard - Manage your blockchain payments and smart contract invoices" />
       </Head>
-      <div className="min-h-screen bg-slate-900 relative">
+      <div className="min-h-screen bg-emerald-50 relative">
         {/* Background Image with Overlay */}
         <div 
           className="fixed inset-0 z-0 opacity-20"
@@ -82,7 +82,7 @@ export default function Dashboard() {
         {/* Content */}
         <div className="relative z-10">
           {/* Header */}
-          <header className="bg-slate-800/80 backdrop-blur-sm shadow-lg border-b border-emerald-700/30">
+          <header className="bg-emerald-600/90 backdrop-blur-sm shadow-lg border-b border-emerald-400/30">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -101,10 +101,10 @@ export default function Dashboard() {
                   <Link href="/invoices/create" className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-700 text-white hover:bg-emerald-800 font-medium transition shadow-sm">
                     ➕ New Invoice
                   </Link>
-                  <Link href="/invoices" className="inline-flex items-center px-4 py-2 rounded-lg bg-slate-700 text-emerald-100 hover:bg-slate-600 font-medium transition">
+                  <Link href="/invoices" className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 font-medium transition">
                     📄 Invoices
                   </Link>
-                  <Link href="/api-keys" className="inline-flex items-center px-4 py-2 rounded-lg bg-slate-700 text-emerald-100 hover:bg-slate-600 font-medium transition">
+                  <Link href="/api-keys" className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 font-medium transition">
                     🔑 API Keys
                   </Link>
                   <button 
@@ -124,93 +124,93 @@ export default function Dashboard() {
           <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Key Metrics */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6 hover:shadow-emerald-500/20 hover:shadow-xl transition">
+            <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6 hover:shadow-emerald-400/20 hover:shadow-xl transition">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-emerald-300">Total Revenue</p>
-                  <p className="text-3xl font-bold text-white mt-2">{stats?.total_amount ? `€${parseFloat(stats.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p>
+                  <p className="text-sm font-medium text-emerald-700">Total Revenue</p>
+                  <p className="text-3xl font-bold text-slate-900 mt-2">{stats?.total_amount ? `€${parseFloat(stats.total_amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}</p>
                 </div>
                 <div className="text-4xl opacity-20 text-emerald-400">💰</div>
               </div>
-              <div className="mt-4 text-xs text-emerald-200/70">All time earnings</div>
+              <div className="mt-4 text-xs text-emerald-600/70">All time earnings</div>
             </div>
 
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6 hover:shadow-emerald-500/20 hover:shadow-xl transition">
+            <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6 hover:shadow-emerald-400/20 hover:shadow-xl transition">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-emerald-300">Web2 Transactions</p>
-                  <p className="text-3xl font-bold text-emerald-400 mt-2">{stats?.web2_count ?? '—'}</p>
+                  <p className="text-sm font-medium text-emerald-700">Web2 Transactions</p>
+                  <p className="text-3xl font-bold text-emerald-600 mt-2">{stats?.web2_count ?? '—'}</p>
                 </div>
                 <div className="text-4xl opacity-20 text-emerald-400">💳</div>
               </div>
-              <div className="mt-4 text-xs text-emerald-200/70">Card & payment methods</div>
+              <div className="mt-4 text-xs text-emerald-600/70">Card & payment methods</div>
             </div>
 
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6 hover:shadow-emerald-500/20 hover:shadow-xl transition">
+            <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6 hover:shadow-emerald-400/20 hover:shadow-xl transition">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-emerald-300">Web3 Transactions</p>
-                  <p className="text-3xl font-bold text-purple-400 mt-2">{stats?.web3_count ?? '—'}</p>
+                  <p className="text-sm font-medium text-emerald-700">Web3 Transactions</p>
+                  <p className="text-3xl font-bold text-purple-500 mt-2">{stats?.web3_count ?? '—'}</p>
                 </div>
                 <div className="text-4xl opacity-20 text-purple-400">🔗</div>
               </div>
-              <div className="mt-4 text-xs text-emerald-200/70">Blockchain payments</div>
+              <div className="mt-4 text-xs text-emerald-600/70">Blockchain payments</div>
             </div>
 
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6 hover:shadow-emerald-500/20 hover:shadow-xl transition">
+            <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6 hover:shadow-emerald-400/20 hover:shadow-xl transition">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-emerald-300">Active API Keys</p>
-                  <p className="text-3xl font-bold text-cyan-400 mt-2">{apiKeys.length}</p>
+                  <p className="text-sm font-medium text-emerald-700">Active API Keys</p>
+                  <p className="text-3xl font-bold text-cyan-600 mt-2">{apiKeys.length}</p>
                 </div>
                 <div className="text-4xl opacity-20 text-cyan-400">🔐</div>
               </div>
-              <div className="mt-4 text-xs text-emerald-200/70">{apiKeys.filter((k: any) => k.mode === 'live').length} live keys</div>
+              <div className="mt-4 text-xs text-emerald-600/70">{apiKeys.filter((k: any) => k.mode === 'live').length} live keys</div>
             </div>
           </div>
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            <div className="lg:col-span-2 bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6">
+            <div className="lg:col-span-2 bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-white">Revenue Trend</h2>
-                <p className="text-sm text-emerald-200/70">Transaction volume over time</p>
+                <h2 className="text-lg font-semibold text-slate-900">Revenue Trend</h2>
+                <p className="text-sm text-emerald-600/70">Transaction volume over time</p>
               </div>
               <RevenueChart data={revenueData.length ? revenueData : [{ date: '01', amount: 0 }]} />
             </div>
 
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6">
+            <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-white">Payment Mix</h2>
-                <p className="text-sm text-emerald-200/70">Web2 vs Web3 distribution</p>
+                <h2 className="text-lg font-semibold text-slate-900">Payment Mix</h2>
+                <p className="text-sm text-emerald-600/70">Web2 vs Web3 distribution</p>
               </div>
               <PaymentDonut data={donutData} />
             </div>
           </div>
 
           {/* VAT Section */}
-          <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6 mb-8">
+          <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6 mb-8">
             <div className="mb-6">
-              <h2 className="text-lg font-semibold text-white">VAT Compliance</h2>
-              <p className="text-sm text-emerald-200/70">Validate and check VAT numbers</p>
+              <h2 className="text-lg font-semibold text-slate-900">VAT Compliance</h2>
+              <p className="text-sm text-emerald-600/70">Validate and check VAT numbers</p>
             </div>
             <VATChecker />
           </div>
 
           {/* Bottom Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6">
+            <div className="lg:col-span-2 bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-white">API Keys</h2>
-                <p className="text-sm text-emerald-200/70">Manage your API credentials</p>
+                <h2 className="text-lg font-semibold text-slate-900">API Keys</h2>
+                <p className="text-sm text-emerald-600/70">Manage your API credentials</p>
               </div>
               <ApiKeysList keys={apiKeys.map((k: any) => ({ id: k.id, key_type: k.type, masked: k.masked || k.id, created_at: k.created_at }))} onRevoke={handleRevoke} />
             </div>
 
-            <div className="bg-slate-800/80 backdrop-blur-sm rounded-lg shadow-lg border border-emerald-600/30 p-6">
+            <div className="bg-white backdrop-blur-sm rounded-lg shadow-lg border border-emerald-200/50 p-6">
               <div className="mb-6">
-                <h2 className="text-lg font-semibold text-white">Plugin Setup</h2>
-                <p className="text-sm text-emerald-200/70">Integrate with your site</p>
+                <h2 className="text-lg font-semibold text-slate-900">Plugin Setup</h2>
+                <p className="text-sm text-emerald-600/70">Integrate with your site</p>
               </div>
               <PluginSetup snippet={`<script src="/plugin.js"></script>`} />
             </div>

@@ -7,9 +7,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Invoicing Merchant (green on white) theme
+        // Invoicing Merchant (light green theme)
         primary: '#10B981',    // green (emerald-500)
-        secondary: '#065F46',  // dark green
+        secondary: '#34D399',  // light green (emerald-400)
         accent: '#A3E635',     // brighter lime accent for CTAs
         background: '#FFFFFF', // white page background
       },

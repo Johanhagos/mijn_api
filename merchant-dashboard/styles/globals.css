@@ -16,20 +16,20 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Premium B2B Brand Tokens - Nature Green Theme */
+/* Premium B2B Brand Tokens - Light Green Theme */
 :root {
-  --ab-primary: #059669; /* Emerald green primary */
-  --ab-secondary: #065f46; /* Deep forest green */
-  --ab-accent: #10b981; /* Fresh green accent */
-  --ab-dark: #064e3b; /* Dark green */
+  --ab-primary: #10b981; /* Emerald green primary */
+  --ab-secondary: #34D399; /* Light green */
+  --ab-accent: #6EE7B7; /* Lighter green accent */
+  --ab-dark: #059669; /* Medium green */
   --ab-muted: #6b7280;
   --ab-bg: #f0fdf4;
   --ab-surface: #ffffff;
-  --ab-border: #d1fae5;
-  --ab-gradient-primary: linear-gradient(135deg, #059669 0%, #10b981 100%);
-  --ab-gradient-dark: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
-  --ab-card-shadow: 0 4px 24px rgba(5, 150, 105, 0.08);
-  --ab-card-shadow-hover: 0 8px 32px rgba(5, 150, 105, 0.15);
+  --ab-border: #a7f3d0;
+  --ab-gradient-primary: linear-gradient(135deg, #10b981 0%, #34D399 100%);
+  --ab-gradient-dark: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  --ab-card-shadow: 0 4px 24px rgba(52, 211, 153, 0.08);
+  --ab-card-shadow-hover: 0 8px 32px rgba(52, 211, 153, 0.15);
   --ab-transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
