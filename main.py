@@ -3115,6 +3115,7 @@ If you tell me your platform (WordPress, WooCommerce, custom site), I’ll provi
 
 What would you like to know?"""
 
+    """
 1. **Get Your API Key**
     - Go to Settings -> API Keys
     - Create a new key (test or live mode)
@@ -3143,7 +3144,7 @@ What would you like to know?"""
 What's your integration method (API, plugin, custom)?"""
     
     # Smart recommendations based on activity
-    elif web2_count > 50 and web3_count == 0:
+    if web2_count > 50 and web3_count == 0:
         if any(word in msg_lower for word in ['web3', 'crypto', 'blockchain']):
             return """💡 **You're Missing Web3 Opportunities!**
 
@@ -3166,7 +3167,7 @@ Your metrics show strong Web2 sales (50+ transactions). Here's why you should en
 
 Ready to activate Web3 payments?"""
     
-    elif web3_count > 10 and web2_count == 0:
+    if web3_count > 10 and web2_count == 0:
         if any(word in msg_lower for word in ['web2', 'traditional', 'credit', 'card']):
             return """💡 **Expand Revenue with Web2 Payments!**
 
