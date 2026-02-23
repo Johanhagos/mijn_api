@@ -776,35 +776,81 @@
     </div>
 
     <script>
-                // Wallet connection: safe MetaMask detection + friendly fallback
+                // Wallet connection: safe MetaMask detection + WalletConnect fallback
+                function loadScript(url) {
+                    return new Promise((resolve, reject) => {
+                        const s = document.createElement('script');
+                        s.src = url;
+                        s.async = true;
+                        s.onload = () => resolve();
+                        s.onerror = () => reject(new Error('Failed to load ' + url));
+                        document.head.appendChild(s);
+                    });
+                }
+
+                async function connectWithWeb3Modal(statusDiv) {
+                    try {
+                        // Load required libs dynamically (CDN)
+                        await loadScript('https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js');
+                        await loadScript('https://unpkg.com/@walletconnect/web3-provider@1.7.8/dist/umd/index.min.js');
+                        await loadScript('https://unpkg.com/web3modal@1.9.8/dist/index.js');
+
+                        const providerOptions = {
+                            walletconnect: {
+                                package: window.WalletConnectProvider.default || window.WalletConnectProvider,
+                                options: {
+                                    infuraId: "" // Optional: add Infura ID or RPC mappings
+                                }
+                            }
+                        };
+
+                        const web3Modal = new window.Web3Modal.default({ cacheProvider: false, providerOptions });
+                        const provider = await web3Modal.connect();
+                        const web3 = new window.Web3(provider);
+                        const accounts = await web3.eth.getAccounts();
+                        if (accounts && accounts[0]) {
+                            statusDiv.textContent = 'Connected: ' + accounts[0];
+                            return { provider, account: accounts[0] };
+                        }
+                        statusDiv.textContent = 'Connected (no account found)';
+                        return null;
+                    } catch (err) {
+                        console.error('Web3Modal connection failed', err);
+                        statusDiv.textContent = 'Wallet connection failed: ' + (err.message || err);
+                        return null;
+                    }
+                }
+
                 async function connectWallet() {
                     const statusDiv = document.getElementById('walletStatus');
                     statusDiv.style.display = 'block';
 
-                    // Prefer injected provider (MetaMask) if available
+                    // If MetaMask is present, prefer it
                     if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
                         try {
                             const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                            statusDiv.textContent = 'Connected: ' + accounts[0];
-                            return { provider: window.ethereum, account: accounts[0] };
+                            if (accounts && accounts[0]) {
+                                statusDiv.textContent = 'Connected: ' + accounts[0];
+                                return { provider: window.ethereum, account: accounts[0] };
+                            }
                         } catch (err) {
-                            statusDiv.textContent = 'Connection failed: ' + (err.message || err);
-                            console.error('MetaMask connection error', err);
-                            return null;
+                            console.error('MetaMask connect error', err);
+                            statusDiv.textContent = 'MetaMask connection failed: ' + (err.message || err);
                         }
                     }
 
-                    // No MetaMask detected — show a friendly install prompt and WalletConnect option
-                    const installUrl = 'https://metamask.io/download.html';
-                    statusDiv.innerHTML = '' +
-                        'MetaMask not detected. <a href="' + installUrl + '" target="_blank" rel="noopener">Install MetaMask</a> or use WalletConnect.';
+                    // No MetaMask or connection failed — try Web3Modal (WalletConnect) fallback
+                    statusDiv.textContent = 'Opening wallet selector...';
+                    const result = await connectWithWeb3Modal(statusDiv);
+                    if (result) return result;
 
-                    // Optional: integrate WalletConnect here. For now, provide user instructions.
-                    // If you want WalletConnect support, add the WalletConnect SDK and initialize it instead of showing this message.
+                    // Final fallback: offer install link
+                    const installUrl = 'https://metamask.io/download.html';
+                    statusDiv.innerHTML = 'No wallet connected. <a href="' + installUrl + '" target="_blank" rel="noopener">Install MetaMask</a> or try another wallet.';
                     return null;
                 }
 
-                // Hide wallet status after 6 seconds (unless it contains a link)
+                // Hide wallet status after a short time unless it contains a link
                 document.getElementById('connectWalletBtn').addEventListener('click', () => {
                     setTimeout(() => {
                         const s = document.getElementById('walletStatus');
