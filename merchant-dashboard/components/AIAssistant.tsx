@@ -94,6 +94,106 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
   const generateAIResponse = (userMessage: string) => {
     const msg = userMessage.toLowerCase();
 
+    // === CUSTOMER SUPPORT (help merchants answer customer questions) ===
+    if (msg.includes('customer ask') || msg.includes('customer wants') || msg.includes('customer question') || msg.includes('how do i tell customer') || msg.includes('customer received invoice')) {
+      return `🙋‍♂️ HELPING YOUR CUSTOMERS:
+
+Common Customer Questions:
+
+💳 **Payment Issues:**
+"We accept cards, bank transfers, and crypto (Bitcoin/Ethereum/USDC). All payments are secure with confirmation emails."
+
+🪙 **Crypto Payment:**
+"Select 'Pay with Crypto' → Choose currency → Scan QR code with your wallet → Send exact amount → Wait 10-30 min for confirmation."
+
+💰 **Why Tax/VAT Charged:**
+"Tax is legally required based on your country. The rate depends on buyer/seller countries. We collect and report it to tax authorities for compliance."
+
+🔄 **Refunds:**
+"Contact me (merchant) first - I can process refunds faster. For card/PayPal, you can dispute if needed. Crypto refunds must come from me (irreversible!)."
+
+📄 **Lost Invoice:**
+"You should have received it via email. Check spam folder. I can resend from my dashboard if needed."
+
+Want specific wording for a customer question? Ask me!`;
+    }
+
+    // Customer crypto payment help
+    if (msg.includes('customer crypto') || msg.includes('customer bitcoin') || msg.includes('explain crypto to customer') || msg.includes('customer doesn\'t know crypto')) {
+      return `🪙 EXPLAINING CRYPTO TO CUSTOMERS:
+
+Simple Message Template:
+
+"Hi! Crypto payments are easy:
+
+1. Click 'Pay with Crypto' at checkout
+2. Choose Bitcoin, Ethereum, or USDC
+3. You'll see a QR code and wallet address
+4. Open your crypto wallet app (like Coinbase or MetaMask)
+5. Scan the QR code OR paste the address
+6. Send the EXACT amount shown
+7. Payment confirms in 10-30 minutes
+
+⚠️ Important:
+• Send exact amount (not more/less)
+• Use correct network (Bitcoin → BTC, Ethereum → ETH)
+• Don't close the page until you see confirmation
+• Small network fees will apply (separate from your order)
+
+No crypto wallet? No worries - you can pay with card or bank transfer instead!"
+
+Copy this message and customize for your customer! 📋`;
+    }
+
+    // Customer tax/VAT questions
+    if (msg.includes('customer tax') || msg.includes('customer vat') || msg.includes('why charged tax') || msg.includes('explain tax to customer')) {
+      return `💰 EXPLAINING TAX/VAT TO CUSTOMERS:
+
+Simple Message Template:
+
+"The tax/VAT on your invoice is required by law and depends on:
+• Your country
+• My country (seller)
+• Type of transaction (B2B or B2C)
+
+Where the tax goes:
+I collect it and pay it to tax authorities. It's tracked for compliance and audits.
+
+Common situations:
+🇪🇺 EU Customers (B2C): VAT based on your country rate
+🏢 EU Business (B2B): If you provide VAT ID, reverse charge applies (0% VAT - you pay tax in your country)
+🌍 Outside EU: Usually 0% VAT, but local taxes may apply in your country
+
+Your invoice shows the full breakdown: base price + tax rate + tax amount.
+
+If you're a registered business with VAT ID, send it to me for reverse charge!"
+
+This explains it clearly for customers! 📊`;
+    }
+
+    // Customer refund handling
+    if (msg.includes('customer refund') || msg.includes('how to refund customer') || msg.includes('customer wants money back') || msg.includes('issue refund')) {
+      return `🔄 HANDLING CUSTOMER REFUNDS:
+
+**Your Process:**
+1. Confirm the refund request (check order details)
+2. Process refund through your dashboard or payment processor
+3. Notify customer with confirmation
+
+**By Payment Method:**
+💳 **Card Payments:** Refund through your payment processor (appears in 3-7 days)
+🔵 **PayPal:** Use PayPal dashboard to refund (instant to their account)
+🪙 **Crypto:** You must send crypto back to customer's wallet address (irreversible!)
+
+**Template Message:**
+"Your refund of [amount] has been processed. For card payments, it takes 3-7 business days to appear. For PayPal, it's instant. You'll see a confirmation email."
+
+**⚠️ Crypto Refunds:**
+Ask customer for wallet address → Verify it's correct → Send exact amount → Get confirmation
+
+Want help with specific refund scenario? Ask me!`;
+    }
+
     // BLOCKCHAIN & PAYMENT PROCESSING CORE
     if (msg.includes('blockchain') || msg.includes('smart contract')) {
       return "Our smart contracts execute payment settlements automatically on multiple blockchains. They're immutable, transparent, and eliminate middlemen - reducing settlement time from 3 days to seconds!";
