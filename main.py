@@ -3116,9 +3116,9 @@ If you tell me your platform (WordPress, WooCommerce, custom site), I’ll provi
 What would you like to know?"""
 
 1. **Get Your API Key**
-   - Go to Settings → API Keys
-   - Create a new key (test or live mode)
-   - Copy and save securely
+    - Go to Settings -> API Keys
+    - Create a new key (test or live mode)
+    - Copy and save securely
 
 2. **Create Your First Checkout**
    - Use /checkout/create endpoint
