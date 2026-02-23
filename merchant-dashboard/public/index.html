@@ -760,6 +760,8 @@
     </footer>
 
     <!-- AI Assistant -->
+        <button id="connectWalletBtn" style="position:fixed;bottom:90px;right:30px;background:#10b981;color:white;border:none;border-radius:50px;padding:0.75rem 1.5rem;font-weight:600;z-index:999;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.15);" onclick="connectWallet()">Connect Wallet</button>
+        <div id="walletStatus" style="position:fixed;bottom:60px;right:30px;background:#d1fae5;color:#333;border-radius:10px;padding:0.5rem 1rem;font-size:0.95rem;z-index:999;display:none;"></div>
     <button id="aiButton" onclick="toggleAI()">💬</button>
     <div class="ai-widget" id="aiWidget">
         <div class="ai-header">
@@ -774,6 +776,27 @@
     </div>
 
     <script>
+                // MetaMask integration
+                async function connectWallet() {
+                    const statusDiv = document.getElementById('walletStatus');
+                    statusDiv.style.display = 'block';
+                    if (typeof window.ethereum === 'undefined') {
+                        statusDiv.textContent = 'MetaMask not found. Please install the MetaMask extension to connect your wallet.';
+                        return;
+                    }
+                    try {
+                        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                        statusDiv.textContent = 'Connected: ' + accounts[0];
+                    } catch (err) {
+                        statusDiv.textContent = 'Connection failed: ' + (err.message || err);
+                    }
+                }
+                // Hide wallet status after 5 seconds
+                document.getElementById('connectWalletBtn').addEventListener('click', () => {
+                    setTimeout(() => {
+                        document.getElementById('walletStatus').style.display = 'none';
+                    }, 5000);
+                });
         function checkout(plan, amount) {
             if (plan === 'enterprise') {
                 // For enterprise, show contact form
