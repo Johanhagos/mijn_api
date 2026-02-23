@@ -866,6 +866,23 @@
                 addMessage(response, 'assistant');
             }, 500);
         }
+
+        // Suppress harmless browser extension errors
+        window.addEventListener('error', (event) => {
+            // Suppress MetaMask and other extension-related errors silently
+            if (event.filename && (event.filename.includes('inpage') || event.filename.includes('extension') || event.filename.includes('chrome-extension'))) {
+                event.preventDefault();
+                return false;
+            }
+        }, true);
+
+        window.addEventListener('unhandledrejection', (event) => {
+            // Suppress MetaMask connection errors if extension not installed
+            if (event.reason && event.reason.message && event.reason.message.includes('MetaMask')) {
+                event.preventDefault();
+                console.log('MetaMask not available - Web3 features disabled');
+            }
+        });
     </script>
 </body>
 </html>
