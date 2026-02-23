@@ -563,7 +563,7 @@ The system handles international combinations so you stay compliant everywhere.`
                   <button
                     key={idx}
                     onClick={() => setInput(action)}
-                    className="text-xs px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full border border-emerald-400/50 transition"}
+                    className="text-xs px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full border border-emerald-400/50 transition"
                   >
                     {action}
                   </button>
