@@ -520,7 +520,7 @@ The system handles international combinations so you stay compliant everywhere.`
           </div>
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gradient-to-b from-emerald-50 via-white to-emerald-50">
             {messages.map((msg, idx) => (
               <div
                 key={idx}
@@ -530,11 +530,11 @@ The system handles international combinations so you stay compliant everywhere.`
                   className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                     msg.role === 'user'
                       ? 'bg-gradient-to-br from-emerald-600 to-cyan-600 text-white shadow-lg'
-                      : 'bg-slate-700 text-white border border-emerald-400/50 shadow-md'
+                      : 'bg-emerald-100 text-slate-900 border border-emerald-400/50 shadow-md'
                   }`}
                 >
                   <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                  <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-white/70' : 'text-slate-300'}`}>
+                  <p className={`text-xs mt-2 ${msg.role === 'user' ? 'text-white/70' : 'text-emerald-700'}`}>
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
@@ -542,7 +542,7 @@ The system handles international combinations so you stay compliant everywhere.`
             ))}
             {isLoading && (
               <div className="flex justify-start">
-                <div className="bg-slate-800 border border-emerald-500/30 rounded-2xl px-4 py-3 shadow-md">
+                <div className="bg-emerald-50 border border-emerald-300/50 rounded-2xl px-4 py-3 shadow-md">
                   <div className="flex gap-2">
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce"></div>
                     <div className="w-2 h-2 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -556,14 +556,14 @@ The system handles international combinations so you stay compliant everywhere.`
 
           {/* Quick Actions */}
           {messages.length === 1 && (
-            <div className="px-4 py-2 border-t border-slate-700">
-              <p className="text-xs text-emerald-300 mb-2">Quick actions:</p>
+            <div className="px-4 py-2 border-t border-emerald-200">
+              <p className="text-xs text-emerald-700 mb-2">Quick actions:</p>
               <div className="flex flex-wrap gap-2">
                 {quickActions.map((action, idx) => (
                   <button
                     key={idx}
                     onClick={() => setInput(action)}
-                    className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-emerald-100 rounded-full border border-emerald-400/50 transition"
+                    className="text-xs px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full border border-emerald-400/50 transition"}
                   >
                     {action}
                   </button>
@@ -573,7 +573,7 @@ The system handles international combinations so you stay compliant everywhere.`
           )}
 
           {/* Input */}
-          <div className="p-4 border-t border-emerald-500/30 bg-slate-900 space-y-3">
+          <div className="p-4 border-t border-emerald-300/50 bg-emerald-50 space-y-3">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -581,7 +581,7 @@ The system handles international combinations so you stay compliant everywhere.`
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Ask me anything about your dashboard..."
-                className="flex-1 px-4 py-2.5 bg-slate-800 border border-emerald-500/60 rounded-xl text-white placeholder-slate-300 focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/30 transition-all duration-200"
+                className="flex-1 px-4 py-2.5 bg-white border border-emerald-400/60 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/30 transition-all duration-200"
                 disabled={isLoading}
               />
               <button
