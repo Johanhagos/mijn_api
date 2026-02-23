@@ -827,10 +827,16 @@
 
             // Simulate AI response
             setTimeout(() => {
-                const lower = message.toLowerCase();
+                const lower = message.toLowerCase().trim();
                 let response = '';
 
-                if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost') || lower.includes('plan')) {
+                // Check for greetings first
+                if (lower === 'hi' || lower === 'hello' || lower.includes('hey') || 
+                    lower.includes('how are you') || lower.includes('how do you do') || 
+                    lower.includes('what\'s up') || lower.includes('how\'s it going') || 
+                    lower === 'hola' || lower === 'bonjour' || lower === 'buenos días') {
+                    response = 'Hello! Welcome to APIBlockchain. 👋 I\'m here to help with any questions about our blockchain payment gateway, cryptocurrency payments, smart contract invoicing, pricing, integration, or anything else. What would you like to know?';
+                } else if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost') || lower.includes('plan')) {
                     response = 'Starter is €20/month (up to 100 transactions). Professional is €29.99/month (unlimited transactions, dashboard, priority support). Enterprise is custom. Want the best plan for your volume?';
                 } else if (lower.includes('plugin') || lower.includes('woocommerce') || lower.includes('wordpress') || lower.includes('integrate')) {
                     response = 'Install the APIBlockchain plugin, add your API key in settings, choose Web2/Web3 methods, and run a test checkout. Tell me your platform and I’ll give exact steps.';
@@ -838,11 +844,21 @@
                     response = 'Yes, we support major stablecoins and cryptocurrencies including USDC, USDT, and ETH.';
                 } else if (lower.includes('api') || lower.includes('developer') || lower.includes('webhook')) {
                     response = 'We provide a REST API with webhooks for real-time payment events and SDKs for common languages. Want a quick start guide?';
+                } else if (lower.includes('tax') || lower.includes('vat') || lower.includes('compliance')) {
+                    response = 'We handle tax compliance automatically across 60+ countries including EU VAT, US sales tax, and international regulations. Our system calculates taxes based on buyer/seller location and provides audit trails.';
+                } else if (lower.includes('pay') || lower.includes('payment') || lower.includes('checkout')) {
+                    response = 'Our payment gateway accepts both traditional payments (credit cards via PayPal) and cryptocurrencies (Bitcoin, Ethereum, stablecoins). You get instant settlement and transparent fees.';
+                } else if (lower.includes('invoice')) {
+                    response = 'Create smart contract invoices with automatic payment tracking, tax calculation, and multi-currency support. Customers can pay via Web2 or Web3 methods.';
+                } else if (lower.includes('refund') || lower.includes('return')) {
+                    response = 'Refunds are processed instantly. For crypto payments, we return funds to the original wallet. For traditional payments, credits go to the customer\'s payment method.';
                 } else {
                     const responses = [
                         'That\'s a great question! You can integrate blockchain payments into your webshop in just a few clicks.',
                         'You\'ll get instant notifications for all transactions and can access real-time analytics 24/7.',
-                        'We offer seamless API integration that works with most popular webshop platforms.'
+                        'We offer seamless API integration that works with most popular webshop platforms.',
+                        'Our platform supports both traditional and cryptocurrency payments with automatic compliance.',
+                        'Need help with something specific? I can answer questions about payments, crypto, tax compliance, invoicing, or integration.'
                     ];
                     response = responses[Math.floor(Math.random() * responses.length)];
                 }
