@@ -2884,6 +2884,150 @@ def generate_rule_based_response(message: str, stats: dict, merchant: dict) -> s
         import random
         return random.choice(responses)
     
+    # === CUSTOMER SUPPORT SECTION (for end-customers asking about payments/invoices) ===
+    # Detect if this is a customer (not merchant) asking about invoice/payment
+    if any(phrase in msg_lower for phrase in ['i received', 'i got an invoice', 'i was charged', 'why do i have to pay', 'what is this charge', 'i need to pay', 'invoice number', 'how do i pay']):
+        return f"""👋 Hi! I'm here to help with your invoice or payment.
+
+**Payment Questions:**
+- We accept credit cards, bank transfers, and cryptocurrency (Bitcoin, Ethereum, USDC)
+- All payments are processed securely
+- You'll receive a confirmation email once payment is complete
+
+**About Your Invoice:**
+- Tax charges are calculated based on your country's regulations
+- The merchant you're paying is using our international payment platform
+- All invoices include full compliance details for tax authorities
+
+**Need Specific Help?**
+- Payment issues → Contact the merchant directly (they'll help!)
+- Crypto payment → I can guide you step-by-step
+- Tax questions → I can explain the charges
+- Invoice details → Please share the invoice number
+
+What specifically can I help you with?"""
+    
+    # Crypto payment instructions for customers
+    if any(phrase in msg_lower for phrase in ['how to pay crypto', 'pay with bitcoin', 'pay with ethereum', 'crypto payment', 'how does crypto work', 'never paid crypto']):
+        return """🪙 **How to Pay with Cryptocurrency:**
+
+**1. Choose Crypto Payment**
+   - Select "Pay with Crypto" on the checkout page
+   - You'll see Bitcoin, Ethereum, or USDC options
+
+**2. Get Payment Details**
+   - You'll receive a wallet address and exact amount
+   - A QR code will also be displayed
+
+**3. Send Payment**
+   - Open your crypto wallet (Coinbase, MetaMask, Trust Wallet, etc.)
+   - Scan QR code OR paste the wallet address
+   - Send the EXACT amount shown (very important!)
+
+**4. Confirmation**
+   - Payment typically confirms in 10-30 minutes
+   - You'll get an email when it's complete
+   - Don't close the page until you see confirmation
+
+**💡 Tips:**
+- Send the exact amount (too little/much may delay processing)
+- Use the correct network (Bitcoin → BTC network, Ethereum → ETH network)
+- Network fees are paid by you (separate from invoice amount)
+
+**Don't have crypto?** You can also pay with credit card or bank transfer!
+
+Any specific questions about the process?"""
+    
+    # Tax explanation for customers
+    if any(phrase in msg_lower for phrase in ['why tax', 'why vat', 'tax charge', 'why am i charged', 'extra charge', 'additional fee']):
+        return f"""💶 **About Tax/VAT Charges:**
+
+**Why Tax is Applied:**
+- All businesses must collect tax according to international law
+- The rate depends on YOUR country and the seller's country
+- This is a legal requirement - not optional!
+
+**Your Tax Details:**
+- Seller is in: {country_info['name']} ({merchant_country})
+- Standard rate: {country_info['rate']}%
+- Your rate depends on your location
+
+**Common Scenarios:**
+- **EU B2C:** VAT is charged based on buyer's country
+- **EU B2B:** If you have a VAT number, reverse charge applies (no VAT charged)
+- **Export (outside EU):** Usually 0% VAT, but local taxes may apply
+- **US/Americas:** Sales tax varies by state/province
+
+**Where Does the Tax Go?**
+- The merchant collects it and pays it to tax authorities
+- This is tracked and reported for compliance
+- You'll see it itemized on your invoice
+
+**Have a VAT Number?**
+If you're a business with a valid VAT ID, the merchant can apply reverse charge (you pay tax in your own country instead).
+
+Need clarification on your specific charge?"""
+    
+    # Refund/dispute handling for customers
+    if any(phrase in msg_lower for phrase in ['refund', 'cancel order', 'dispute', 'wrong charge', 'didn\'t receive', 'not delivered', 'scam']):
+        return """🔄 **Refund & Dispute Process:**
+
+**Step 1: Contact the Merchant First**
+- The merchant controls refunds and order fulfillment
+- They can process refunds faster than any dispute
+- Check your invoice for their contact information
+
+**Step 2: Payment Dispute (if merchant doesn't respond)**
+- **Card Payments:** Contact your bank/card issuer for chargeback
+- **PayPal:** Use PayPal's dispute resolution center
+- **Crypto Payments:** Contact the merchant (crypto transactions are final)
+
+**Step 3: Document Everything**
+- Save emails, receipts, and communication
+- Note dates, amounts, and what went wrong
+- This helps with dispute resolution
+
+**⚠️ About Crypto Refunds:**
+Cryptocurrency transactions are irreversible - only the merchant can send funds back. Always verify orders before paying with crypto!
+
+**🛡️ Our Platform:**
+We provide the payment infrastructure, but merchants handle fulfillment. If you believe there's fraud, please report it immediately.
+
+What's your specific situation? I can guide you through next steps."""
+    
+    # Invoice/receipt questions from customers
+    if any(phrase in msg_lower for phrase in ['invoice', 'receipt', 'proof of payment', 'transaction record', 'need documentation']):
+        return """📄 **Invoice & Receipt Information:**
+
+**Getting Your Invoice:**
+- You should receive it automatically via email after payment
+- Check spam/junk folder if you don't see it
+- Invoice includes: merchant details, your details, items, tax breakdown
+
+**What's Included:**
+- ✅ Invoice number (for your records)
+- ✅ Date of transaction
+- ✅ Merchant information (seller)
+- ✅ Your information (buyer)
+- ✅ Itemized charges
+- ✅ Tax/VAT breakdown
+- ✅ Total amount paid
+- ✅ Payment method used
+
+**For Business/Accounting:**
+- Our invoices are tax-compliant in 60+ countries
+- They meet audit requirements
+- Include all fields needed for VAT deduction
+- 7-year retention for tax authorities
+
+**Lost Your Invoice?**
+- Contact the merchant with your order/transaction number
+- They can resend it from their dashboard
+- Have your email and approximate date ready
+
+**Need Specific Details?**
+Tell me what you're looking for (invoice number, merchant info, tax details, etc.)"""
+    
     # Casual product/feature questions
     if msg_lower in ['what can you do?', 'what do you do?', 'tell me about you', 'who are you?']:
         return f"""👋 I'm your AI business assistant! Here's what I handle:
@@ -2914,6 +3058,11 @@ def generate_rule_based_response(message: str, stats: dict, merchant: dict) -> s
 - Answer questions
 - Give advice
 - Help troubleshoot
+
+**👥 Customer Support**
+- Help customers with payments
+- Explain invoices & taxes
+- Guide crypto payments
 
 What would you like to explore?"""
     

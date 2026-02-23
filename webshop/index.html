@@ -953,6 +953,31 @@
         function generateAIResponse(userMessage) {
             const msg = userMessage.toLowerCase();
             
+            // === CUSTOMER SUPPORT (for people who received invoices/payments) ===
+            if (msg.includes('i received') || msg.includes('i got an invoice') || msg.includes('i was charged') || msg.includes('why do i have to pay') || msg.includes('what is this charge') || msg.includes('i need to pay')) {
+                return "👋 Hi! I'm here to help with your invoice or payment.\n\n💳 Payment Options: We accept credit cards, bank transfers, and cryptocurrency (Bitcoin, Ethereum, USDC). All payments are secure and you'll get a confirmation email.\n\n📄 About Your Invoice: Tax charges follow your country's regulations. The merchant uses our international payment platform to ensure compliance.\n\n🔍 Need Help? Ask me about:\n• Crypto payment instructions\n• Tax/VAT explanations\n• Invoice details\n• Payment issues\n\nWhat can I help you with?";
+            }
+            
+            // Crypto payment help for customers
+            if (msg.includes('how to pay crypto') || msg.includes('pay with bitcoin') || msg.includes('pay with ethereum') || msg.includes('crypto payment') || msg.includes('never paid crypto') || msg.includes('how does crypto work')) {
+                return "🪙 HOW TO PAY WITH CRYPTO:\n\n1️⃣ Select 'Pay with Crypto' on checkout\n2️⃣ Choose currency (Bitcoin, Ethereum, or USDC)\n3️⃣ You'll see a wallet address + QR code\n4️⃣ Open your crypto wallet (Coinbase, MetaMask, etc.)\n5️⃣ Scan QR or paste address\n6️⃣ Send EXACT amount shown\n7️⃣ Wait 10-30 minutes for confirmation\n\n⚠️ Important:\n• Send exact amount (not more/less)\n• Use correct network (BTC network for Bitcoin, ETH for Ethereum)\n• Don't close page until confirmed\n• Network fees separate from invoice\n\n💁 No crypto? You can pay with card or bank transfer instead!";
+            }
+            
+            // Tax explanation for customers
+            if (msg.includes('why tax') || msg.includes('why vat') || msg.includes('tax charge') || msg.includes('why am i charged') || msg.includes('extra charge') || msg.includes('additional fee')) {
+                return "💶 ABOUT TAX/VAT CHARGES:\n\nWhy Tax Applied:\n• Businesses must collect tax by law\n• Rate depends on your country & seller country\n• This is legal compliance - required!\n\nCommon Scenarios:\n🇪🇺 EU B2C: VAT based on buyer country\n🏢 EU B2B: Reverse charge with VAT ID (no VAT charged)\n🌍 Export: Usually 0% VAT, local taxes may apply\n🇺🇸 US: Sales tax varies by state\n\nWhere Does Tax Go?\nMerchant collects & pays to tax authorities. Tracked for compliance & audits.\n\n📄 Have VAT Number? Tell merchant to apply reverse charge!";
+            }
+            
+            // Refund/dispute help for customers
+            if (msg.includes('refund') || msg.includes('cancel order') || msg.includes('dispute') || msg.includes('wrong charge') || msg.includes('didn\'t receive') || msg.includes('not delivered') || msg.includes('scam')) {
+                return "🔄 REFUND & DISPUTE HELP:\n\nStep 1: Contact Merchant First\n• Merchant controls refunds & orders\n• Check invoice for contact info\n• They can refund faster than disputes\n\nStep 2: Payment Dispute (if no response)\n💳 Card: Contact bank for chargeback\n🟦 PayPal: Use PayPal dispute center\n🪙 Crypto: Only merchant can refund (transactions final!)\n\nStep 3: Document Everything\n• Save emails & receipts\n• Note dates, amounts, issues\n• Helps with resolution\n\n⚠️ Crypto Warning: Always verify before paying - crypto is irreversible!\n\nWhat's your situation? I can guide next steps.";
+            }
+            
+            // Invoice/receipt help for customers
+            if (msg.includes('invoice') && (msg.includes('lost') || msg.includes('need') || msg.includes('where') || msg.includes('receipt') || msg.includes('proof'))) {
+                return "📄 INVOICE & RECEIPT HELP:\n\nGetting Your Invoice:\n• Sent automatically via email after payment\n• Check spam/junk folder\n• Includes merchant + buyer details + tax breakdown\n\nWhat's Included:\n✅ Invoice number\n✅ Transaction date\n✅ Merchant information\n✅ Your information\n✅ Itemized charges\n✅ Tax/VAT breakdown\n✅ Payment method\n\nFor Business/Accounting:\n• Tax-compliant in 60+ countries\n• Meets audit requirements\n• VAT deduction ready\n• 7-year retention\n\nLost Invoice? Contact merchant with order number - they can resend!";
+            }
+            
             // BLOCKCHAIN & PAYMENT PROCESSING CORE
             if (msg.includes('blockchain') || msg.includes('smart contract')) {
                 return "Our smart contracts execute payment settlements automatically on multiple blockchains. They're immutable, transparent, and eliminate middlemen - reducing settlement time from 3 days to seconds!";
