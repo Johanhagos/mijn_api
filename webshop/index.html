@@ -953,10 +953,12 @@
         }
         
         function generateAIResponse(userMessage) {
-            const msg = userMessage.toLowerCase();
+            const msg = userMessage.toLowerCase().trim();
             
             // === WELCOMING FIRST-TIME MESSAGE ===
-            if (msg === 'hi' || msg === 'hello' || msg === 'help' || msg === 'start' || msg === 'begin') {
+            if (msg === 'hi' || msg === 'hello' || msg === 'help' || msg === 'start' || msg === 'begin' || 
+                msg.includes('hey') || msg.includes('how are you') || msg.includes('how do you do') || 
+                msg.includes('what\'s up') || msg.includes('how\'s it going') || msg === 'hola' || msg === 'bonjour') {
                 return "👋 Welcome! I'm here to help you with your payment and invoice questions.\n\n**I can answer:**\n\n💰 **Payment Questions**\n• How to pay (credit card, bank transfer, crypto)\n• Payment methods and security\n• Transaction status\n\n📄 **Invoice & Charges**\n• Why you're being charged\n• What's on your invoice\n• Tax/VAT explanations\n• Lost invoice help\n\n🪙 **Cryptocurrency**\n• How to pay with Bitcoin/Ethereum\n• Crypto payment step-by-step\n• Wallet and network guidance\n\n⚖️ **Tax Information**\n• Why tax is charged\n• Tax rates by country\n• VAT rules\n• Compliance details\n\n🔄 **Refunds & Disputes**\n• Refund process\n• Dispute resolution\n• Chargeback information\n\n**Just ask!** For example:\n• 'How do I pay?'\n• 'Why is there a tax charge?'\n• 'How do I pay with crypto?'\n• 'I need my invoice'\n• 'Can I get a refund?'\n\nWhat can I help you with?";
             }
             
