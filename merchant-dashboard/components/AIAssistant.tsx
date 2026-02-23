@@ -92,10 +92,12 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
   ];
 
   const generateAIResponse = (userMessage: string) => {
-    const msg = userMessage.toLowerCase();
+    const msg = userMessage.toLowerCase().trim();
 
     // === WELCOMING FIRST-TIME MESSAGE ===
-    if (msg === 'hi' || msg === 'hello' || msg === 'help' || msg === 'start' || msg === 'begin') {
+    if (msg === 'hi' || msg === 'hello' || msg === 'help' || msg === 'start' || msg === 'begin' || 
+        msg.includes('hey') || msg.includes('how are you') || msg.includes('how do you do') || 
+        msg.includes('what\'s up') || msg.includes('how\'s it going')) {
       return `👋 Welcome to APIBlockchain AI Assistant!
 
 **I'm here to help you with:**
