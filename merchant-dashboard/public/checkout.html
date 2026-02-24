@@ -635,7 +635,7 @@
                     return actions.order.capture().then(() => {
                         showSuccess('PayPal payment processed successfully!');
                         setTimeout(() => {
-                            window.location.href = 'https://dashboard.apiblockchain.io?payment=success';
+                            window.location.href = 'https://dashboard.apiblockchain.io/login?payment=success';
                         }, 2000);
                     });
                 },
@@ -662,3 +662,5 @@
     </script>
 </body>
 </html>
+
+
