@@ -1,0 +1,28 @@
+name: "CI: Deploy Migrations (placeholder)"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  check-and-trigger:
+    name: Check secrets and trigger migration workflow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.DATABASE_URL }}" ] || [ -z "${{ secrets.JWT_SECRET_KEY }}" ]; then
+            echo "ERROR: Required secrets DATABASE_URL and JWT_SECRET_KEY are not set in repository secrets."
+            echo "Set them via GitHub → Settings → Secrets and Variables → Actions."
+            exit 1
+          fi
+          echo "Secrets present. This job can trigger the 'deploy_migrations' workflow."
+
+      - name: Trigger `deploy_migrations` workflow (optional)
+        uses: peter-evans/workflow-dispatch@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          workflow: deploy_migrations.yml
+          ref: main
