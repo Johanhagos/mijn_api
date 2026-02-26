@@ -16,6 +16,8 @@ from jose import jwt, JWTError
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 import threading
+import requests
+import xml.etree.ElementTree as ET
 
 # INTERNATIONAL TAX RATES DATABASE (2026)
 # Format: 'COUNTRY_CODE': tax_rate_percentage
@@ -323,6 +325,14 @@ if not READ_ONLY_FS and (DATA_DIR / "invoices.json").exists():
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
 
+# AI transcripts storage
+AI_TRANSCRIPTS_FILE = DATA_DIR / "ai_transcripts.json"
+if not READ_ONLY_FS and not AI_TRANSCRIPTS_FILE.exists():
+    try:
+        AI_TRANSCRIPTS_FILE.write_text('[]', encoding='utf-8')
+    except Exception:
+        pass
+
 # passlib CryptContext configured for bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # bcrypt has a maximum password length of 72 bytes. Enforce server-side to avoid
@@ -396,6 +406,127 @@ def validate_payment_state_transition(current_status: str, new_status: str) -> b
         "failed": [],
     }
     return new_status in valid_transitions.get(current_status, [])
+
+
+# ---------------------- AI and VAT helper endpoints ----------------------
+class ChatRequest(BaseModel):
+    message: str
+    context: dict = Field(default_factory=dict)
+    history: List[dict] = Field(default_factory=list)
+
+
+def server_generate_response(message: str, context: dict | None = None) -> str:
+    """Produce a conservative, deterministic server-side reply for the AI widget.
+    This is a lightweight stub. For production, wire to an LLM or retrieval system.
+    """
+    m = (message or '').lower()
+    # VAT-specific shortcuts
+    if 'reverse charge' in m or 'b2b' in m or 'vat id' in m:
+        return "When both parties are in the EU and the buyer provides a valid VAT ID, the invoice is issued with 0% VAT (reverse charge). The buyer must account for VAT in their country. Use /vat/validate to validate a VAT number."
+    if 'vat rates' in m or 'eu vat rates' in m:
+        # return a short summary
+        sample = ', '.join([f"{k}:{v}%" for k, v in list(EU_COUNTRIES.items())[:6]])
+        return f"EU VAT snapshot: {sample}. Ask for 'full list' for more."
+    if 'integrate' in m or 'plugin' in m or 'woocommerce' in m:
+        return "See our integration docs at /docs or the dashboard API keys page. For plugins we provide step-by-step guides in the dashboard."
+    if 'hello' in m or 'hi' in m or 'help' in m:
+        return "Hi — I'm the APIBlockchain assistant. Ask about payments, VAT, invoices, or integrations. Try 'Explain EU B2B reverse charge' or 'Validate VAT ID: NL123456789B01'."
+    # fallback generic reply
+    return "Thanks — I received your question. For detailed tax checks use the VAT quick actions, or ask me to validate a VAT ID."
+
+
+def append_transcript(record: dict):
+    if READ_ONLY_FS:
+        return
+    try:
+        with _lock:
+            data = []
+            try:
+                data = json.loads(AI_TRANSCRIPTS_FILE.read_text(encoding='utf-8') or '[]')
+            except Exception:
+                data = []
+            data.append(record)
+            AI_TRANSCRIPTS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+    except Exception:
+        pass
+
+
+@app.post('/ai/chat')
+async def ai_chat(req: ChatRequest, request: Request):
+    user_ip = request.client.host if request.client else 'unknown'
+    reply = server_generate_response(req.message, req.context)
+    # Save transcript (redact obvious PII in this simple example)
+    record = {
+        'timestamp': datetime.utcnow().isoformat() + 'Z',
+        'ip': user_ip,
+        'message': req.message,
+        'context': req.context,
+        'reply': reply
+    }
+    append_transcript(record)
+    return JSONResponse({'reply': reply})
+
+
+@app.post('/vat/validate')
+async def vat_validate(payload: dict = Body(...)):
+    """Validate an EU VAT number using VIES when possible; fall back to format check.
+    Request body: { "country_code": "NL", "vat_number": "123456789B01" }
+    """
+    country = (payload.get('country_code') or '').upper()
+    vat = (payload.get('vat_number') or '').replace(' ', '').replace('-', '')
+    # Basic format check
+    format_ok = bool(vat and len(vat) >= 6 and vat.isalnum())
+    result = {'country_code': country, 'vat_number': vat, 'format_ok': format_ok, 'valid': False, 'source': 'format'}
+
+    # Try VIES SOAP service if country looks EU-ish
+    if country in EU_COUNTRIES:
+        try:
+            # build SOAP request
+            wsdl = 'https://ec.europa.eu/taxation_customs/vies/services/checkVatService'
+            # SOAP action endpoint (non-wsdl URL)
+            url = 'https://ec.europa.eu/taxation_customs/vies/services/checkVatService'
+            envelope = f"""
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:ec.europa.eu:taxud:vies:services:checkVat:types">
+  <soap:Body>
+    <urn:checkVat>
+      <urn:countryCode>{country}</urn:countryCode>
+      <urn:vatNumber>{vat}</urn:vatNumber>
+    </urn:checkVat>
+  </soap:Body>
+</soap:Envelope>
+"""
+            headers = {'Content-Type': 'text/xml; charset=utf-8'}
+            resp = requests.post(url, data=envelope.encode('utf-8'), headers=headers, timeout=10)
+            if resp.status_code == 200 and resp.content:
+                # parse response XML
+                try:
+                    tree = ET.fromstring(resp.content)
+                    ns = {'soap': 'http://schemas.xmlsoap.org/soap/envelope/'}
+                    # look for <valid>true</valid>
+                    valid = 'true' in resp.text.lower()
+                    result.update({'valid': valid, 'source': 'vies'})
+                except Exception:
+                    result.update({'valid': False, 'source': 'vies_parse_error'})
+        except Exception:
+            # network or VIES error — leave format-based result
+            result.update({'valid': False, 'source': 'vies_unavailable'})
+
+    return JSONResponse(result)
+
+
+@app.get('/ai/transcripts')
+def get_transcripts(x_admin_token: str | None = Header(None)):
+    """Admin endpoint to view AI transcripts. Protected by `ADMIN_TOKEN` env var."""
+    ADMIN_TOKEN = os.getenv('ADMIN_TOKEN')
+    if not ADMIN_TOKEN or x_admin_token != ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail='Unauthorized')
+    try:
+        text = AI_TRANSCRIPTS_FILE.read_text(encoding='utf-8') if AI_TRANSCRIPTS_FILE.exists() else '[]'
+        data = json.loads(text or '[]')
+        return JSONResponse({'count': len(data), 'transcripts': data})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 def generate_customer_access_link(session_id: str, merchant_id: int, expires_days: int = 7) -> dict:
@@ -621,10 +752,16 @@ def db_get_user(username: str):
         db = _get_db_session()
         if not db:
             return None
-        user = db.query(ORMUser).filter(ORMUser.username == username).first()
-        if not user:
-            return None
-        return {"id": user.id, "name": user.username, "password": user.password_hash, "role": user.role}
+        try:
+            user = db.query(ORMUser).filter(ORMUser.username == username).first()
+            if not user:
+                return None
+            return {"id": user.id, "name": user.username, "password": user.password_hash, "role": user.role}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
     except Exception:
         return None
 
@@ -635,8 +772,14 @@ def db_list_users():
         db = _get_db_session()
         if not db:
             return None
-        rows = db.query(ORMUser).all()
-        return [{"id": r.id, "name": r.username, "role": r.role} for r in rows]
+        try:
+            rows = db.query(ORMUser).all()
+            return [{"id": r.id, "name": r.username, "role": r.role} for r in rows]
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
     except Exception:
         return None
 
@@ -647,11 +790,17 @@ def db_create_user(user_dict: dict):
         db = _get_db_session()
         if not db:
             return None
-        u = ORMUser(username=user_dict["name"], password_hash=user_dict["password"], role=user_dict.get("role", "user"))
-        db.add(u)
-        db.commit()
-        db.refresh(u)
-        return {"id": u.id, "name": u.username, "role": u.role}
+        try:
+            u = ORMUser(username=user_dict["name"], password_hash=user_dict["password"], role=user_dict.get("role", "user"))
+            db.add(u)
+            db.commit()
+            db.refresh(u)
+            return {"id": u.id, "name": u.username, "role": u.role}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
     except Exception:
         return None
 
@@ -662,13 +811,19 @@ def db_delete_user_by_id(user_id: int):
         db = _get_db_session()
         if not db:
             return None
-        u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
-        if not u:
-            return None
-        out = {"id": u.id, "name": u.username, "role": u.role}
-        db.delete(u)
-        db.commit()
-        return out
+        try:
+            u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
+            if not u:
+                return None
+            out = {"id": u.id, "name": u.username, "role": u.role}
+            db.delete(u)
+            db.commit()
+            return out
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
     except Exception:
         return None
 
@@ -679,12 +834,106 @@ def db_update_role(user_id: int, role: str):
         db = _get_db_session()
         if not db:
             return None
-        u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
-        if not u:
+        try:
+            u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
+            if not u:
+                return None
+            u.role = role
+            db.commit()
+            return {"id": u.id, "name": u.username, "role": u.role}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+    except Exception:
+        return None
+
+
+def db_store_refresh_token(token: str, username: str, expires_at: datetime = None):
+    try:
+        from app.models.refresh_token import RefreshToken as ORMRefreshToken
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
             return None
-        u.role = role
-        db.commit()
-        return {"id": u.id, "name": u.username, "role": u.role}
+        try:
+            user = db.query(ORMUser).filter(ORMUser.username == username).first()
+            if not user:
+                return None
+            rt = ORMRefreshToken(user_id=user.id, token=token, expires_at=expires_at)
+            db.add(rt)
+            db.commit()
+            db.refresh(rt)
+            return {"id": rt.id, "token": rt.token, "user_id": rt.user_id, "revoked": rt.revoked}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+    except Exception:
+        return None
+
+
+def db_get_refresh_token(token: str):
+    try:
+        from app.models.refresh_token import RefreshToken as ORMRefreshToken
+        db = _get_db_session()
+        if not db:
+            return None
+        try:
+            row = db.query(ORMRefreshToken).filter(ORMRefreshToken.token == token).first()
+            if not row:
+                return None
+            return {"id": row.id, "user_id": row.user_id, "token": row.token, "expires_at": row.expires_at, "revoked": bool(row.revoked)}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+    except Exception:
+        return None
+
+
+def db_revoke_refresh_token(token: str):
+    try:
+        from app.models.refresh_token import RefreshToken as ORMRefreshToken
+        db = _get_db_session()
+        if not db:
+            return None
+        try:
+            row = db.query(ORMRefreshToken).filter(ORMRefreshToken.token == token).first()
+            if not row:
+                return None
+            row.revoked = True
+            db.commit()
+            return {"id": row.id, "revoked": True}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
+    except Exception:
+        return None
+
+
+def db_revoke_all_tokens_for_user(user_id: int):
+    try:
+        from app.models.refresh_token import RefreshToken as ORMRefreshToken
+        db = _get_db_session()
+        if not db:
+            return None
+        try:
+            rows = db.query(ORMRefreshToken).filter(ORMRefreshToken.user_id == user_id).all()
+            for r in rows:
+                r.revoked = True
+            db.commit()
+            return {"revoked": len(rows)}
+        finally:
+            try:
+                db.close()
+            except Exception:
+                pass
     except Exception:
         return None
 
@@ -715,7 +964,22 @@ def create_refresh_token(data: dict):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire})
+    # Ensure refresh tokens are unique on each issuance to support rotation.
+    try:
+        to_encode.update({"jti": str(uuid.uuid4())})
+    except Exception:
+        pass
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    # If DB is available, store the refresh token for revocation/rotation support
+    try:
+        db = _get_db_session()
+        if db:
+            try:
+                db_store_refresh_token(encoded_jwt, data.get("sub"), expires_at=expire)
+            except Exception:
+                pass
+    except Exception:
+        pass
     return encoded_jwt
 
 
@@ -1123,7 +1387,7 @@ async def forgot_password(request: Request, payload: dict = Body(...)):
 
 
 @app.post("/refresh")
-async def refresh_access_token(request: Request):
+async def refresh_access_token(request: Request, response: Response):
     ip = get_client_ip(request)
     refresh_token = request.cookies.get(COOKIE_NAME)
     if not refresh_token:
@@ -1138,8 +1402,40 @@ async def refresh_access_token(request: Request):
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    users = load_users()
-    user = next((u for u in users if u["name"] == username), None)
+    # If a DB is available, verify the refresh token exists and isn't revoked.
+    db = _get_db_session()
+    if db:
+        rt = db_get_refresh_token(refresh_token)
+        if not rt:
+            raise HTTPException(status_code=401, detail="Invalid refresh token")
+        if rt.get("revoked"):
+            raise HTTPException(status_code=401, detail="Revoked refresh token")
+        # Optionally check expires_at if present
+        expires_at = rt.get("expires_at")
+        if expires_at:
+            try:
+                if isinstance(expires_at, str):
+                    # some backends return ISO strings — try parsing
+                    expires_dt = datetime.fromisoformat(expires_at)
+                else:
+                    expires_dt = expires_at
+                if expires_dt.tzinfo is None:
+                    # assume UTC
+                    expires_dt = expires_dt.replace(tzinfo=timezone.utc)
+                if datetime.now(timezone.utc) > expires_dt:
+                    raise HTTPException(status_code=401, detail="Expired refresh token")
+            except HTTPException:
+                raise
+            except Exception:
+                pass
+
+    # Resolve user (prefer DB-backed user when available)
+    user = None
+    try:
+        user = db_get_user(username) or next((u for u in load_users() if u["name"] == username), None)
+    except Exception:
+        user = next((u for u in load_users() if u["name"] == username), None)
+
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
@@ -1147,7 +1443,71 @@ async def refresh_access_token(request: Request):
         data={"sub": username, "role": role or user.get("role", "user")}
     )
 
+    # Rotate refresh token when DB is available: issue new refresh token, store it, revoke old one.
+    new_refresh_token = None
+    try:
+        new_refresh_token = create_refresh_token(
+            data={"sub": username, "role": role or user.get("role", "user")}
+        )
+        # Revoke the old token in DB
+        try:
+            db_revoke_refresh_token(refresh_token)
+        except Exception:
+            pass
+    except Exception:
+        # If rotation fails, continue returning access token but don't set new cookie
+        new_refresh_token = None
+
+    if new_refresh_token:
+        response.set_cookie(
+            key=COOKIE_NAME,
+            value=new_refresh_token,
+            httponly=True,
+            secure=COOKIE_SECURE,
+            samesite=COOKIE_SAMESITE,
+            max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+            path="/refresh",
+        )
+
     return {"access_token": new_access_token, "token_type": "bearer"}
+
+
+@app.post("/logout")
+async def logout(request: Request, response: Response):
+    """Revoke the refresh token (if present) and clear the cookie."""
+    refresh_token = request.cookies.get(COOKIE_NAME)
+    if refresh_token:
+        try:
+            db = _get_db_session()
+            if db:
+                try:
+                    db_revoke_refresh_token(refresh_token)
+                finally:
+                    try:
+                        db.close()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    # Clear cookie on client
+    response.delete_cookie(COOKIE_NAME, path="/refresh")
+    return {"detail": "logged out"}
+
+
+@app.post("/logout/all")
+async def logout_all(current_user: dict = Depends(get_current_user)):
+    """Revoke all refresh tokens for the current user."""
+    uid = current_user.get("id")
+    try:
+        # Prefer DB-backed user id when present
+        if isinstance(uid, int):
+            db_revoke_all_tokens_for_user(uid)
+            return {"detail": "all refresh tokens revoked"}
+    except Exception:
+        pass
+    # If no DB available or failure, return success to avoid leaking info
+    return {"detail": "all refresh tokens revoked"}
 
 
 @app.get("/protected")

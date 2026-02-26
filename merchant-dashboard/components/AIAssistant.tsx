@@ -16,6 +16,12 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
       timestamp: new Date()
     }
   ]);
+  const [vatQuickActions, setVatQuickActions] = useState<string[]>([
+    'Explain EU B2B reverse charge',
+    'Provide customer VAT message template',
+    'Show EU VAT rates overview',
+    'Validate VAT ID: NL123456789B01'
+  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -499,6 +505,8 @@ The system handles international combinations so you stay compliant everywhere.`
     return contexts[Math.floor(Math.random() * contexts.length)];
   };
 
+
+    // Keyboard shortcuts and accessibility helpers
   return (
     <div
       style={
@@ -516,6 +524,23 @@ The system handles international combinations so you stay compliant everywhere.`
             height: inline ? '36px' : '64px',
             padding: inline ? '0 14px' : '0',
             borderRadius: inline ? '18px' : '50%',
+                      {/* VAT Quick Actions: always available when open */}
+                      {isOpen && (
+                        <div className="px-4 py-2 border-t border-emerald-200 bg-emerald-50">
+                          <p className="text-xs text-emerald-700 mb-2">VAT quick actions:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {vatQuickActions.map((action, idx) => (
+                              <button
+                                key={idx}
+                                onClick={() => { setInput(action); setTimeout(() => handleSend(), 100); }}
+                                className="text-xs px-3 py-1 bg-emerald-200 hover:bg-emerald-300 text-emerald-900 rounded-full border border-emerald-300/50 transition"
+                              >
+                                {action}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
             background: 'linear-gradient(to bottom right, #10b981, #06b6d4)',
             color: 'white',
             border: 'none',

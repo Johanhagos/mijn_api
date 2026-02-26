@@ -27,6 +27,11 @@ This file tells AI coding agents how this small FastAPI service is structured an
 - SECRET_KEY is read from `JWT_SECRET_KEY` env var; hard-coded fallback exists for dev only. New changes must keep this env override.
 - Avoid leaking internal exceptions in HTTP responses (the code intentionally maps errors to 4xx/5xx messages).
 
+Additional notes (2026-02-26):
+- The project now stores refresh tokens in a DB table `refresh_tokens` when a `DATABASE_URL` is provided. Alembic migration `20260226_add_refresh_tokens` was added; run `alembic upgrade heads` to apply it.
+- For serverless deployments (Vercel), use a managed Postgres/Supabase and run migrations outside functions (CI/admin job). Do not rely on local filesystem persistence.
+- Add `httpx` to test/runtime requirements for `TestClient` usage.
+
 ## Typical change examples
 - Add a new protected endpoint: use `Depends(get_current_user)` for authenticated or `Depends(require_admin)` for admin-only.
 - Return public user views: match the pattern used in `list_users` / `get_user` (hide `password` field and return `id`, `name`, `role`).

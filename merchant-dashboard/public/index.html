@@ -186,48 +186,52 @@
         }
 
         .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-        }
+            // Send to server /ai/chat
+            addMessage('...', 'assistant');
+            fetch('/ai/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message })
+            }).then(r => r.json()).then(j => {
+                // remove the temporary '...'
+                const msgs = document.getElementById('aiMessages');
+                if (msgs && msgs.lastChild && msgs.lastChild.textContent === '...') msgs.removeChild(msgs.lastChild);
+                if (j && j.reply) addMessage(j.reply, 'assistant');
+                else addMessage('Sorry, I could not generate a reply right now.', 'assistant');
+            }).catch(err => {
+                const msgs = document.getElementById('aiMessages');
+                if (msgs && msgs.lastChild && msgs.lastChild.textContent === '...') msgs.removeChild(msgs.lastChild);
+                addMessage('Sorry, the assistant is unavailable. Try again later.', 'assistant');
+                console.error('AI chat error', err);
+            });
 
-        .feature-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 15px;
-            text-align: center;
-            transition: all 0.3s;
-            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
-        }
 
-        .feature-card:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.2);
+        function handleVATQuick(action) {
+            // If action indicates VAT validation, call backend
+            if (action.startsWith('Validate VAT ID')) {
+                // extract id
+                const parts = action.split(':');
+                const vat = (parts[1] || '').trim();
+                if (!vat) { addMessage('No VAT ID provided.', 'assistant'); return; }
+                // naive country extraction: first two letters
+                const country = vat.slice(0,2).toUpperCase();
+                addMessage(`Checking VAT ID ${vat}...`, 'assistant');
+                fetch('/vat/validate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ country_code: country, vat_number: vat })
+                }).then(r => r.json()).then(res => {
+                    if (res.valid) addMessage(`VAT ID ${vat} validated (source: ${res.source}).`, 'assistant');
+                    else addMessage(`VAT ID ${vat} not validated (source: ${res.source}). Format ok: ${res.format_ok}`, 'assistant');
+                }).catch(e => {
+                    addMessage('VAT validation service unavailable; performed local format check only.', 'assistant');
+                });
+                return;
+            }
+            // otherwise, populate input and trigger send
+            document.getElementById('aiInput').value = action;
+            sendAIMessage();
         }
-
-        .feature-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-        }
-
-        .feature-card h3 {
-            font-family: 'Montserrat', sans-serif;
-            font-size: 1.3rem;
-            margin-bottom: 0.5rem;
-            color: #333;
-        }
-
-        .feature-card p {
-            color: #666;
-            line-height: 1.8;
-        }
-
-        /* Pricing Section */
-        .pricing {
-            padding: 5rem 2rem;
-            background: white;
-        }
-
         .pricing-container {
             max-width: 1200px;
             margin: 0 auto;
@@ -762,16 +766,25 @@
     <!-- AI Assistant -->
         <button id="connectWalletBtn" style="position:fixed;top:30px;right:30px;background:#10b981;color:white;border:none;border-radius:50px;padding:0.75rem 1.5rem;font-weight:600;z-index:999;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.15);" onclick="connectWallet()">Connect Wallet</button>
         <div id="walletStatus" style="position:fixed;top:70px;right:30px;background:#d1fae5;color:#333;border-radius:10px;padding:0.5rem 1rem;font-size:0.95rem;z-index:999;display:none;"></div>
-    <button id="aiButton" onclick="toggleAI()">💬</button>
-    <div class="ai-widget" id="aiWidget">
+    <button id="aiButton" onclick="toggleAI()" aria-controls="aiWidget" aria-expanded="false" aria-haspopup="dialog" aria-label="Open AI Assistant">💬</button>
+    <div class="ai-widget" id="aiWidget" role="dialog" aria-modal="true" aria-labelledby="aiHeader" aria-hidden="true">
         <div class="ai-header">
-            <h3>AI Assistant</h3>
-            <button class="ai-close" onclick="toggleAI()">×</button>
+            <h3 id="aiHeader">AI Assistant</h3>
+            <button class="ai-close" onclick="toggleAI()" aria-label="Close AI Assistant">×</button>
         </div>
-        <div class="ai-messages" id="aiMessages"></div>
+        <div class="ai-messages" id="aiMessages" role="log" aria-live="polite" aria-atomic="false" tabindex="0"></div>
+
+        <!-- VAT Quick Actions (accessible) -->
+        <div class="ai-quick-actions" id="aiQuickActions" style="padding:0.75rem 1rem; border-top:1px solid #eee; display:flex; gap:0.5rem; flex-wrap:wrap; background:#f8fffb;">
+            <button class="btn" onclick="handleVATQuick('Explain EU B2B reverse charge')" aria-label="Explain EU B2B reverse charge">EU B2B reverse charge</button>
+            <button class="btn" onclick="handleVATQuick('Provide customer VAT message template')" aria-label="Provide customer VAT message template">Customer VAT message</button>
+            <button class="btn" onclick="handleVATQuick('Show EU VAT rates overview')" aria-label="Show EU VAT rates overview">EU VAT rates</button>
+            <button class="btn" onclick="handleVATQuick('Validate VAT ID: NL123456789B01')" aria-label="Validate sample VAT ID">Validate VAT ID</button>
+        </div>
+
         <div class="ai-input">
-            <input type="text" placeholder="Ask me anything..." id="aiInput" onkeypress="handleAIInput(event)">
-            <button onclick="sendAIMessage()">➤</button>
+            <input type="text" placeholder="Ask me anything... (Press Ctrl+K to focus)" id="aiInput" onkeypress="handleAIInput(event)" aria-label="AI question input">
+            <button onclick="sendAIMessage()" aria-label="Send message">➤</button>
         </div>
     </div>
 
@@ -875,13 +888,20 @@
 
         function toggleAI() {
             const widget = document.getElementById('aiWidget');
-            widget.classList.toggle('active');
-            if (widget.classList.contains('active')) {
-                document.getElementById('aiInput').focus();
+            const btn = document.getElementById('aiButton');
+            const isActive = widget.classList.toggle('active');
+            widget.setAttribute('aria-hidden', (!isActive).toString());
+            btn.setAttribute('aria-expanded', isActive ? 'true' : 'false');
+            if (isActive) {
+                const inEl = document.getElementById('aiInput');
+                inEl.focus();
                 // Initialize with welcome message
                 if (document.getElementById('aiMessages').children.length === 0) {
-                    addMessage('Hi! I\'m APIBlockchain\'s AI Assistant. How can I help you today?', 'assistant');
+                    addMessage('Hi! I\'m APIBlockchain\'s AI Assistant. How can I help you today? Try VAT questions like "EU B2B reverse charge".', 'assistant');
                 }
+            } else {
+                // restore focus to main button for keyboard users
+                btn.focus();
             }
         }
 
@@ -909,7 +929,7 @@
             addMessage(message, 'user');
             input.value = '';
 
-            // Simulate AI response
+            // Simulate AI response (enhanced VAT handling)
             setTimeout(() => {
                 const lower = message.toLowerCase().trim();
                 let response = '';
@@ -929,7 +949,7 @@
                 } else if (lower.includes('api') || lower.includes('developer') || lower.includes('webhook')) {
                     response = 'We provide a REST API with webhooks for real-time payment events and SDKs for common languages. Want a quick start guide?';
                 } else if (lower.includes('tax') || lower.includes('vat') || lower.includes('compliance')) {
-                    response = 'We handle tax compliance automatically across 60+ countries including EU VAT, US sales tax, and international regulations. Our system calculates taxes based on buyer/seller location and provides audit trails.';
+                    response = 'We handle tax compliance automatically across 60+ countries including EU VAT, US sales tax, and international regulations. Our system calculates taxes based on buyer/seller location and provides audit trails. For EU B2B transactions with a valid VAT ID we apply the reverse charge (0% on invoice) and add the appropriate note. Ask me "Explain EU B2B reverse charge" or click the VAT buttons for templates.';
                 } else if (lower.includes('pay') || lower.includes('payment') || lower.includes('checkout')) {
                     response = 'Our payment gateway accepts both traditional payments (credit cards via PayPal) and cryptocurrencies (Bitcoin, Ethereum, stablecoins). You get instant settlement and transparent fees.';
                 } else if (lower.includes('invoice')) {
@@ -949,6 +969,39 @@
 
                 addMessage(response, 'assistant');
             }, 500);
+        }
+
+        // VAT quick action handler
+        function handleVATQuick(action) {
+            // map to precise responses
+            if (action === 'Explain EU B2B reverse charge') {
+                addMessage('When both seller and buyer are in the EU and the buyer provides a valid VAT ID, the invoice is issued with 0% VAT and a note: "Reverse charge - customer liable for VAT". The buyer reports the purchase in their VAT return. Seller validates buyer VAT ID and stores it for audit.', 'assistant');
+                return;
+            }
+            if (action === 'Provide customer VAT message template') {
+                addMessage('Customer message sample:\n\n"Hi! The VAT on your invoice follows EU rules. Since you provided a valid business VAT ID, VAT is not charged (reverse charge). Please keep this invoice for your records and report the acquisition in your VAT return."', 'assistant');
+                return;
+            }
+            if (action === 'Show EU VAT rates overview') {
+                addMessage('EU VAT rates snapshot: Austria 20%, Belgium 21%, Germany 19%, France 20%, Italy 22%, Netherlands 21%, Spain 21%, Sweden 25% ... For full list, ask "EU VAT rates".', 'assistant');
+                return;
+            }
+            // Validate VAT ID: naive check (format only)
+            if (action.startsWith('Validate VAT ID')) {
+                const parts = action.split(':');
+                const id = (parts[1] || '').trim();
+                const valid = isValidEUVAT(id);
+                if (valid) addMessage(`VAT ID ${id} looks valid (format). For production, please verify with VIES or local authority.`, 'assistant');
+                else addMessage(`VAT ID ${id} does not match common EU VAT ID patterns. Please check and try again.`, 'assistant');
+                return;
+            }
+        }
+
+        // Basic EU VAT ID format checker (not authoritative)
+        function isValidEUVAT(vat) {
+            if (!vat) return false;
+            // Simple pattern: country code (2 letters) + 8-12 alphanum
+            return /^[A-Za-z]{2}[A-Za-z0-9]{8,12}$/.test(vat.replace(/\s|-/g, ''));
         }
 
         // Suppress harmless browser extension errors
