@@ -9,7 +9,10 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '0001_add_merchant_id'
-down_revision = None
+# This migration expects an `invoices` table to exist. Ensure the invoices
+# creation migration runs before this one by setting its down_revision to the
+# invoices creation revision added on 2026-02-26.
+down_revision = '20260226_create_invoices_table'
 branch_labels = None
 depends_on = None
 

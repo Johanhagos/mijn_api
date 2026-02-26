@@ -17,7 +17,26 @@ if DATABASE_URL.startswith("sqlite") and ":memory:" in DATABASE_URL:
         future=True,
     )
 else:
-    engine = create_engine(DATABASE_URL, echo=True, future=True)
+    # Configure pooling for non-SQLite databases. Pool sizing can be tuned
+    # via environment variables (sensible defaults are provided).
+    pool_size = int(os.environ.get("DB_POOL_SIZE", "5"))
+    max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", "10"))
+    pool_timeout = int(os.environ.get("DB_POOL_TIMEOUT", "30"))
+    pool_pre_ping = os.environ.get("DB_POOL_PRE_PING", "1") in ("1", "true", "True", "yes")
+
+    # For file-backed sqlite use the plain create_engine. For real DBs use pooling.
+    if DATABASE_URL.startswith("sqlite"):
+        engine = create_engine(DATABASE_URL, echo=True, future=True)
+    else:
+        engine = create_engine(
+            DATABASE_URL,
+            echo=True,
+            future=True,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
+            pool_pre_ping=pool_pre_ping,
+        )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
