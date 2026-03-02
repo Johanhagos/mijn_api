@@ -57,28 +57,40 @@ def migrate_invoices_from_json(
     migrated = []
     
     for inv_dict in invoices_data:
-        # Check if invoice already exists
-        existing = db.query(DBInvoice).filter(DBInvoice.id == inv_dict["id"]).first()
-        if existing:
+        try:
+            # Check if invoice already exists
+            existing = db.query(DBInvoice).filter(DBInvoice.id == inv_dict["id"]).first()
+            if existing:
+                continue
+            
+            # Parse date safely
+            issue_date = datetime.now().date()
+            if "created_at" in inv_dict:
+                try:
+                    issue_date = datetime.fromisoformat(inv_dict["created_at"]).date()
+                except (ValueError, TypeError) as e:
+                    print(f"[WARN] Invalid date format for invoice {inv_dict['id']}: {e}")
+            
+            # Create invoice
+            invoice = DBInvoice(
+                id=inv_dict["id"],
+                shop_id=default_shop_id,
+                customer_id=default_customer_id,
+                invoice_number=inv_dict.get("invoice_number", f"INV-{inv_dict['id'][:8]}"),
+                status=inv_dict.get("status", "DRAFT").upper(),
+                issue_date=issue_date,
+                due_date=datetime.now().date(),
+                subtotal=inv_dict.get("amount", 0),
+                vat_total=0,
+                total=inv_dict.get("amount", 0),
+                currency="EUR",
+                finalized=inv_dict.get("status") == "paid"
+            )
+            db.add(invoice)
+            migrated.append(invoice)
+        except Exception as e:
+            print(f"[ERROR] Failed to migrate invoice {inv_dict.get('id', 'unknown')}: {e}")
             continue
-        
-        # Create invoice
-        invoice = DBInvoice(
-            id=inv_dict["id"],
-            shop_id=default_shop_id,
-            customer_id=default_customer_id,
-            invoice_number=inv_dict.get("invoice_number", f"INV-{inv_dict['id'][:8]}"),
-            status=inv_dict.get("status", "DRAFT").upper(),
-            issue_date=datetime.fromisoformat(inv_dict["created_at"]).date() if "created_at" in inv_dict else datetime.now().date(),
-            due_date=datetime.now().date(),
-            subtotal=inv_dict.get("amount", 0),
-            vat_total=0,
-            total=inv_dict.get("amount", 0),
-            currency="EUR",
-            finalized=inv_dict.get("status") == "paid"
-        )
-        db.add(invoice)
-        migrated.append(invoice)
     
     db.commit()
     return migrated

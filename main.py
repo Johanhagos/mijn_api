@@ -860,8 +860,10 @@ async def add_user(
     except Exception:
         raise HTTPException(status_code=500, detail="Error processing password")
 
-    # Check if user with this email already exists
-    existing = get_user_by_email(db, user.name)  # Using name as email for now
+    # TODO: Update User Pydantic model to require email field
+    # Currently using 'name' as email for backward compatibility with existing API
+    # This should be addressed before production deployment
+    existing = get_user_by_email(db, user.name)
     if existing:
         raise HTTPException(status_code=400, detail="User already exists")
 
@@ -869,7 +871,7 @@ async def add_user(
     shop_id = admin.get("shop_id")
     new_user = create_user(
         db=db,
-        email=user.name,  # Using name as email for backward compatibility
+        email=user.name,  # TODO: Use proper email field once User model is updated
         password_hash=hashed,
         role=user.role,
         shop_id=shop_id,
@@ -971,34 +973,6 @@ async def register_merchant(
         "email": email,
         "country": country,
         "api_key": api_key  # Return once for the merchant to save
-    }
-
-    # Create new user with merchant role
-    new_user = {
-        "id": new_id,
-        "name": name,
-        "email": email,
-        "password": hashed,
-        "role": "merchant",
-        "business_name": business_name or name,
-        "country": country,  # For automatic VAT calculation
-    }
-
-    users.append(new_user)
-    save_users(users)
-
-    # Auto-login: generate access token
-    access_token = create_access_token(
-        data={"sub": name, "role": "merchant"}
-    )
-
-    return {
-        "message": "Registration successful",
-        "access_token": access_token,
-        "token_type": "bearer",
-        "merchant_id": new_id,
-        "email": email,
-        "country": country
     }
 
 
