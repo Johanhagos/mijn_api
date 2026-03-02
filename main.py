@@ -308,8 +308,16 @@ async def rate_limit_middleware(request: Request, call_next):
         return response
         
     except Exception as e:
-        # On error, allow the request but log it
-        print(f"Rate limit error: {e}")
+        # On error, allow the request but log it with context
+        import traceback
+        error_details = {
+            "error": str(e),
+            "traceback": traceback.format_exc(),
+            "client_ip": client_ip,
+            "path": request.url.path,
+            "rate_limit_key": rate_limit_key
+        }
+        print(f"Rate limit middleware error: {json.dumps(error_details)}")
         return await call_next(request)
     finally:
         db.close()
@@ -508,14 +516,16 @@ def get_client_ip(request: Request):
 
 
 class User(BaseModel):
-    id: int
-    name: str
+    """Request model for user creation (legacy, kept for API compatibility)"""
+    id: int  # Legacy field, not used in database operations
+    name: str  # Used as email address for backward compatibility
     password: str = Field(..., min_length=6, max_length=72)
     role: str = "user"
 
 
 class PublicUser(BaseModel):
-    id: str
+    """Response model for user data (uses UUID string for id)"""
+    id: str  # UUID string from database
     name: str
     email: Optional[str] = None
     role: str
@@ -2186,17 +2196,29 @@ async def create_invoice(
         if existing:
             raise HTTPException(status_code=400, detail=f"Invoice number {payload.invoice_number} already exists")
     
-    # Parse dates with error handling
+    # Parse dates with error handling and explicit timezone handling
     try:
         issue_date_str = payload.date_issued or datetime.now(timezone.utc).date().isoformat()
-        issue_date = datetime.fromisoformat(issue_date_str) if isinstance(issue_date_str, str) else issue_date_str
+        if isinstance(issue_date_str, str):
+            issue_date = datetime.fromisoformat(issue_date_str)
+            # Ensure naive datetimes are treated as UTC
+            if issue_date.tzinfo is None:
+                issue_date = issue_date.replace(tzinfo=None)  # Store as naive for date fields
+        else:
+            issue_date = issue_date_str
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format for issue_date. Use ISO format (YYYY-MM-DD)")
     
     due_date = None
     if payload.due_date:
         try:
-            due_date = datetime.fromisoformat(payload.due_date) if isinstance(payload.due_date, str) else payload.due_date
+            if isinstance(payload.due_date, str):
+                due_date = datetime.fromisoformat(payload.due_date)
+                # Ensure naive datetimes for consistency
+                if due_date.tzinfo is None:
+                    due_date = due_date.replace(tzinfo=None)
+            else:
+                due_date = payload.due_date
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format for due_date. Use ISO format (YYYY-MM-DD)")
     else:
