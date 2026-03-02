@@ -2,29 +2,20 @@ from fastapi import FastAPI, HTTPException, Body, Response, Request, UploadFile,
 from fastapi.middleware.cors import CORSMiddleware
 import hashlib
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List
 import json
 from pathlib import Path
 import os
 import sys
 from passlib.context import CryptContext
-from datetime import datetime, timedelta, timezone, date
+from datetime import datetime, timedelta, timezone
 import uuid
 from fastapi.responses import JSONResponse, HTMLResponse
 from time import time
 from jose import jwt, JWTError
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from sqlalchemy import func, select, and_, or_
-from decimal import Decimal
-
-# Import database and models
-from database import get_db, SessionLocal, init_db
-from models import (
-    Shop, User as DBUser, Customer, Product, Invoice as DBInvoice, InvoiceItem,
-    RefreshToken, AuditLog, InvoiceHistory
-)
+import threading
 
 # INTERNATIONAL TAX RATES DATABASE (2026)
 # Format: 'COUNTRY_CODE': tax_rate_percentage
@@ -262,7 +253,9 @@ if IS_PROD:
         print("FATAL: JWT_SECRET_KEY is not set", file=sys.stderr)
         sys.exit(1)
 
-# Determine storage directory for PDFs and legacy files
+# Determine storage directory. Prefer `DATA_DIR` env var (set to /tmp on Railway),
+# otherwise fall back to /tmp by default. For local dev you can set DATA_DIR back
+# to a project-local path if desired.
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp"))
 
 if not DATA_DIR.exists():
@@ -270,16 +263,65 @@ if not DATA_DIR.exists():
     if not IS_PROD:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# Invoice PDF storage directory
-INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
-
-# Legacy file paths (kept for backward compatibility with existing code)
+USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
-SESSIONS_FILE = DATA_DIR / "sessions.json"
+INVOICES_FILE = DATA_DIR / "invoices.json"
+INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
 API_KEYS_FILE = DATA_DIR / "api_keys.json"
+SESSIONS_FILE = DATA_DIR / "sessions.json"
 
-# Detect read-only filesystem state
+# Detect read-only filesystem state so writes can be disabled safely.
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
+
+# Initialize api_keys.json from repo if not present in DATA_DIR (important for Railway deployments)
+if not READ_ONLY_FS and not (DATA_DIR / "api_keys.json").exists():
+    repo_api_keys = Path(__file__).parent / "api_keys.json"
+    if repo_api_keys.exists():
+        import shutil
+        try:
+            shutil.copy(str(repo_api_keys), str(DATA_DIR / "api_keys.json"))
+            print(f"[INFO] Initialized api_keys.json from repo to {DATA_DIR}")
+        except Exception as e:
+            print(f"[WARN] Could not copy api_keys.json: {e}")
+
+# Always copy users.json from repo to DATA_DIR on startup (ensures latest version)
+if not READ_ONLY_FS:
+    repo_users = Path(__file__).parent / "users.json"
+    if repo_users.exists():
+        import shutil
+        try:
+            shutil.copy(str(repo_users), str(DATA_DIR / "users.json"))
+            print(f"[INFO] Initialized users.json from repo to {DATA_DIR}")
+        except Exception as e:
+            print(f"[WARN] Could not copy users.json: {e}")
+
+# Initialize invoices.json from repo if not present in DATA_DIR
+if not READ_ONLY_FS and not (DATA_DIR / "invoices.json").exists():
+    repo_invoices = Path(__file__).parent / "invoices.json"
+    if repo_invoices.exists():
+        import shutil
+        try:
+            shutil.copy(str(repo_invoices), str(DATA_DIR / "invoices.json"))
+            print(f"[INFO] Initialized invoices.json from repo to {DATA_DIR}")
+        except Exception as e:
+            print(f"[WARN] Could not copy invoices.json: {e}")
+
+# If invoices.json exists but is empty, seed from repo copy
+if not READ_ONLY_FS and (DATA_DIR / "invoices.json").exists():
+    try:
+        existing_text = (DATA_DIR / "invoices.json").read_text(encoding="utf-8").strip()
+        existing_invoices = json.loads(existing_text or "[]")
+        if not existing_invoices:
+            repo_invoices = Path(__file__).parent / "invoices.json"
+            if repo_invoices.exists():
+                import shutil
+                shutil.copy(str(repo_invoices), str(DATA_DIR / "invoices.json"))
+                print(f"[INFO] Seeded invoices.json from repo to {DATA_DIR}")
+    except Exception as e:
+        print(f"[WARN] Could not seed invoices.json: {e}")
+
+# Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
+_lock = threading.Lock()
 
 # passlib CryptContext configured for bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -405,7 +447,6 @@ def clear_attempts(username: str):
 
 
 def log_event(event: str, username: str = "-", ip: str = "-"):
-    """Legacy file-based logging (kept for backward compatibility)"""
     timestamp = datetime.now(timezone.utc).isoformat()
     line = f"{timestamp} | {ip} | {username} | {event}\n"
     if READ_ONLY_FS:
@@ -413,11 +454,9 @@ def log_event(event: str, username: str = "-", ip: str = "-"):
         print(line, file=sys.stderr, end="")
         return
 
-    try:
+    with _lock:
         with open(AUDIT_LOG_FILE, "a", encoding="utf-8") as f:
             f.write(line)
-    except Exception as e:
-        print(f"[WARN] Could not write to audit log: {e}", file=sys.stderr)
 
 
 def get_client_ip(request: Request):
@@ -427,14 +466,17 @@ def get_client_ip(request: Request):
 class User(BaseModel):
     id: int
     name: str
+    # Add early validation for password length (characters). We still enforce
+    # bcrypt's 72-byte limit server-side because max_length here counts
+    # characters, not bytes.
     password: str = Field(..., min_length=6, max_length=72)
+    # Role for role-based access control. Defaults to 'user'. Example: 'admin'
     role: str = "user"
 
 
 class PublicUser(BaseModel):
-    id: str
+    id: int
     name: str
-    email: Optional[str] = None
     role: str
 
 
@@ -470,6 +512,23 @@ class OneComWebhookPayload(BaseModel):
     payload: dict = {}
 
 
+def _ensure_users_file() -> None:
+    if READ_ONLY_FS:
+        # Running on read-only filesystem — don't attempt to create files.
+        return
+
+    if not USERS_FILE.exists():
+        USERS_FILE.write_text("[]", encoding="utf-8")
+
+
+def _ensure_invoices_file() -> None:
+    if READ_ONLY_FS:
+        return
+
+    if not INVOICES_FILE.exists():
+        INVOICES_FILE.write_text("[]", encoding="utf-8")
+
+
 def _ensure_api_keys_file() -> None:
     if READ_ONLY_FS:
         return
@@ -484,8 +543,23 @@ def _ensure_sessions_file() -> None:
         SESSIONS_FILE.write_text("[]", encoding="utf-8")
 
 
+def load_invoices() -> List[dict]:
+    _ensure_invoices_file()
+    try:
+        return json.loads(INVOICES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_invoices(invoices: List[dict]) -> None:
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist invoices.json")
+
+    with _lock:
+        INVOICES_FILE.write_text(json.dumps(invoices, indent=4), encoding="utf-8")
+
+
 def load_api_keys() -> List[dict]:
-    """Load API keys from legacy JSON file (backward compatibility)"""
     _ensure_api_keys_file()
     try:
         return json.loads(API_KEYS_FILE.read_text(encoding="utf-8"))
@@ -494,7 +568,6 @@ def load_api_keys() -> List[dict]:
 
 
 def load_sessions() -> List[dict]:
-    """Load sessions from legacy JSON file (backward compatibility)"""
     _ensure_sessions_file()
     try:
         return json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
@@ -503,17 +576,18 @@ def load_sessions() -> List[dict]:
 
 
 def save_api_keys(keys: List[dict]) -> None:
-    """Save API keys to legacy JSON file (backward compatibility)"""
     if READ_ONLY_FS:
         raise RuntimeError("Filesystem is read-only; cannot persist api_keys.json")
-    API_KEYS_FILE.write_text(json.dumps(keys, indent=4), encoding="utf-8")
+    with _lock:
+        API_KEYS_FILE.write_text(json.dumps(keys, indent=4), encoding="utf-8")
 
 
 def save_sessions(sessions: List[dict]) -> None:
-    """Save sessions to legacy JSON file (backward compatibility)"""
     if READ_ONLY_FS:
         raise RuntimeError("Filesystem is read-only; cannot persist sessions.json")
-    SESSIONS_FILE.write_text(json.dumps(sessions, indent=4), encoding="utf-8")
+
+    with _lock:
+        SESSIONS_FILE.write_text(json.dumps(sessions, indent=4), encoding="utf-8")
 
 
 def ensure_invoice_pdf_dir() -> None:
@@ -523,109 +597,111 @@ def ensure_invoice_pdf_dir() -> None:
         INVOICE_PDF_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def load_users() -> List[dict]:
+    _ensure_users_file()
+    try:
+        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        # If the file is corrupted, return empty list (could also raise)
+        return []
+
+
+def _get_db_session():
+    try:
+        from app.db.session import SessionLocal
+        return SessionLocal()
+    except Exception:
+        return None
+
+
+def db_get_user(username: str):
+    """Return a user dict from the database, or None if DB unavailable or user not found."""
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        user = db.query(ORMUser).filter(ORMUser.username == username).first()
+        if not user:
+            return None
+        return {"id": user.id, "name": user.username, "password": user.password_hash, "role": user.role}
+    except Exception:
+        return None
+
+
+def db_list_users():
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        rows = db.query(ORMUser).all()
+        return [{"id": r.id, "name": r.username, "role": r.role} for r in rows]
+    except Exception:
+        return None
+
+
+def db_create_user(user_dict: dict):
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        u = ORMUser(username=user_dict["name"], password_hash=user_dict["password"], role=user_dict.get("role", "user"))
+        db.add(u)
+        db.commit()
+        db.refresh(u)
+        return {"id": u.id, "name": u.username, "role": u.role}
+    except Exception:
+        return None
+
+
+def db_delete_user_by_id(user_id: int):
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
+        if not u:
+            return None
+        out = {"id": u.id, "name": u.username, "role": u.role}
+        db.delete(u)
+        db.commit()
+        return out
+    except Exception:
+        return None
+
+
+def db_update_role(user_id: int, role: str):
+    try:
+        from app.models.user import User as ORMUser
+        db = _get_db_session()
+        if not db:
+            return None
+        u = db.query(ORMUser).filter(ORMUser.id == user_id).first()
+        if not u:
+            return None
+        u.role = role
+        db.commit()
+        return {"id": u.id, "name": u.username, "role": u.role}
+    except Exception:
+        return None
+
+
+def save_users(users: List[dict]) -> None:
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist users.json")
+
+    with _lock:
+        USERS_FILE.write_text(json.dumps(users, indent=4), encoding="utf-8")
+
+
 def _hash_password(password: str) -> str:
     # Use passlib's CryptContext with bcrypt for secure password hashing.
     # passlib handles salts and versioning for bcrypt.
     return pwd_context.hash(password)
 
-
-# ====================================================================
-# DATABASE HELPER FUNCTIONS
-# ====================================================================
-
-def get_or_create_default_shop(db: Session) -> Shop:
-    """Get or create default shop for backward compatibility"""
-    shop = db.query(Shop).first()
-    if not shop:
-        shop = Shop(
-            name="Default Organization",
-            country="NL",
-            address={"street": "", "city": "", "zip": "", "country": "NL"},
-            currency="EUR",
-            invoice_prefix="INV",
-            api_key_hash=hashlib.sha256(b"default").hexdigest(),
-            plan="starter"
-        )
-        db.add(shop)
-        db.commit()
-        db.refresh(shop)
-    return shop
-
-
-def get_user_by_email(db: Session, email: str) -> Optional[DBUser]:
-    """Get user by email"""
-    return db.query(DBUser).filter(DBUser.email == email).first()
-
-
-def get_user_by_id(db: Session, user_id: str) -> Optional[DBUser]:
-    """Get user by ID"""
-    return db.query(DBUser).filter(DBUser.id == user_id).first()
-
-
-def create_user(db: Session, email: str, password_hash: str, role: str, shop_id: str, name: str = None) -> DBUser:
-    """Create a new user in the database"""
-    user = DBUser(
-        email=email,
-        password_hash=password_hash,
-        role=role,
-        shop_id=shop_id,
-        name=name or email.split("@")[0],
-        active=True,
-        email_verified=False,
-        token_version=1
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
-
-def get_invoice_by_id(db: Session, invoice_id: str) -> Optional[DBInvoice]:
-    """Get invoice by ID"""
-    return db.query(DBInvoice).filter(DBInvoice.id == invoice_id).first()
-
-
-def get_invoices_by_shop(db: Session, shop_id: str, skip: int = 0, limit: int = 100) -> List[DBInvoice]:
-    """Get all invoices for a shop"""
-    return db.query(DBInvoice).filter(DBInvoice.shop_id == shop_id).offset(skip).limit(limit).all()
-
-
-def create_customer(db: Session, shop_id: str, name: str, email: str, country: str, address: dict, vat_number: str = None) -> Customer:
-    """Create a new customer"""
-    customer = Customer(
-        shop_id=shop_id,
-        name=name,
-        email=email,
-        country=country,
-        address=address,
-        vat_number=vat_number
-    )
-    db.add(customer)
-    db.commit()
-    db.refresh(customer)
-    return customer
-
-
-def log_event_to_db(db: Session, action: str, shop_id: str = None, actor: str = "-", ip: str = "-", target: str = None, extra_data: dict = None):
-    """Log an event to the audit log table"""
-    try:
-        log = AuditLog(
-            shop_id=shop_id,
-            actor=actor,
-            action=action,
-            target=target,
-            extra_data=extra_data,
-            ip=ip
-        )
-        db.add(log)
-        db.commit()
-    except Exception as e:
-        print(f"[WARN] Failed to log event to database: {e}", file=sys.stderr)
-
-
-# ====================================================================
-# JWT AND AUTH FUNCTIONS
-# ====================================================================
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -670,13 +746,13 @@ async def get_token_payload(token: str = Depends(oauth2_scheme)) -> dict:
     return decode_jwt(token)
 
 
-async def get_current_user(request: Request, db: Session = Depends(get_db)):
+async def get_current_user(request: Request):
     """Resolve the current user from either a Bearer JWT or an API key.
 
     Order of precedence:
     1. Bearer JWT in `Authorization: Bearer <token>`
     2. API key in `X-API-KEY: <key>` or `Authorization: ApiKey <key>`
-    3. Non-production fallback to the first user for local dev convenience
+    3. Non-production fallback to the first user in `users.json` for local dev convenience
     """
     # Try JWT first (Authorization: Bearer ...)
     auth = request.headers.get("authorization") or request.headers.get("Authorization")
@@ -684,17 +760,10 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)):
         token = auth.split(None, 1)[1]
         payload = verify_token(token)
         if payload:
-            email = payload.get("sub")
-            user_db = get_user_by_email(db, email)
-            if user_db:
-                return {
-                    "id": user_db.id,
-                    "name": user_db.name or user_db.email,
-                    "email": user_db.email,
-                    "role": user_db.role,
-                    "shop_id": user_db.shop_id,
-                    "token_version": user_db.token_version
-                }
+            username = payload.get("sub")
+            user = db_get_user(username) or next((u for u in load_users() if u.get("name") == username), None)
+            if user:
+                return user
 
     # Next: accept API keys via X-API-KEY header or Authorization: ApiKey <key>
     api_key = request.headers.get("x-api-key") or request.headers.get("X-API-KEY")
@@ -707,60 +776,56 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)):
     if api_key:
         try:
             key_hash = hashlib.sha256(api_key.encode("utf-8")).hexdigest()
-            # Check database for Shop by API key
-            shop = db.query(Shop).filter(Shop.api_key_hash == key_hash).first()
-            if shop:
-                # Return shop owner (first admin user)
-                user_db = db.query(DBUser).filter(
-                    DBUser.shop_id == shop.id,
-                    DBUser.role == "admin"
-                ).first()
-                if user_db:
-                    return {
-                        "id": user_db.id,
-                        "name": user_db.name or user_db.email,
-                        "email": user_db.email,
-                        "role": user_db.role,
-                        "shop_id": user_db.shop_id,
-                        "token_version": user_db.token_version
-                    }
-            
-            # Fallback to file-based API keys for backward compatibility
+            # First check file-based api_keys store
             keys = load_api_keys()
+            # Primary lookup: SHA256 key hash (preferred)
             row = next((k for k in keys if k.get("key_hash") == key_hash), None)
+            # Backward-compatibility: accept raw `key` field if present in the store
             if not row:
                 row = next((k for k in keys if k.get("key") == api_key), None)
             if row:
                 uid = row.get("user_id")
-                user_db = get_user_by_id(db, uid)
-                if user_db:
-                    return {
-                        "id": user_db.id,
-                        "name": user_db.name or user_db.email,
-                        "email": user_db.email,
-                        "role": user_db.role,
-                        "shop_id": user_db.shop_id,
-                        "token_version": user_db.token_version
-                    }
-        except Exception as e:
-            print(f"[WARN] API key check failed: {e}", file=sys.stderr)
+                # Prefer DB-backed user if available
+                try:
+                    from app.models.user import User as ORMUser
+                    db = _get_db_session()
+                    if db:
+                        u = db.query(ORMUser).filter(ORMUser.id == uid).first()
+                        if u:
+                            return {"id": u.id, "name": u.username, "role": u.role}
+                except Exception:
+                    pass
+                # Fallback to file-based users
+                users = load_users()
+                u = next((x for x in users if x.get("id") == uid), None)
+                if u:
+                    return u
+
+            # Try DB-backed API keys when available (older deployments)
+            try:
+                from app.models.api_key import APIKey as ORMAPIKey
+                db = _get_db_session()
+                if db:
+                    row = db.query(ORMAPIKey).filter(ORMAPIKey.key_hash == key_hash).first()
+                    if row:
+                        try:
+                            from app.models.user import User as ORMUser
+                            u = db.query(ORMUser).filter(ORMUser.id == row.user_id).first()
+                            if u:
+                                return {"id": u.id, "name": u.username, "role": u.role}
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     # Development fallback: allow local dev convenience when not in production
     if not IS_PROD:
-        # Try to get first user from database
-        user_db = db.query(DBUser).first()
-        if user_db:
-            return {
-                "id": user_db.id,
-                "name": user_db.name or user_db.email,
-                "email": user_db.email,
-                "role": user_db.role,
-                "shop_id": user_db.shop_id,
-                "token_version": user_db.token_version
-            }
-        # Create a dev user if none exists
-        shop = get_or_create_default_shop(db)
-        return {"id": "dev", "name": "dev", "email": "dev@localhost", "role": "admin", "shop_id": shop.id, "token_version": 1}
+        users = load_users()
+        if users:
+            return users[0]
+        return {"id": 0, "name": "dev", "role": "user"}
 
     # No auth found
     raise HTTPException(status_code=401, detail="Invalid or expired token or API key")
@@ -799,49 +864,28 @@ async def health_check():
 
 
 @app.get("/users", response_model=List[PublicUser])
-async def list_users(
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """List all users in the current user's shop"""
-    shop_id = current_user.get("shop_id")
-    users = db.query(DBUser).filter(DBUser.shop_id == shop_id).all()
-    return [
-        {
-            "id": str(u.id),
-            "name": u.name or u.email,
-            "email": u.email,
-            "role": u.role
-        }
-        for u in users
-    ]
+async def list_users(current_user: dict = Depends(get_current_user)):
+    users = db_list_users()
+    if users is None:
+        users = load_users()
+    # Hide password hashes from responses
+    return [{"id": u["id"], "name": u["name"], "role": u.get("role", "user")} for u in users]
 
 
 @app.get("/users/{user_id}", response_model=PublicUser)
-async def get_user(
-    user_id: str,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
+async def get_user(user_id: int, current_user: dict = Depends(get_current_user)):
     """Return a single public user by id. 404 if not found."""
-    user = get_user_by_id(db, user_id)
-    if not user or user.shop_id != current_user.get("shop_id"):
+    users = db_list_users()
+    if users is None:
+        users = load_users()
+    user = next((u for u in users if u["id"] == user_id), None)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return {
-        "id": str(user.id),
-        "name": user.name or user.email,
-        "email": user.email,
-        "role": user.role
-    }
+    return {"id": user["id"], "name": user["name"], "role": user.get("role", "user")}
 
 
 @app.post("/users", response_model=PublicUser, status_code=201)
-async def add_user(
-    user: User,
-    admin: dict = Depends(require_admin),
-    db: Session = Depends(get_db)
-):
-    """Create a new user in the system"""
+async def add_user(user: User, admin: dict = Depends(require_admin)):
     # Enforce bcrypt byte-length limit on password (UTF-8 bytes)
     pw_bytes = user.password.encode("utf-8")
     if len(pw_bytes) > BCRYPT_MAX_BYTES:
@@ -860,41 +904,32 @@ async def add_user(
     except Exception:
         raise HTTPException(status_code=500, detail="Error processing password")
 
-    # Check if user with this email already exists
-    existing = get_user_by_email(db, user.name)  # Using name as email for now
-    if existing:
-        raise HTTPException(status_code=400, detail="User already exists")
+    # Try to create user in DB first
+    created = db_create_user({"name": user.name, "password": hashed, "role": user.role})
+    if created:
+        return {"id": created["id"], "name": created["name"], "role": created.get("role", "user")}
 
-    # Create new user in the same shop as admin
-    shop_id = admin.get("shop_id")
-    new_user = create_user(
-        db=db,
-        email=user.name,  # Using name as email for backward compatibility
-        password_hash=hashed,
-        role=user.role,
-        shop_id=shop_id,
-        name=user.name
-    )
+    # Fallback to file-based store
+    users = load_users()
+    if any(u["id"] == user.id for u in users):
+        raise HTTPException(status_code=400, detail="User id already exists")
+    if any(u["name"] == user.name for u in users):
+        raise HTTPException(status_code=400, detail="User name already exists")
 
-    return {
-        "id": str(new_user.id),
-        "name": new_user.name,
-        "email": new_user.email,
-        "role": new_user.role
-    }
+    new_user = {"id": user.id, "name": user.name, "password": hashed, "role": user.role}
+    users.append(new_user)
+    save_users(users)
+    return {"id": new_user["id"], "name": new_user["name"], "role": new_user.get("role", "user")}
 
 
 @app.post("/register")
-async def register_merchant(
-    payload: dict = Body(...),
-    db: Session = Depends(get_db)
-):
+async def register_merchant(payload: dict = Body(...)):
     """Public endpoint for merchant self-registration."""
     name = payload.get("name", "").strip()
     email = payload.get("email", "").strip()
     password = payload.get("password", "").strip()
     business_name = payload.get("business_name", "").strip()
-    country = payload.get("country", "NL").strip().upper()
+    country = payload.get("country", "NL").strip().upper()  # Country code for VAT calculation
 
     if not name or not email or not password:
         raise HTTPException(status_code=400, detail="Username, email, and password are required")
@@ -923,55 +958,14 @@ async def register_merchant(
         raise HTTPException(status_code=500, detail="Error processing password")
 
     # Check for existing user
-    existing = get_user_by_email(db, email)
-    if existing:
+    users = load_users()
+    if any(u["name"] == name for u in users):
+        raise HTTPException(status_code=400, detail="Username already exists")
+    if any(u.get("email") == email for u in users):
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Create new shop for merchant
-    import secrets
-    api_key = secrets.token_urlsafe(32)
-    api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-    
-    shop = Shop(
-        name=business_name or name,
-        country=country,
-        address={"street": "", "city": "", "zip": "", "country": country},
-        currency="EUR",
-        invoice_prefix="INV",
-        api_key_hash=api_key_hash,
-        plan="starter",
-        email=email
-    )
-    db.add(shop)
-    db.flush()
-
-    # Create merchant user
-    user = create_user(
-        db=db,
-        email=email,
-        password_hash=hashed,
-        role="merchant",
-        shop_id=shop.id,
-        name=name
-    )
-
-    # Auto-login: generate access token
-    access_token = create_access_token(
-        data={"sub": email, "role": "merchant"}
-    )
-
-    log_event_to_db(db, "USER_REGISTERED", shop_id=shop.id, actor=email)
-
-    return {
-        "message": "Registration successful",
-        "access_token": access_token,
-        "token_type": "bearer",
-        "merchant_id": str(user.id),
-        "shop_id": str(shop.id),
-        "email": email,
-        "country": country,
-        "api_key": api_key  # Return once for the merchant to save
-    }
+    # Generate new ID
+    new_id = max([u["id"] for u in users], default=0) + 1
 
     # Create new user with merchant role
     new_user = {
@@ -1006,10 +1000,8 @@ async def register_merchant(
 async def login_for_access_token(
     request: Request,
     response: Response,
-    login: LoginRequest = Body(...),
-    db: Session = Depends(get_db)
+    login: LoginRequest = Body(...)
 ):
-    """Login endpoint - supports email or username"""
     # Get the identifier (username or email, whichever is provided)
     try:
         identifier = login.get_identifier()
@@ -1024,48 +1016,43 @@ async def login_for_access_token(
 
     ip = get_client_ip(request)
 
-    # Try to find user by email or name
+    users = load_users()
+    # Search by username or email
     user = None
-    if login.email:
-        user = get_user_by_email(db, login.email)
-    elif login.name:
-        # Try as email first, then as name
-        user = get_user_by_email(db, login.name)
-        if not user:
-            user = db.query(DBUser).filter(DBUser.name == login.name).first()
+    if login.name:
+        user = next((u for u in users if u["name"] == login.name), None)
+    elif login.email:
+        user = next((u for u in users if u.get("email") == login.email), None)
 
-    if not user:
-        log_event("LOGIN_FAIL", identifier, ip)
-        register_failed_attempt(identifier, ip)
-        raise HTTPException(status_code=401, detail="Invalid username/email or password")
-
-    # Verify password
+    stored_pw = user.get("password") if user else None
     valid = False
-    try:
-        valid = pwd_context.verify(login.password, user.password_hash)
-    except Exception:
-        valid = False
+    if stored_pw and isinstance(stored_pw, str) and stored_pw.startswith("sha256$"):
+        try:
+            import hashlib as _hl
+            valid = _hl.sha256(login.password.encode("utf-8")).hexdigest() == stored_pw.split("sha256$", 1)[1]
+        except Exception:
+            valid = False
+    else:
+        try:
+            valid = bool(stored_pw and pwd_context.verify(login.password, stored_pw))
+        except Exception:
+            valid = False
 
-    if not valid:
+    if not user or not valid:
         log_event("LOGIN_FAIL", identifier, ip)
-        register_failed_attempt(identifier, ip)
+        register_failed_attempt(identifier)
         raise HTTPException(status_code=401, detail="Invalid username/email or password")
 
     clear_attempts(identifier)
 
-    # Update last login
-    user.last_login_at = datetime.now(timezone.utc)
-    user.last_login_ip = ip
-    db.commit()
-
     access_token = create_access_token(
-        data={"sub": user.email, "role": user.role, "token_version": user.token_version}
+        data={"sub": user["name"], "role": user.get("role", "user")}
     )
     refresh_token = create_refresh_token(
-        data={"sub": user.email, "role": user.role, "token_version": user.token_version}
+        data={"sub": user["name"], "role": user.get("role", "user")}
     )
 
-    # Store refresh token in HttpOnly cookie
+    # 🔐 Store refresh token in HttpOnly cookie
     response.set_cookie(
         key=COOKIE_NAME,
         value=refresh_token,
@@ -1077,16 +1064,14 @@ async def login_for_access_token(
     )
 
     # Audit successful login
-    log_event("LOGIN_SUCCESS", user.email, ip)
-    log_event_to_db(db, "LOGIN_SUCCESS", shop_id=user.shop_id, actor=user.email, ip=ip)
+    log_event("LOGIN_SUCCESS", user["name"], ip)
 
-    # Return canonical auth response
+    # Return canonical auth response including merchant identity
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "merchant_id": str(user.id),
-        "shop_id": str(user.shop_id),
-        "email": user.email,
+        "merchant_id": user.get("id"),
+        "email": user.get("email") if isinstance(user, dict) else None,
     }
 
 
@@ -1199,6 +1184,7 @@ async def delete_user(user_id: int, admin: dict = Depends(require_admin)):
 
 
 # --- Invoice PDF endpoint (simple generator) ---
+from typing import Optional
 import io
 import logging
 from fpdf import FPDF
