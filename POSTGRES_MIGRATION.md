@@ -3,6 +3,20 @@
 ## Overview
 This document describes the migration from JSON file-based storage to PostgreSQL for the mijn_api FastAPI application.
 
+## ⚠️ Breaking Changes
+
+### UUID IDs
+**IMPORTANT:** User IDs have changed from integers to UUID strings.
+- Before: `{"id": 123, "name": "John"}`
+- After: `{"id": "550e8400-e29b-41d4-a716-446655440000", "name": "John"}`
+
+**Impact:** API clients must update to handle string IDs instead of integers.
+
+**Migration Path:**
+1. Update client code to accept string IDs
+2. Test against development environment
+3. Deploy to production during maintenance window
+
 ## What Has Been Migrated
 
 ### ✅ Completed
@@ -249,7 +263,7 @@ DATABASE_URL=postgresql://user:pass@host:5432/dbname
 JWT_SECRET_KEY=your-secret-key-here
 
 # Optional
-SQL_ECHO=true  # Enable SQL query logging for debugging
+SQL_ECHO=true  # Enable SQL query logging for debugging (⚠️ NEVER use in production! Exposes sensitive data and impacts performance)
 DATA_DIR=/path/to/data  # For PDF storage
 ```
 

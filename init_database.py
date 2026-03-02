@@ -5,6 +5,8 @@ Run this once to create tables and migrate existing JSON data
 """
 import os
 import sys
+import secrets
+import hashlib
 from pathlib import Path
 
 # Add parent directory to path
@@ -17,7 +19,6 @@ from db_migration_helpers import (
     migrate_invoices_from_json,
     get_or_create_default_customer
 )
-import hashlib
 
 
 def main():
@@ -37,7 +38,6 @@ def main():
         if not shop:
             print("📦 Creating default shop...")
             # Generate API key
-            import secrets
             api_key = secrets.token_urlsafe(32)
             api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
             
