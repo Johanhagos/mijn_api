@@ -274,12 +274,18 @@ if not DATA_DIR.exists():
 INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
 
 # Legacy file paths (kept for backward compatibility with existing code)
+USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
+INVOICES_FILE = DATA_DIR / "invoices.json"
 SESSIONS_FILE = DATA_DIR / "sessions.json"
 API_KEYS_FILE = DATA_DIR / "api_keys.json"
 
 # Detect read-only filesystem state
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
+
+# Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
+import threading
+_lock = threading.Lock()
 
 # passlib CryptContext configured for bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -470,6 +476,20 @@ class OneComWebhookPayload(BaseModel):
     payload: dict = {}
 
 
+def _ensure_users_file() -> None:
+    if READ_ONLY_FS:
+        return
+    if not USERS_FILE.exists():
+        USERS_FILE.write_text("[]", encoding="utf-8")
+
+
+def _ensure_invoices_file() -> None:
+    if READ_ONLY_FS:
+        return
+    if not INVOICES_FILE.exists():
+        INVOICES_FILE.write_text("[]", encoding="utf-8")
+
+
 def _ensure_api_keys_file() -> None:
     if READ_ONLY_FS:
         return
@@ -482,6 +502,50 @@ def _ensure_sessions_file() -> None:
         return
     if not SESSIONS_FILE.exists():
         SESSIONS_FILE.write_text("[]", encoding="utf-8")
+
+
+def load_users() -> List[dict]:
+    """Load users from legacy JSON file (backward compatibility)"""
+    _ensure_users_file()
+    try:
+        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return []
+
+
+def save_users(users: List[dict]) -> None:
+    """Save users to legacy JSON file (backward compatibility)"""
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist users.json")
+    with _lock:
+        USERS_FILE.write_text(json.dumps(users, indent=4), encoding="utf-8")
+
+
+def load_invoices() -> List[dict]:
+    """Load invoices from legacy JSON file (backward compatibility)"""
+    _ensure_invoices_file()
+    try:
+        return json.loads(INVOICES_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_invoices(invoices: List[dict]) -> None:
+    """Save invoices to legacy JSON file (backward compatibility)"""
+    if READ_ONLY_FS:
+        raise RuntimeError("Filesystem is read-only; cannot persist invoices.json")
+    with _lock:
+        INVOICES_FILE.write_text(json.dumps(invoices, indent=4), encoding="utf-8")
+
+
+def db_get_user(username: str):
+    """Return a user dict from the database, or None if user not found (legacy)"""
+    return None
+
+
+def db_delete_user_by_id(user_id: int):
+    """Delete user by ID (legacy stub)"""
+    return None
 
 
 def load_api_keys() -> List[dict]:
@@ -506,21 +570,24 @@ def save_api_keys(keys: List[dict]) -> None:
     """Save API keys to legacy JSON file (backward compatibility)"""
     if READ_ONLY_FS:
         raise RuntimeError("Filesystem is read-only; cannot persist api_keys.json")
-    API_KEYS_FILE.write_text(json.dumps(keys, indent=4), encoding="utf-8")
+    with _lock:
+        API_KEYS_FILE.write_text(json.dumps(keys, indent=4), encoding="utf-8")
 
 
 def save_sessions(sessions: List[dict]) -> None:
     """Save sessions to legacy JSON file (backward compatibility)"""
     if READ_ONLY_FS:
         raise RuntimeError("Filesystem is read-only; cannot persist sessions.json")
-    SESSIONS_FILE.write_text(json.dumps(sessions, indent=4), encoding="utf-8")
+    with _lock:
+        SESSIONS_FILE.write_text(json.dumps(sessions, indent=4), encoding="utf-8")
 
 
 def ensure_invoice_pdf_dir() -> None:
     if READ_ONLY_FS:
         return
-    if not INVOICE_PDF_DIR.exists():
-        INVOICE_PDF_DIR.mkdir(parents=True, exist_ok=True)
+    with _lock:
+        if not INVOICE_PDF_DIR.exists():
+            INVOICE_PDF_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def _hash_password(password: str) -> str:
@@ -1112,7 +1179,8 @@ async def forgot_password(request: Request, payload: dict = Body(...)):
 
 
 @app.post("/refresh")
-async def refresh_access_token(request: Request):
+async def refresh_access_token(request: Request, db: Session = Depends(get_db)):
+    """Refresh access token with token rotation and validation."""
     ip = get_client_ip(request)
     refresh_token = request.cookies.get(COOKIE_NAME)
     if not refresh_token:
@@ -1120,23 +1188,282 @@ async def refresh_access_token(request: Request):
 
     try:
         payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        role: str = payload.get("role")
-        if username is None:
+        email: str = payload.get("sub")
+        token_version: int = payload.get("token_version", 1)
+        if email is None:
             raise HTTPException(status_code=401, detail="Invalid refresh token")
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    users = load_users()
-    user = next((u for u in users if u["name"] == username), None)
+    # Get user from database
+    user = get_user_by_email(db, email)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
-
+    
+    # Validate token version (invalidate all tokens on password change)
+    if user.token_version != token_version:
+        raise HTTPException(status_code=401, detail="Token has been invalidated")
+    
+    # Check if refresh token exists in database and is valid
+    token_hash = hashlib.sha256(refresh_token.encode()).hexdigest()
+    db_refresh_token = db.query(RefreshToken).filter(
+        RefreshToken.token_hash == token_hash,
+        RefreshToken.user_id == user.id,
+        RefreshToken.valid.is_(True)
+    ).first()
+    
+    if not db_refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token not found or invalid")
+    
+    # Check if token is expired
+    if db_refresh_token.expires_at < datetime.now(timezone.utc):
+        db_refresh_token.valid = False
+        db.commit()
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    
+    # Invalidate old refresh token (rotation)
+    db_refresh_token.valid = False
+    db_refresh_token.revoked_at = datetime.now(timezone.utc)
+    db_refresh_token.revoked_reason = "rotated"
+    
+    # Create new access token
     new_access_token = create_access_token(
-        data={"sub": username, "role": role or user.get("role", "user")}
+        data={"sub": user.email, "role": user.role, "token_version": user.token_version}
     )
+    
+    # Create new refresh token
+    new_refresh_token = create_refresh_token(
+        data={"sub": user.email, "role": user.role, "token_version": user.token_version}
+    )
+    new_refresh_token_hash = hashlib.sha256(new_refresh_token.encode()).hexdigest()
+    
+    new_db_refresh_token = RefreshToken(
+        user_id=user.id,
+        token_hash=new_refresh_token_hash,
+        token_version=user.token_version,
+        valid=True,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS),
+        ip_address=ip,
+        user_agent=request.headers.get("user-agent")
+    )
+    db.add(new_db_refresh_token)
+    db.commit()
+    
+    # Set new refresh token cookie
+    response = JSONResponse({
+        "access_token": new_access_token,
+        "token_type": "bearer"
+    })
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=new_refresh_token,
+        httponly=True,
+        secure=COOKIE_SECURE,
+        samesite=COOKIE_SAMESITE,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
+    )
+    
+    log_event_to_db(db, "TOKEN_REFRESHED", shop_id=user.shop_id, actor=user.email, ip=ip)
+    
+    return response
 
-    return {"access_token": new_access_token, "token_type": "bearer"}
+
+@app.post("/auth/send-verification-email")
+async def send_verification_email(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Send email verification link. Creates EmailVerification record."""
+    email = payload.get("email", "").strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
+    user = get_user_by_email(db, email)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.email_verified:
+        return {"message": "Email already verified"}
+    
+    # Generate cryptographically secure verification token
+    import secrets
+    token = secrets.token_urlsafe(32)
+    
+    # Create verification record
+    verification = EmailVerification(
+        user_id=user.id,
+        token=token,
+        verified=False,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7)
+    )
+    db.add(verification)
+    db.commit()
+    
+    # In production, send actual email here
+    # For now, return the token (dev only)
+    verification_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/verify-email?token={token}"
+    
+    log_event_to_db(db, "EMAIL_VERIFICATION_SENT", shop_id=user.shop_id, actor=user.email)
+    
+    if IS_PROD:
+        return {"message": "Verification email sent"}
+    else:
+        return {"message": "Verification email sent", "token": token, "url": verification_url}
+
+
+@app.post("/auth/verify-email")
+async def verify_email(
+    payload: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Verify email using token. Updates User.email_verified."""
+    token = payload.get("token", "").strip()
+    if not token:
+        raise HTTPException(status_code=400, detail="Token is required")
+    
+    # Find verification record
+    verification = db.query(EmailVerification).filter(
+        EmailVerification.token == token,
+        EmailVerification.verified.is_(False)
+    ).first()
+    
+    if not verification:
+        raise HTTPException(status_code=404, detail="Invalid or already used verification token")
+    
+    # Check if expired
+    if verification.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Verification token expired")
+    
+    # Mark as verified
+    verification.verified = True
+    verification.verified_at = datetime.now(timezone.utc)
+    
+    # Update user
+    user = get_user_by_id(db, verification.user_id)
+    if user:
+        user.email_verified = True
+        user.email_verified_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    
+    log_event_to_db(db, "EMAIL_VERIFIED", shop_id=user.shop_id if user else None, actor=user.email if user else "unknown")
+    
+    return {"message": "Email verified successfully"}
+
+
+@app.post("/auth/request-password-reset")
+async def request_password_reset(
+    payload: dict = Body(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Request password reset. Creates PasswordReset record and sends email."""
+    email = payload.get("email", "").strip()
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    
+    user = get_user_by_email(db, email)
+    if not user:
+        # Don't reveal if user exists (security best practice)
+        return {"message": "If the email exists, a password reset link has been sent"}
+    
+    ip = get_client_ip(request) if request else "unknown"
+    
+    # Generate cryptographically secure reset token
+    import secrets
+    token = secrets.token_urlsafe(32)
+    
+    # Create password reset record
+    reset = PasswordReset(
+        user_id=user.id,
+        token=token,
+        used=False,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=1),  # 1 hour expiry
+        ip_address=ip
+    )
+    db.add(reset)
+    db.commit()
+    
+    # In production, send actual email here
+    reset_url = f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/reset-password?token={token}"
+    
+    log_event_to_db(db, "PASSWORD_RESET_REQUESTED", shop_id=user.shop_id, actor=user.email, ip=ip)
+    
+    if IS_PROD:
+        return {"message": "If the email exists, a password reset link has been sent"}
+    else:
+        return {"message": "Password reset link generated", "token": token, "url": reset_url}
+
+
+@app.post("/auth/reset-password")
+async def reset_password(
+    payload: dict = Body(...),
+    request: Request = None,
+    db: Session = Depends(get_db)
+):
+    """Reset password using token. Validates token, updates password, increments token_version."""
+    token = payload.get("token", "").strip()
+    new_password = payload.get("password", "").strip()
+    
+    if not token or not new_password:
+        raise HTTPException(status_code=400, detail="Token and password are required")
+    
+    # Validate password length
+    if len(new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    
+    pw_bytes = new_password.encode("utf-8")
+    if len(pw_bytes) > BCRYPT_MAX_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Password is too long: bcrypt limits passwords to {BCRYPT_MAX_BYTES} bytes when encoded as UTF-8"
+        )
+    
+    # Find password reset record
+    reset = db.query(PasswordReset).filter(
+        PasswordReset.token == token,
+        PasswordReset.used.is_(False)
+    ).first()
+    
+    if not reset:
+        raise HTTPException(status_code=404, detail="Invalid or already used reset token")
+    
+    # Check if expired
+    if reset.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reset token expired")
+    
+    # Get user
+    user = get_user_by_id(db, reset.user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    ip = get_client_ip(request) if request else "unknown"
+    
+    # Update password
+    user.password_hash = pwd_context.hash(new_password)
+    
+    # Increment token version to invalidate all existing tokens
+    user.token_version += 1
+    
+    # Mark reset as used
+    reset.used = True
+    reset.used_at = datetime.now(timezone.utc)
+    
+    # Invalidate all refresh tokens for this user
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id == user.id,
+        RefreshToken.valid.is_(True)
+    ).update({
+        "valid": False,
+        "revoked_at": datetime.now(timezone.utc),
+        "revoked_reason": "password_reset"
+    })
+    
+    db.commit()
+    
+    log_event_to_db(db, "PASSWORD_RESET_COMPLETED", shop_id=user.shop_id, actor=user.email, ip=ip)
+    
+    return {"message": "Password reset successfully"}
 
 
 @app.get("/protected")
@@ -1616,8 +1943,21 @@ async def invoice_pdf(req: InvoicePDFRequest):
 
 
 # ========== INVOICE NUMBERING HELPERS ==========
+def get_next_invoice_number_from_db(db: Session, shop_id: str, invoice_prefix: str = "INV") -> str:
+    """Get next sequential invoice number using database atomic increment."""
+    shop = db.query(Shop).filter(Shop.id == shop_id).with_for_update().first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
+    
+    shop.last_invoice_number += 1
+    db.commit()
+    
+    year = datetime.now(timezone.utc).year
+    return f"{invoice_prefix}-{year}-{shop.last_invoice_number:04d}"
+
+
 def get_next_invoice_number(merchant_id: int = None) -> str:
-    """Get next sequential invoice number (e.g., INV-2026-0001)."""
+    """Legacy: Get next sequential invoice number (e.g., INV-2026-0001)."""
     invoices = load_invoices()
     year = datetime.now(timezone.utc).year
     
@@ -1674,17 +2014,19 @@ def create_credit_note_number(merchant_id: int = None) -> str:
 
 
 @app.post("/invoices", response_model=InvoiceOut, status_code=201)
-async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(get_current_user)):
+async def create_invoice(
+    payload: InvoiceCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Create and persist an invoice with automatic numbering and VAT calculation."""
-    import uuid
+    shop_id = current_user.get("shop_id")
+    user_id = current_user.get("id")
     
-    invoices = load_invoices()
-    
-    # Generate unique ID
-    unique_id = str(uuid.uuid4())
-    
-    # Auto-generate invoice number if not provided
-    invoice_number = payload.invoice_number or get_next_invoice_number()
+    # Validate shop exists
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
     
     def _to_number(value, default=0.0):
         try:
@@ -1693,7 +2035,7 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
             return float(str(value).strip())
         except (ValueError, TypeError):
             return default
-
+    
     # Normalize items and calculate subtotal
     items = payload.items or []
     normalized_items = []
@@ -1707,7 +2049,7 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
             "unit_price": unit_price,
             "amount": round(amount, 2),
         })
-
+    
     subtotal = payload.subtotal
     if subtotal is None:
         subtotal = sum(i.get("amount", 0) for i in normalized_items)
@@ -1716,264 +2058,421 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
     # Determine VAT rate
     vat_rate = 0.0
     if payload.buyer_type == "B2B" and payload.buyer_vat:
-        # B2B with VAT number: reverse charge (0% VAT)
         vat_rate = 0.0
     elif payload.vat_rate is not None:
         vat_rate = payload.vat_rate
     else:
-        # Default: 21% VAT (adjustable by merchant later)
         vat_rate = 21.0
     
     vat_amount, total = calculate_vat(subtotal, vat_rate)
     
-    # If user provided vat_amount, use it (for special cases)
     if payload.vat_amount is not None:
         vat_amount = payload.vat_amount
         total = subtotal + vat_amount
     
-    # If user provided total, recalculate vat_amount
     if payload.total is not None:
         total = payload.total
         vat_amount = total - subtotal
-
-    inv = {
-        "id": unique_id,
-        "invoice_number": invoice_number,
-        "order_number": payload.order_number,
-        "seller_name": payload.seller_name,
-        "seller_vat": payload.seller_vat,
-        "seller_address": payload.seller_address,
-        "seller_country": payload.seller_country,
-        "buyer_name": payload.buyer_name,
-        "buyer_vat": payload.buyer_vat,
-        "buyer_address": payload.buyer_address,
-        "buyer_country": payload.buyer_country,
-        "buyer_type": payload.buyer_type,
-        "date_issued": payload.date_issued or datetime.now(timezone.utc).date().isoformat(),
-        "due_date": payload.due_date,
-        "items": normalized_items,
-        "subtotal": round(subtotal, 2),
-        "vat_rate": vat_rate,
-        "vat_amount": round(vat_amount, 2),
-        "total": round(total, 2),
-        "payment_system": payload.payment_system or "web2",
-        "blockchain_tx_id": payload.blockchain_tx_id,
-        "description": payload.description,
-        "notes": payload.notes,
-        "status": payload.status or "issued",
-        "merchant_logo_url": payload.merchant_logo_url,
-        "created_by": current_user.get("name"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-    invoices.append(inv)
-    try:
-        save_invoices(invoices)
-    except RuntimeError:
-        # Filesystem read-only: continue without persistence (in-memory only)
-        pass
-
-    # Generate and store PDF if possible
-    pdf_url = None
-    try:
-        pdf_req = InvoicePDFRequest(
-            logo_url=inv.get("merchant_logo_url"),
-            invoice_number=inv["invoice_number"],
-            invoice_date=inv.get("date_issued"),
-            seller=inv["seller_name"],
-            seller_vat=inv.get("seller_vat"),
-            seller_address=inv.get("seller_address"),
-            seller_country=inv.get("seller_country"),
-            buyer=inv["buyer_name"],
-            buyer_vat=inv.get("buyer_vat"),
-            buyer_address=inv.get("buyer_address"),
-            buyer_country=inv.get("buyer_country"),
-            buyer_type=inv.get("buyer_type"),
-            description=inv.get("description") or (normalized_items[0].get("description") if normalized_items else ""),
-            quantity=normalized_items[0].get("quantity", 1) if normalized_items else 1,
-            unit_price=normalized_items[0].get("unit_price", 0) if normalized_items else 0,
-            net_amount=inv["subtotal"],
-            vat_amount=inv["vat_amount"],
-            vat_rate=vat_rate,
-            total_amount=inv["total"],
-            payment_system=inv.get("payment_system", "web2"),
-            blockchain_tx_id=inv.get("blockchain_tx_id"),
-        )
-
-        pdf_bytes = render_invoice_pdf(pdf_req)
-        ensure_invoice_pdf_dir()
-        if not READ_ONLY_FS and INVOICE_PDF_DIR.exists():
-            pdf_path = INVOICE_PDF_DIR / f"invoice-{unique_id}.pdf"
-            pdf_path.write_bytes(pdf_bytes)
-            pdf_url = str(pdf_path)
-    except Exception as e:
-        logger = logging.getLogger("uvicorn.error")
-        logger.exception("Error generating invoice PDF")
-        pdf_url = None
-
-    inv["pdf_url"] = pdf_url
     
-    # Update saved invoice with PDF URL
-    invoices[-1] = inv
+    # Get or create customer
+    customer = db.query(Customer).filter(
+        Customer.shop_id == shop_id,
+        Customer.name == payload.buyer_name
+    ).first()
+    
+    if not customer:
+        customer = Customer(
+            shop_id=shop_id,
+            name=payload.buyer_name,
+            email=None,
+            vat_number=payload.buyer_vat,
+            address={
+                "street": payload.buyer_address or "",
+                "city": "",
+                "zip": "",
+                "country": payload.buyer_country or ""
+            },
+            country=payload.buyer_country or "NL"
+        )
+        db.add(customer)
+        db.flush()
+    
+    # Get next invoice number atomically
+    invoice_number = payload.invoice_number or get_next_invoice_number_from_db(db, shop_id, shop.invoice_prefix)
+    
+    # If custom invoice number provided, check uniqueness
+    if payload.invoice_number:
+        existing = db.query(DBInvoice).filter(
+            DBInvoice.shop_id == shop_id,
+            DBInvoice.invoice_number == payload.invoice_number
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail=f"Invoice number {payload.invoice_number} already exists")
+    
+    # Parse dates with error handling
     try:
-        save_invoices(invoices)
-    except RuntimeError:
-        pass
-
+        issue_date_str = payload.date_issued or datetime.now(timezone.utc).date().isoformat()
+        issue_date = datetime.fromisoformat(issue_date_str) if isinstance(issue_date_str, str) else issue_date_str
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format for issue_date. Use ISO format (YYYY-MM-DD)")
+    
+    due_date = None
+    if payload.due_date:
+        try:
+            due_date = datetime.fromisoformat(payload.due_date) if isinstance(payload.due_date, str) else payload.due_date
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format for due_date. Use ISO format (YYYY-MM-DD)")
+    else:
+        due_date = issue_date + timedelta(days=30)
+    
+    # Create invoice
+    invoice = DBInvoice(
+        shop_id=shop_id,
+        customer_id=customer.id,
+        invoice_number=invoice_number,
+        status=payload.status or "DRAFT",
+        issue_date=issue_date,
+        due_date=due_date,
+        subtotal=Decimal(str(round(subtotal, 2))),
+        vat_total=Decimal(str(round(vat_amount, 2))),
+        total=Decimal(str(round(total, 2))),
+        currency=shop.currency,
+        finalized=False
+    )
+    db.add(invoice)
+    db.flush()
+    
+    # Create invoice items
+    for item_data in normalized_items:
+        qty = int(item_data.get("quantity", 1))
+        unit_price_val = Decimal(str(item_data.get("unit_price", 0)))
+        item_vat_rate = Decimal(str(item_data.get("vat_rate", vat_rate)))
+        
+        item_subtotal = unit_price_val * qty
+        item_vat = item_subtotal * (item_vat_rate / 100)
+        item_total = item_subtotal + item_vat
+        
+        invoice_item = InvoiceItem(
+            invoice_id=invoice.id,
+            product_name=item_data.get("description", "Item"),
+            description=item_data.get("description"),
+            quantity=qty,
+            unit_price=unit_price_val,
+            vat_rate=item_vat_rate,
+            subtotal=item_subtotal,
+            vat_amount=item_vat,
+            total=item_total
+        )
+        db.add(invoice_item)
+    
+    # Create initial history record
+    history = InvoiceHistory(
+        invoice_id=invoice.id,
+        changed_by=user_id,
+        change_type="created",
+        snapshot={
+            "invoice_number": invoice_number,
+            "status": invoice.status,
+            "subtotal": float(invoice.subtotal),
+            "vat_total": float(invoice.vat_total),
+            "total": float(invoice.total),
+            "items": normalized_items
+        }
+    )
+    db.add(history)
+    
+    # Commit transaction
+    db.commit()
+    db.refresh(invoice)
+    
+    # Log audit event
+    log_event_to_db(db, "INVOICE_CREATED", shop_id=shop_id, actor=current_user.get("email"), target=invoice.id)
+    
     return InvoiceOut(
-        id=inv["id"],
-        invoice_number=inv["invoice_number"],
-        order_number=inv.get("order_number"),
-        seller_name=inv["seller_name"],
-        seller_address=inv.get("seller_address"),
-        seller_vat=inv.get("seller_vat"),
-        buyer_name=inv["buyer_name"],
-        buyer_address=inv.get("buyer_address"),
-        buyer_vat=inv.get("buyer_vat"),
-        buyer_type=inv.get("buyer_type"),
-        subtotal=inv["subtotal"],
-        vat_rate=inv.get("vat_rate"),
-        vat_amount=inv["vat_amount"],
-        total=inv["total"],
-        payment_system=inv.get("payment_system"),
-        blockchain_tx_id=inv.get("blockchain_tx_id"),
-        pdf_url=inv.get("pdf_url"),
-        status=inv.get("status"),
-        created_at=inv.get("created_at"),
-        due_date=inv.get("due_date"),
-        notes=inv.get("notes"),
-        merchant_logo_url=inv.get("merchant_logo_url"),
+        id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        order_number=payload.order_number,
+        seller_name=shop.name,
+        seller_address=shop.address.get("street", "") if isinstance(shop.address, dict) else "",
+        seller_vat=shop.vat_number,
+        buyer_name=customer.name,
+        buyer_address=payload.buyer_address,
+        buyer_vat=customer.vat_number,
+        buyer_type=payload.buyer_type,
+        subtotal=float(invoice.subtotal),
+        vat_rate=vat_rate,
+        vat_amount=float(invoice.vat_total),
+        total=float(invoice.total),
+        payment_system=payload.payment_system,
+        blockchain_tx_id=payload.blockchain_tx_id,
+        pdf_url=None,
+        status=invoice.status,
+        created_at=invoice.created_at.isoformat() if invoice.created_at else None,
+        due_date=invoice.due_date.isoformat() if invoice.due_date else None,
+        notes=payload.notes,
+        merchant_logo_url=payload.merchant_logo_url
     )
 
 
 @app.get("/invoices", response_model=List[InvoiceOut])
-async def list_invoices(current_user: dict = Depends(get_current_user)):
-    invoices = load_invoices()
-    return [InvoiceOut(**{
-        "id": inv.get("id"),
-        "invoice_number": inv.get("invoice_number"),
-        "order_number": inv.get("order_number"),
-        "seller_name": inv.get("seller_name"),
-        "seller_address": inv.get("seller_address"),
-        "seller_vat": inv.get("seller_vat"),
-        "buyer_name": inv.get("buyer_name"),
-        "buyer_address": inv.get("buyer_address"),
-        "buyer_vat": inv.get("buyer_vat"),
-        "buyer_type": inv.get("buyer_type"),
-        "subtotal": inv.get("subtotal", 0),
-        "vat_rate": inv.get("vat_rate"),
-        "vat_amount": inv.get("vat_amount", 0),
-        "total": inv.get("total", 0),
-        "payment_system": inv.get("payment_system"),
-        "blockchain_tx_id": inv.get("blockchain_tx_id"),
-        "pdf_url": inv.get("pdf_url"),
-        "status": inv.get("status", "issued"),
-        "created_at": inv.get("created_at"),
-        "due_date": inv.get("due_date"),
-        "notes": inv.get("notes"),
-        "merchant_logo_url": inv.get("merchant_logo_url"),
-    }) for inv in invoices]
+async def list_invoices(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List all invoices for the current user's shop."""
+    shop_id = current_user.get("shop_id")
+    
+    invoices = db.query(DBInvoice).filter(DBInvoice.shop_id == shop_id).order_by(DBInvoice.created_at.desc()).all()
+    
+    result = []
+    for inv in invoices:
+        customer = db.query(Customer).filter(Customer.id == inv.customer_id).first()
+        shop = db.query(Shop).filter(Shop.id == inv.shop_id).first()
+        
+        result.append(InvoiceOut(
+            id=inv.id,
+            invoice_number=inv.invoice_number,
+            order_number=None,
+            seller_name=shop.name if shop else "",
+            seller_address=shop.address.get("street", "") if shop and isinstance(shop.address, dict) else "",
+            seller_vat=shop.vat_number if shop else None,
+            buyer_name=customer.name if customer else "",
+            buyer_address=customer.address.get("street", "") if customer and isinstance(customer.address, dict) else "",
+            buyer_vat=customer.vat_number if customer else None,
+            buyer_type=None,
+            subtotal=float(inv.subtotal),
+            vat_rate=None,
+            vat_amount=float(inv.vat_total),
+            total=float(inv.total),
+            payment_system=None,
+            blockchain_tx_id=None,
+            pdf_url=inv.pdf_url,
+            status=inv.status,
+            created_at=inv.created_at.isoformat() if inv.created_at else None,
+            due_date=inv.due_date.isoformat() if inv.due_date else None,
+            notes=None,
+            merchant_logo_url=None
+        ))
+    
+    return result
+
+
+@app.get("/invoices/{invoice_id}", response_model=InvoiceOut)
+async def get_invoice(
+    invoice_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get a single invoice by ID."""
+    shop_id = current_user.get("shop_id")
+    
+    invoice = db.query(DBInvoice).filter(
+        DBInvoice.id == invoice_id,
+        DBInvoice.shop_id == shop_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+    shop = db.query(Shop).filter(Shop.id == invoice.shop_id).first()
+    
+    return InvoiceOut(
+        id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        order_number=None,
+        seller_name=shop.name if shop else "",
+        seller_address=shop.address.get("street", "") if shop and isinstance(shop.address, dict) else "",
+        seller_vat=shop.vat_number if shop else None,
+        buyer_name=customer.name if customer else "",
+        buyer_address=customer.address.get("street", "") if customer and isinstance(customer.address, dict) else "",
+        buyer_vat=customer.vat_number if customer else None,
+        buyer_type=None,
+        subtotal=float(invoice.subtotal),
+        vat_rate=None,
+        vat_amount=float(invoice.vat_total),
+        total=float(invoice.total),
+        payment_system=invoice.payment_method,
+        blockchain_tx_id=invoice.payment_reference,
+        pdf_url=invoice.pdf_url,
+        status=invoice.status,
+        created_at=invoice.created_at.isoformat() if invoice.created_at else None,
+        due_date=invoice.due_date.isoformat() if invoice.due_date else None,
+        notes=None,
+        merchant_logo_url=None
+    )
 
 
 @app.post("/invoices/{invoice_id}/void")
-async def void_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
-    """Mark an invoice as VOID without reusing its number. Only works for non-sent invoices."""
-    invoices = load_invoices()
-    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+async def void_invoice(
+    invoice_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Mark an invoice as CANCELED without reusing its number. Only works for non-paid invoices."""
+    shop_id = current_user.get("shop_id")
+    user_id = current_user.get("id")
     
-    if not inv:
+    invoice = db.query(DBInvoice).filter(
+        DBInvoice.id == invoice_id,
+        DBInvoice.shop_id == shop_id
+    ).first()
+    
+    if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    # Only allow voiding drafted/non-sent invoices
-    if inv.get("status") in ["paid", "refunded"]:
-        raise HTTPException(status_code=400, detail="Cannot void a paid or refunded invoice")
+    # Only allow voiding drafted/non-paid invoices
+    if invoice.status in ["PAID"]:
+        raise HTTPException(status_code=400, detail="Cannot void a paid invoice")
     
-    inv["status"] = "void"
-    inv["voided_at"] = datetime.now(timezone.utc).isoformat()
-    inv["voided_by"] = current_user.get("name")
+    if invoice.finalized:
+        raise HTTPException(status_code=400, detail="Cannot void a finalized invoice")
     
-    try:
-        save_invoices(invoices)
-    except RuntimeError:
-        pass
+    # Create history snapshot before change
+    history = InvoiceHistory(
+        invoice_id=invoice.id,
+        changed_by=user_id,
+        change_type="voided",
+        snapshot={
+            "invoice_number": invoice.invoice_number,
+            "status": invoice.status,
+            "new_status": "CANCELED"
+        }
+    )
+    db.add(history)
     
-    return {"status": "voided", "invoice_id": invoice_id, "invoice_number": inv.get("invoice_number")}
+    invoice.status = "CANCELED"
+    invoice.updated_at = datetime.now(timezone.utc)
+    
+    db.commit()
+    
+    log_event_to_db(db, "INVOICE_VOIDED", shop_id=shop_id, actor=current_user.get("email"), target=invoice.id)
+    
+    return {"status": "voided", "invoice_id": invoice_id, "invoice_number": invoice.invoice_number}
 
 
 @app.post("/credit-notes", response_model=CreditNoteOut, status_code=201)
-async def create_credit_note(payload: CreditNoteCreate, current_user: dict = Depends(get_current_user)):
-    """Create a credit note referencing an original invoice. This handles refunds without modifying the original."""
-    invoices = load_invoices()
+async def create_credit_note(
+    payload: CreditNoteCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a credit note referencing an original invoice (stored as CREDIT_NOTE status invoice)."""
+    shop_id = current_user.get("shop_id")
+    user_id = current_user.get("id")
     
     # Find original invoice
-    original_inv = next((i for i in invoices if i.get("id") == payload.invoice_id), None)
-    if not original_inv:
+    original_invoice = db.query(DBInvoice).filter(
+        DBInvoice.id == payload.invoice_id,
+        DBInvoice.shop_id == shop_id
+    ).first()
+    
+    if not original_invoice:
         raise HTTPException(status_code=404, detail="Referenced invoice not found")
     
-    credit_note_num = create_credit_note_number()
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    if not shop:
+        raise HTTPException(status_code=404, detail="Shop not found")
     
-    credit_note = {
-        "id": str(uuid.uuid4()),
-        "type": "credit_note",
-        "credit_note_number": credit_note_num,
-        "invoice_reference": original_inv.get("invoice_number"),
-        "invoice_id": payload.invoice_id,
-        "amount": payload.amount,
-        "vat_amount": payload.vat_amount or 0,
-        "reason": payload.reason,  # "full_refund", "partial_refund", etc.
-        "description": payload.description,
-        "created_by": current_user.get("name"),
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+    # Generate credit note number
+    shop.last_invoice_number += 1
+    credit_note_number = f"CN-{datetime.now(timezone.utc).year}-{shop.last_invoice_number:04d}"
     
-    # Mark original invoice as having a credit note
-    if "credit_notes" not in original_inv:
-        original_inv["credit_notes"] = []
-    original_inv["credit_notes"].append(credit_note_num)
+    # Create credit note as an invoice with CREDIT_NOTE status
+    credit_note = DBInvoice(
+        shop_id=shop_id,
+        customer_id=original_invoice.customer_id,
+        invoice_number=credit_note_number,
+        status="CREDIT_NOTE",
+        issue_date=datetime.now(timezone.utc),
+        due_date=datetime.now(timezone.utc),
+        subtotal=-Decimal(str(payload.amount)),
+        vat_total=-Decimal(str(payload.vat_amount or 0)),
+        total=-Decimal(str(payload.amount + (payload.vat_amount or 0))),
+        currency=original_invoice.currency,
+        finalized=True
+    )
+    db.add(credit_note)
+    db.flush()
     
-    invoices.append(credit_note)
-    try:
-        save_invoices(invoices)
-    except RuntimeError:
-        pass
+    # Create history record
+    history = InvoiceHistory(
+        invoice_id=credit_note.id,
+        changed_by=user_id,
+        change_type="created",
+        snapshot={
+            "credit_note_number": credit_note_number,
+            "original_invoice": original_invoice.invoice_number,
+            "amount": payload.amount,
+            "reason": payload.reason,
+            "description": payload.description
+        }
+    )
+    db.add(history)
+    
+    db.commit()
+    db.refresh(credit_note)
+    
+    log_event_to_db(db, "CREDIT_NOTE_CREATED", shop_id=shop_id, actor=current_user.get("email"), target=credit_note.id)
     
     return CreditNoteOut(
-        id=credit_note["id"],
-        credit_note_number=credit_note["credit_note_number"],
-        invoice_reference=credit_note["invoice_reference"],
-        amount=credit_note["amount"],
-        vat_amount=credit_note["vat_amount"],
-        reason=credit_note["reason"],
-        description=credit_note["description"],
-        created_at=credit_note["created_at"],
+        id=credit_note.id,
+        credit_note_number=credit_note.invoice_number,
+        invoice_reference=original_invoice.invoice_number,
+        amount=payload.amount,
+        vat_amount=payload.vat_amount or 0,
+        reason=payload.reason,
+        description=payload.description,
+        created_at=credit_note.created_at.isoformat() if credit_note.created_at else None
     )
 
 
 @app.get("/invoices/{invoice_id}/credit-notes", response_model=List[CreditNoteOut])
-async def get_invoice_credit_notes(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_invoice_credit_notes(
+    invoice_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """Get all credit notes for an invoice."""
-    invoices = load_invoices()
+    shop_id = current_user.get("shop_id")
     
     # Find original invoice
-    original_inv = next((i for i in invoices if i.get("id") == invoice_id), None)
-    if not original_inv:
+    original_invoice = db.query(DBInvoice).filter(
+        DBInvoice.id == invoice_id,
+        DBInvoice.shop_id == shop_id
+    ).first()
+    
+    if not original_invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
-    credit_notes = []
-    for cn in invoices:
-        if cn.get("type") == "credit_note" and cn.get("invoice_id") == invoice_id:
-            credit_notes.append(CreditNoteOut(
-                id=cn["id"],
-                credit_note_number=cn["credit_note_number"],
-                invoice_reference=cn["invoice_reference"],
-                amount=cn["amount"],
-                vat_amount=cn.get("vat_amount", 0),
-                reason=cn["reason"],
-                description=cn.get("description"),
-                created_at=cn.get("created_at"),
-            ))
+    # Find credit notes that reference this invoice (via history snapshot)
+    credit_notes = db.query(DBInvoice).filter(
+        DBInvoice.shop_id == shop_id,
+        DBInvoice.status == "CREDIT_NOTE"
+    ).all()
     
-    return credit_notes
+    result = []
+    for cn in credit_notes:
+        # Check history to see if it references our invoice
+        histories = db.query(InvoiceHistory).filter(
+            InvoiceHistory.invoice_id == cn.id
+        ).all()
+        
+        for hist in histories:
+            if hist.snapshot and hist.snapshot.get("original_invoice") == original_invoice.invoice_number:
+                result.append(CreditNoteOut(
+                    id=cn.id,
+                    credit_note_number=cn.invoice_number,
+                    invoice_reference=original_invoice.invoice_number,
+                    amount=float(abs(cn.subtotal)),
+                    vat_amount=float(abs(cn.vat_total)),
+                    reason=hist.snapshot.get("reason", ""),
+                    description=hist.snapshot.get("description"),
+                    created_at=cn.created_at.isoformat() if cn.created_at else None
+                ))
+                break
+    
+    return result
 
 
 @app.get("/merchant/usage")
@@ -2002,10 +2501,8 @@ async def merchant_usage(request: Request):
             raise HTTPException(status_code=401, detail="Unauthorized")
         users = load_users()
         current_user = users[0] if users else {"id": 0, "name": "dev", "role": "user"}
-    """Return simple usage statistics for the current merchant/user.
-
-    Aggregates invoices created by the current user (or matching `merchant_id` when present).
-    """
+    
+    # Aggregate invoices created by the current user
     invoices = load_invoices()
 
     merchant_name = current_user.get("name")
@@ -2363,47 +2860,45 @@ async def debug_add_api_key(payload: dict = Body(...)):
     raise HTTPException(status_code=404, detail="Not found")
 
 
-@app.get("/invoices/{invoice_id}", response_model=InvoiceOut)
-async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
-    invoices = load_invoices()
-    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    return InvoiceOut(**{
-        "id": inv.get("id"),
-        "invoice_number": inv.get("invoice_number"),
-        "order_number": inv.get("order_number"),
-        "seller_name": inv.get("seller_name"),
-        "buyer_name": inv.get("buyer_name"),
-        "subtotal": inv.get("subtotal", 0),
-        "vat_amount": inv.get("vat_amount", 0),
-        "total": inv.get("total", 0),
-        "payment_system": inv.get("payment_system"),
-        "blockchain_tx_id": inv.get("blockchain_tx_id"),
-        "pdf_url": inv.get("pdf_url"),
-    })
 
 
 @app.patch("/invoices/{invoice_id}", response_model=InvoiceOut)
-async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: dict = Depends(get_current_user)):
-    """Update an invoice. Recalculates VAT if items are modified. Validates state transitions."""
-    invoices = load_invoices()
-    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
-    if not inv:
+async def update_invoice(
+    invoice_id: str,
+    payload: InvoiceUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update an invoice. Rejects edits if invoice is finalized. Creates history snapshots."""
+    shop_id = current_user.get("shop_id")
+    user_id = current_user.get("id")
+    
+    invoice = db.query(DBInvoice).filter(
+        DBInvoice.id == invoice_id,
+        DBInvoice.shop_id == shop_id
+    ).first()
+    
+    if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
     
+    # Check if invoice is finalized
+    if invoice.finalized:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot edit finalized invoice. To make changes, create a credit note or contact support."
+        )
+    
     # State transition validation
-    current_status = inv.get("status", "draft")
+    current_status = invoice.status
     new_status = payload.status or current_status
     
     if new_status != current_status:
         valid_transitions = {
-            "draft": ["sent", "cancelled"],
-            "sent": ["paid", "overdue", "cancelled"],
-            "paid": ["overdue"],
-            "overdue": ["paid"],
-            "void": [],
-            "cancelled": [],
+            "DRAFT": ["SENT", "CANCELED"],
+            "SENT": ["PAID", "OVERDUE", "CANCELED"],
+            "PAID": ["OVERDUE"],
+            "OVERDUE": ["PAID"],
+            "CANCELED": [],
         }
         if new_status not in valid_transitions.get(current_status, []):
             raise HTTPException(
@@ -2411,28 +2906,46 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
                 detail=f"Cannot transition from '{current_status}' to '{new_status}'"
             )
     
+    # Create history snapshot before changes
+    old_snapshot = {
+        "status": invoice.status,
+        "subtotal": float(invoice.subtotal),
+        "vat_total": float(invoice.vat_total),
+        "total": float(invoice.total),
+    }
+    
     # Update allowed fields
     if payload.status is not None:
-        inv["status"] = payload.status
+        invoice.status = payload.status
+    
     if payload.due_date is not None:
-        inv["due_date"] = payload.due_date
-    if payload.notes is not None:
-        inv["notes"] = payload.notes
-    if payload.buyer_name is not None:
-        inv["buyer_name"] = payload.buyer_name
-    if payload.buyer_email is not None:
-        inv["buyer_email"] = payload.buyer_email
-    if payload.buyer_address is not None:
-        inv["buyer_address"] = payload.buyer_address
-    if payload.buyer_country is not None:
-        inv["buyer_country"] = payload.buyer_country
-    if payload.buyer_vat is not None:
-        inv["buyer_vat"] = payload.buyer_vat
-    if payload.buyer_type is not None:
-        inv["buyer_type"] = payload.buyer_type
+        try:
+            due_date = datetime.fromisoformat(payload.due_date) if isinstance(payload.due_date, str) else payload.due_date
+            invoice.due_date = due_date
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format for due_date. Use ISO format (YYYY-MM-DD)")
+    
+    # Update customer info if provided
+    if any([payload.buyer_name, payload.buyer_address, payload.buyer_vat, payload.buyer_country]):
+        customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+        if customer:
+            if payload.buyer_name:
+                customer.name = payload.buyer_name
+            if payload.buyer_vat:
+                customer.vat_number = payload.buyer_vat
+            if payload.buyer_country:
+                customer.country = payload.buyer_country
+            if payload.buyer_address:
+                if isinstance(customer.address, dict):
+                    customer.address["street"] = payload.buyer_address
+                else:
+                    customer.address = {"street": payload.buyer_address, "city": "", "zip": "", "country": customer.country}
     
     # Recalculate VAT if items changed
     if payload.items is not None:
+        # Delete existing items
+        db.query(InvoiceItem).filter(InvoiceItem.invoice_id == invoice.id).delete()
+        
         def _to_number(value, default=0.0):
             try:
                 if value is None:
@@ -2441,57 +2954,163 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
             except (ValueError, TypeError):
                 return default
         
-        normalized_items = []
-        for item in payload.items:
-            qty = _to_number(item.get("quantity", 1), 1.0)
-            unit_price = _to_number(item.get("unit_price", 0), 0.0)
-            amount = _to_number(item.get("amount", qty * unit_price), qty * unit_price)
-            normalized_items.append({
-                **item,
-                "quantity": qty,
-                "unit_price": unit_price,
-                "amount": round(amount, 2),
-            })
+        # Recreate items
+        subtotal = 0
+        for item_data in payload.items:
+            qty = int(_to_number(item_data.get("quantity", 1), 1.0))
+            unit_price_val = Decimal(str(_to_number(item_data.get("unit_price", 0), 0.0)))
+            item_vat_rate = Decimal(str(_to_number(item_data.get("vat_rate", payload.vat_rate or 21.0), 21.0)))
+            
+            item_subtotal = unit_price_val * qty
+            item_vat = item_subtotal * (item_vat_rate / 100)
+            item_total = item_subtotal + item_vat
+            
+            invoice_item = InvoiceItem(
+                invoice_id=invoice.id,
+                product_name=item_data.get("description", "Item"),
+                description=item_data.get("description"),
+                quantity=qty,
+                unit_price=unit_price_val,
+                vat_rate=item_vat_rate,
+                subtotal=item_subtotal,
+                vat_amount=item_vat,
+                total=item_total
+            )
+            db.add(invoice_item)
+            subtotal += float(item_subtotal)
         
-        inv["items"] = normalized_items
-        
-        # Recalculate subtotal
-        subtotal = sum(i.get("amount", 0) for i in normalized_items)
-        inv["subtotal"] = round(subtotal, 2)
-        
-        # Recalculate VAT
-        vat_rate = payload.vat_rate if payload.vat_rate is not None else inv.get("vat_rate", 21.0)
+        # Recalculate invoice totals
+        vat_rate = payload.vat_rate if payload.vat_rate is not None else 21.0
         vat_amount, total = calculate_vat(subtotal, vat_rate)
-        inv["vat_rate"] = vat_rate
-        inv["vat_amount"] = vat_amount
-        inv["total"] = total
+        
+        invoice.subtotal = Decimal(str(round(subtotal, 2)))
+        invoice.vat_total = Decimal(str(round(vat_amount, 2)))
+        invoice.total = Decimal(str(round(total, 2)))
     
     # Mark as updated
-    inv["updated_at"] = datetime.now(timezone.utc).isoformat()
-    inv["updated_by"] = current_user.get("name")
+    invoice.updated_at = datetime.now(timezone.utc)
     
-    # Persist
-    try:
-        save_invoices(invoices)
-    except RuntimeError:
-        pass
+    # Create history record
+    new_snapshot = {
+        "status": invoice.status,
+        "subtotal": float(invoice.subtotal),
+        "vat_total": float(invoice.vat_total),
+        "total": float(invoice.total),
+    }
+    
+    history = InvoiceHistory(
+        invoice_id=invoice.id,
+        changed_by=user_id,
+        change_type="updated",
+        snapshot={
+            "before": old_snapshot,
+            "after": new_snapshot
+        }
+    )
+    db.add(history)
+    
+    db.commit()
+    db.refresh(invoice)
     
     # Log audit event
-    log_event(f"INVOICE_UPDATED id={invoice_id} status={new_status}", current_user.get("name"), "-")
+    log_event_to_db(db, "INVOICE_UPDATED", shop_id=shop_id, actor=current_user.get("email"), target=invoice.id)
     
-    return InvoiceOut(**{
-        "id": inv.get("id"),
-        "invoice_number": inv.get("invoice_number"),
-        "order_number": inv.get("order_number"),
-        "seller_name": inv.get("seller_name"),
-        "buyer_name": inv.get("buyer_name"),
-        "subtotal": inv.get("subtotal", 0),
-        "vat_amount": inv.get("vat_amount", 0),
-        "total": inv.get("total", 0),
-        "payment_system": inv.get("payment_system"),
-        "blockchain_tx_id": inv.get("blockchain_tx_id"),
-        "pdf_url": inv.get("pdf_url"),
-    })
+    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+    shop = db.query(Shop).filter(Shop.id == invoice.shop_id).first()
+    
+    return InvoiceOut(
+        id=invoice.id,
+        invoice_number=invoice.invoice_number,
+        order_number=None,
+        seller_name=shop.name if shop else "",
+        seller_address=shop.address.get("street", "") if shop and isinstance(shop.address, dict) else "",
+        seller_vat=shop.vat_number if shop else None,
+        buyer_name=customer.name if customer else "",
+        buyer_address=customer.address.get("street", "") if customer and isinstance(customer.address, dict) else "",
+        buyer_vat=customer.vat_number if customer else None,
+        buyer_type=None,
+        subtotal=float(invoice.subtotal),
+        vat_rate=None,
+        vat_amount=float(invoice.vat_total),
+        total=float(invoice.total),
+        payment_system=invoice.payment_method,
+        blockchain_tx_id=invoice.payment_reference,
+        pdf_url=invoice.pdf_url,
+        status=invoice.status,
+        created_at=invoice.created_at.isoformat() if invoice.created_at else None,
+        due_date=invoice.due_date.isoformat() if invoice.due_date else None,
+        notes=None,
+        merchant_logo_url=None
+    )
+
+
+@app.post("/invoices/{invoice_id}/finalize")
+async def finalize_invoice(
+    invoice_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Finalize an invoice, making it immutable. Creates a history snapshot."""
+    shop_id = current_user.get("shop_id")
+    user_id = current_user.get("id")
+    
+    invoice = db.query(DBInvoice).filter(
+        DBInvoice.id == invoice_id,
+        DBInvoice.shop_id == shop_id
+    ).first()
+    
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    
+    if invoice.finalized:
+        raise HTTPException(status_code=400, detail="Invoice is already finalized")
+    
+    # Create finalization history snapshot
+    items = db.query(InvoiceItem).filter(InvoiceItem.invoice_id == invoice.id).all()
+    items_snapshot = [
+        {
+            "product_name": item.product_name,
+            "quantity": item.quantity,
+            "unit_price": float(item.unit_price),
+            "vat_rate": float(item.vat_rate),
+            "subtotal": float(item.subtotal),
+            "vat_amount": float(item.vat_amount),
+            "total": float(item.total)
+        }
+        for item in items
+    ]
+    
+    history = InvoiceHistory(
+        invoice_id=invoice.id,
+        changed_by=user_id,
+        change_type="finalized",
+        snapshot={
+            "invoice_number": invoice.invoice_number,
+            "status": invoice.status,
+            "subtotal": float(invoice.subtotal),
+            "vat_total": float(invoice.vat_total),
+            "total": float(invoice.total),
+            "items": items_snapshot,
+            "finalized_at": datetime.now(timezone.utc).isoformat()
+        }
+    )
+    db.add(history)
+    
+    # Mark as finalized
+    invoice.finalized = True
+    invoice.finalized_at = datetime.now(timezone.utc)
+    invoice.finalized_by = user_id
+    
+    db.commit()
+    
+    log_event_to_db(db, "INVOICE_FINALIZED", shop_id=shop_id, actor=current_user.get("email"), target=invoice.id)
+    
+    return {
+        "status": "finalized",
+        "invoice_id": invoice_id,
+        "invoice_number": invoice.invoice_number,
+        "finalized_at": invoice.finalized_at.isoformat() if invoice.finalized_at else None
+    }
 
 
 # --- Country-Specific VAT & Compliance Database ---
