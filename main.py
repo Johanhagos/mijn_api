@@ -23,7 +23,7 @@ from decimal import Decimal
 from database import get_db, SessionLocal, init_db
 from models import (
     Shop, User as DBUser, Customer, Product, Invoice as DBInvoice, InvoiceItem,
-    RefreshToken, AuditLog, InvoiceHistory
+    RefreshToken, AuditLog, InvoiceHistory, RateLimit
 )
 
 # INTERNATIONAL TAX RATES DATABASE (2026)
@@ -236,6 +236,83 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Rate limiting middleware using PostgreSQL
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    """
+    Rate limiting middleware that tracks requests per IP/user in PostgreSQL.
+    Default: 100 requests per minute per IP.
+    """
+    # Skip rate limiting for health check and some paths
+    if request.url.path in ["/health", "/"]:
+        return await call_next(request)
+    
+    # Get client identifier (IP or user ID from token)
+    client_ip = request.client.host if request.client else "unknown"
+    rate_limit_key = f"ip:{client_ip}"
+    
+    # Try to extract user from token for per-user limiting
+    try:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user_id = payload.get("sub")
+            if user_id:
+                rate_limit_key = f"user:{user_id}"
+    except Exception:
+        pass  # Fall back to IP-based limiting
+    
+    # Check rate limit in database
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        window_start = now.replace(second=0, microsecond=0)  # 1-minute window
+        
+        # Get or create rate limit record
+        rate_record = db.query(RateLimit).filter(
+            and_(
+                RateLimit.key == rate_limit_key,
+                RateLimit.window_start == window_start
+            )
+        ).first()
+        
+        if rate_record:
+            if rate_record.request_count >= 100:  # Max 100 requests per minute
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "Rate limit exceeded. Please try again later.",
+                        "retry_after": 60
+                    }
+                )
+            rate_record.request_count += 1
+        else:
+            rate_record = RateLimit(
+                key=rate_limit_key,
+                window_start=window_start,
+                request_count=1
+            )
+            db.add(rate_record)
+        
+        db.commit()
+        
+        # Add rate limit headers to response
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = "100"
+        response.headers["X-RateLimit-Remaining"] = str(100 - rate_record.request_count)
+        response.headers["X-RateLimit-Reset"] = str(int((window_start + timedelta(minutes=1)).timestamp()))
+        
+        return response
+        
+    except Exception as e:
+        # On error, allow the request but log it
+        print(f"Rate limit error: {e}")
+        return await call_next(request)
+    finally:
+        db.close()
 
 
 # Middleware to block debug routes when debug access is disabled.
