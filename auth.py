@@ -131,36 +131,8 @@ def create_password_reset_token() -> Tuple[str, str]:
 
 # ===== CURRENT USER DEPENDENCY =====
 
-def get_current_user(
-    token: str,
-    db: Session
-) -> User:
-    """
-    Extract and verify JWT, return current user.
-    Called as a dependency in protected endpoints.
-    """
-    try:
-        payload = verify_token(token)
-    except HTTPException:
-        raise
-    
-    user_id = payload.get("sub")
-    org_id = payload.get("org_id")
-    
-    if not user_id or not org_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token claims"
-        )
-    
-    user = db.query(User).filter(User.id == int(user_id), User.org_id == int(org_id)).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    
-    return user
+# Note: get_current_user is defined in main.py as a FastAPI dependency
+# that chains token extraction from headers with database lookup
 
 
 def get_current_org(user: User) -> Organization:
