@@ -442,7 +442,12 @@
                     ✗ There was an error sending your message. Please try again or contact us directly.
                 </div>
 
-                <form id="contactForm" method="POST" action="/api/contact">
+                <form id="contactForm" method="POST" action="sendmail.php">
+                    <!-- Hidden fields for sendmail.php -->
+                    <input type="hidden" name="recipient" value="info@apiblockchain.io">
+                    <input type="hidden" name="subject" id="subjectHidden" value="">
+                    <input type="hidden" name="replyto" id="replytoHidden" value="">
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="name">Full Name *</label>
@@ -467,7 +472,7 @@
 
                     <div class="form-group">
                         <label for="subject">Subject *</label>
-                        <input type="text" id="subject" name="subject" required placeholder="e.g., Integration Request, Support, etc.">
+                        <input type="text" id="subject" name="subject_label" required placeholder="e.g., Integration Request, Support, etc.">
                     </div>
 
                     <div class="form-group">
@@ -507,51 +512,53 @@
             successMessage.style.display = 'none';
             errorMessage.style.display = 'none';
 
-            // Collect form data
+            // Get form data
             const formData = new FormData(contactForm);
-            const data = {
-                name: formData.get('name'),
-                email: formData.get('email'),
-                phone: formData.get('phone') || '',
-                company: formData.get('company') || '',
-                subject: formData.get('subject'),
-                message: formData.get('message'),
-                to: 'info@apiblockchain.io',
-                timestamp: new Date().toISOString()
-            };
+            
+            // Update hidden fields with form values
+            document.getElementById('subjectHidden').value = formData.get('subject_label');
+            document.getElementById('replytoHidden').value = formData.get('email');
 
             try {
                 // Show loading state
                 const submitBtn = contactForm.querySelector('.submit-btn');
                 submitBtn.classList.add('btn-loading');
 
-                // Send to backend API
-                const response = await fetch('/api/contact', {
+                // Submit form to sendmail.php
+                const response = await fetch('sendmail.php', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
+                    body: new FormData(contactForm)
                 });
+
+                const text = await response.text();
 
                 // Remove loading state
                 submitBtn.classList.remove('btn-loading');
 
-                if (response.ok) {
+                // Check if sendmail.php returned success
+                if (response.ok && !text.includes('error')) {
                     // Success
                     successMessage.style.display = 'block';
+                    successMessage.textContent = '✓ Your message has been sent successfully! We\'ll get back to you soon.';
                     contactForm.reset();
                     
                     // Scroll to success message
                     successMessage.scrollIntoView({ behavior: 'smooth' });
+
+                    // Optional: Redirect to thank you page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/thank-you.html';
+                    }, 2000);
                 } else {
                     // Server error
                     errorMessage.style.display = 'block';
+                    errorMessage.textContent = '✗ There was an error sending your message. Please try again or contact us directly.';
                     errorMessage.scrollIntoView({ behavior: 'smooth' });
                 }
             } catch (error) {
                 console.error('Error:', error);
                 errorMessage.style.display = 'block';
+                errorMessage.textContent = '✗ There was an error sending your message. Please try again or contact us directly.';
                 errorMessage.scrollIntoView({ behavior: 'smooth' });
                 
                 // Remove loading state on error
@@ -559,14 +566,6 @@
                 submitBtn.classList.remove('btn-loading');
             }
         });
-
-        // Fallback for browsers without FormData support
-        // or to use sendmail.php directly
-        if (typeof fetch === 'undefined') {
-            // Fallback form submission
-            contactForm.action = '/sendmail.php';
-            contactForm.method = 'POST';
-        }
     </script>
 </body>
 </html>
