@@ -144,6 +144,12 @@ class PasswordReset(BaseModel):
     new_password: str = Field(..., min_length=6, max_length=72)
 
 
+class PasswordResetResponse(BaseModel):
+    """Password reset response."""
+    message: str
+    email: str
+
+
 class PasswordChange(BaseModel):
     """Change password (requires old password)."""
     old_password: str
@@ -152,7 +158,14 @@ class PasswordChange(BaseModel):
 
 class EmailVerificationRequest(BaseModel):
     """Verify email with token."""
+    email: EmailStr
     token: str
+
+
+class EmailVerificationResponse(BaseModel):
+    """Email verification response."""
+    message: str
+    user: dict  # Contains id, email, name, email_verified, email_verified_at
 
 
 # === INVOICE ===
@@ -267,6 +280,75 @@ class APIKeyResponse(BaseModel):
 class APIKeyWithSecret(APIKeyResponse):
     """New API key with secret (only shown once)."""
     key: str
+
+
+# === PAYMENTS (PHASE 2) ===
+
+class PaymentSessionCreate(BaseModel):
+    """Create a payment session."""
+    amount_cents: int = Field(..., gt=0)  # amount in cents, must be positive
+    currency: str = Field(default="EUR", min_length=3, max_length=3)
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
+    metadata: Optional[dict] = None
+
+
+class PaymentSessionResponse(BaseModel):
+    """Payment session details."""
+    session_id: str
+    amount_cents: int
+    currency: str
+    status: str  # created, pending, paid, failed
+    payment_status: str  # not_started, pending, completed
+    payment_provider: Optional[str]
+    paid_at: Optional[str]
+    checkout_url: str  # URL where customer should be sent
+    
+    class Config:
+        from_attributes = True
+
+
+class StripeWebhookPayload(BaseModel):
+    """Stripe webhook event."""
+    type: str
+    data: dict
+
+
+class OneComWebhookPayload(BaseModel):
+    """One.com webhook event."""
+    type: str
+    reference: str  # session_id
+    status: str
+
+
+class Web3WebhookPayload(BaseModel):
+    """Web3/Blockchain webhook event."""
+    type: str
+    session_id: str
+    transaction_id: str
+    network: str  # ethereum, polygon, etc.
+    amount: float
+
+
+class WebhookResponse(BaseModel):
+    """Webhook response with generated entitlements."""
+    success: bool
+    session_id: str
+    message: str
+    invoice_created: Optional[dict] = None
+    api_key_created: Optional[str] = None
+    customer_access: Optional[dict] = None
+
+
+class SessionStatusResponse(BaseModel):
+    """Session status (public endpoint, no auth required)."""
+    session_id: str
+    status: str
+    payment_status: str
+    payment_provider: Optional[str]
+    paid_at: Optional[str]
+    amount_cents: int
+    currency: str
 
 
 # === AUDIT LOGS ===

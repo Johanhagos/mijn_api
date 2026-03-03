@@ -269,6 +269,7 @@ INVOICES_FILE = DATA_DIR / "invoices.json"
 INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
 API_KEYS_FILE = DATA_DIR / "api_keys.json"
 SESSIONS_FILE = DATA_DIR / "sessions.json"
+CONTACTS_FILE = DATA_DIR / "contacts.json"
 
 # Detect read-only filesystem state so writes can be disabled safely.
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
@@ -512,6 +513,16 @@ class OneComWebhookPayload(BaseModel):
     payload: dict = {}
 
 
+class ContactMessage(BaseModel):
+    name: str
+    email: str
+    phone: str = ""
+    company: str = ""
+    subject: str
+    message: str
+    to: str = "info@apiblockchain.io"
+
+
 def _ensure_users_file() -> None:
     if READ_ONLY_FS:
         # Running on read-only filesystem — don't attempt to create files.
@@ -541,6 +552,35 @@ def _ensure_sessions_file() -> None:
         return
     if not SESSIONS_FILE.exists():
         SESSIONS_FILE.write_text("[]", encoding="utf-8")
+
+
+def _ensure_contacts_file() -> None:
+    if READ_ONLY_FS:
+        return
+    if not CONTACTS_FILE.exists():
+        CONTACTS_FILE.write_text("[]", encoding="utf-8")
+
+
+def load_contacts() -> List[dict]:
+    _ensure_contacts_file()
+    try:
+        return json.loads(CONTACTS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_contact(contact_data: dict) -> None:
+    """Add a new contact message to contacts.json"""
+    if READ_ONLY_FS:
+        return
+    
+    _ensure_contacts_file()
+    with _lock:
+        contacts = load_contacts()
+        contact_data["id"] = str(uuid.uuid4())
+        contact_data["created_at"] = datetime.now(timezone.utc).isoformat()
+        contacts.append(contact_data)
+        CONTACTS_FILE.write_text(json.dumps(contacts, indent=4), encoding="utf-8")
 
 
 def load_invoices() -> List[dict]:
@@ -4910,4 +4950,110 @@ def process_payment(request: PaymentRequest):
         return JSONResponse(
             status_code=400,
             content={"error": f"Payment failed: {error_msg}", "success": False}
+        )
+
+
+# --- CONTACT FORM ENDPOINT ---
+
+@app.post("/api/contact")
+async def submit_contact_form(contact: ContactMessage, request: Request):
+    """
+    Handle contact form submissions from the frontend.
+    Saves message to contacts.json and logs the event.
+    
+    Returns: {"success": True, "message": "Your message has been received"}
+    """
+    try:
+        # Basic validation
+        if not contact.name or len(contact.name.strip()) < 2:
+            raise ValueError("Name must be at least 2 characters")
+        
+        if not contact.email or "@" not in contact.email:
+            raise ValueError("Invalid email address")
+        
+        if not contact.subject or len(contact.subject.strip()) < 3:
+            raise ValueError("Subject must be at least 3 characters")
+        
+        if not contact.message or len(contact.message.strip()) < 10:
+            raise ValueError("Message must be at least 10 characters")
+        
+        # Prepare contact data
+        contact_dict = {
+            "name": contact.name.strip(),
+            "email": contact.email.strip(),
+            "phone": contact.phone.strip() if contact.phone else "",
+            "company": contact.company.strip() if contact.company else "",
+            "subject": contact.subject.strip(),
+            "message": contact.message.strip(),
+            "to": contact.to or "info@apiblockchain.io",
+            "ip": request.client.host if request else "unknown"
+        }
+        
+        # Save to contacts.json
+        save_contact(contact_dict)
+        
+        # Log the event
+        log_event(
+            f"CONTACT_FORM_SUBMITTED from={contact_dict['email']} subject={contact_dict['subject']}",
+            contact_dict['email'],
+            contact_dict.get('ip', 'unknown')
+        )
+        
+        return {
+            "success": True,
+            "message": "Your message has been received! We'll get back to you within 24 hours.",
+            "id": contact_dict.get("id")
+        }
+    
+    except ValueError as ve:
+        return JSONResponse(
+            status_code=400,
+            content={"success": False, "error": str(ve)}
+        )
+    except Exception as e:
+        log_event(f'CONTACT_FORM_ERROR email={contact.email} error={str(e)}', contact.email, '-')
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": "Failed to process contact form. Please try again."}
+        )
+
+
+@app.get("/api/contact/messages")
+async def get_contact_messages(token: str = None):
+    """
+    Retrieve all contact messages (admin only).
+    Requires authentication with admin role.
+    """
+    try:
+        if not token:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Authentication required"}
+            )
+        
+        # Verify admin token
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            if payload.get("role") != "admin":
+                return JSONResponse(
+                    status_code=403,
+                    content={"error": "Admin access required"}
+                )
+        except JWTError:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "Invalid token"}
+            )
+        
+        messages = load_contacts()
+        return {
+            "success": True,
+            "count": len(messages),
+            "messages": messages
+        }
+    
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
         )

@@ -1,53 +1,28 @@
 """
-Database configuration and session management for PHASE 1
+Database configuration for SQLite (testing & development)
 """
 
-import os
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import QueuePool
-import logging
+from sqlalchemy.orm import sessionmaker
 
-logger = logging.getLogger(__name__)
+# Use SQLite for immediate testing - swap to PostgreSQL in production
+DATABASE_URL = "sqlite:///./mijn_api_dev.db"
 
-# Database URL from environment, with fallback for local development
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://user:password@localhost:5432/mijn_api_db"
-)
-
-# For production, enforce SSL
-if os.getenv("RAILWAY_ENVIRONMENT") == "production":
-    if "sslmode" not in DATABASE_URL:
-        DATABASE_URL += "?sslmode=require"
-
-# Create engine with connection pooling
 engine = create_engine(
     DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,  # Test connections before using
-    echo=os.getenv("SQL_ECHO") == "1",  # Debug: echo SQL queries
+    connect_args={"check_same_thread": False}
 )
 
-SessionLocal = sessionmaker(
-    bind=engine,
-    class_=Session,
-    expire_on_commit=False,
-)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-def get_db() -> Session:
-    """Dependency: inject database session into FastAPI endpoints."""
+def get_db():
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-
-def init_db():
     """Create all tables (development only; use Alembic for production)."""
     from models_phase1 import Base
     Base.metadata.create_all(bind=engine)

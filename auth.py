@@ -129,6 +129,62 @@ def create_password_reset_token() -> Tuple[str, str]:
     return token, token_hash
 
 
+def verify_email_token(db: Session, token: str, user_email: str) -> Optional[User]:
+    """
+    Verify email token for a user.
+    Returns user if token is valid, None otherwise.
+    """
+    token_hash = hash_token(token)
+    
+    user = db.query(User).filter(
+        User.email == user_email,
+        User.email_verification_token == token_hash
+    ).first()
+    
+    if not user:
+        return None
+    
+    # Check if token has expired
+    if user.email_verification_expires:
+        expires = user.email_verification_expires
+        # Ensure both datetimes are timezone-aware for comparison
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if now > expires:
+            return None
+    
+    return user
+
+
+def verify_password_reset_token(db: Session, token: str, user_email: str) -> Optional[User]:
+    """
+    Verify password reset token for a user.
+    Returns user if token is valid, None otherwise.
+    """
+    token_hash = hash_token(token)
+    
+    user = db.query(User).filter(
+        User.email == user_email,
+        User.password_reset_token == token_hash
+    ).first()
+    
+    if not user:
+        return None
+    
+    # Check if token has expired
+    if user.password_reset_expires:
+        expires = user.password_reset_expires
+        # Ensure both datetimes are timezone-aware for comparison
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        if now > expires:
+            return None
+    
+    return user
+
+
 # ===== CURRENT USER DEPENDENCY =====
 
 # Note: get_current_user is defined in main.py as a FastAPI dependency

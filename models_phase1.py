@@ -248,3 +248,47 @@ class APIKey(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
     organization = relationship("Organization", back_populates="api_keys")
+
+class PaymentSession(Base):
+    """Payment sessions for checkout flow (Phase 2)."""
+    __tablename__ = "payment_sessions"
+    __table_args__ = (
+        Index("idx_session_org", "org_id"),
+        Index("idx_session_status", "status"),
+        UniqueConstraint("session_id", name="uq_session_id"),
+    )
+    
+    id = Column(Integer, primary_key=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=False)
+    
+    # Unique session identifier
+    session_id = Column(String(36), nullable=False, unique=True)  # UUID
+    
+    # Payment details
+    amount_cents = Column(Integer, nullable=False)  # in cents
+    currency = Column(String(3), nullable=False, default="EUR")
+    
+    # State machine: created → pending → paid (terminal)
+    # or created → failed (terminal)
+    status = Column(String(50), default="created")  # created, pending, paid, failed
+    payment_status = Column(String(50), default="not_started")  # not_started, pending, completed
+    
+    # Payment provider tracking
+    payment_provider = Column(String(50), nullable=True)  # stripe, onecom, web3
+    stripe_intent_id = Column(String(255), nullable=True)
+    onecom_txn_id = Column(String(255), nullable=True)
+    web3_tx_id = Column(String(255), nullable=True)
+    
+    # URLs
+    success_url = Column(String(500), nullable=True)
+    cancel_url = Column(String(500), nullable=True)
+    
+    # Custom metadata
+    custom_metadata = Column(JSON, nullable=False, default={})
+    
+    # Timestamps
+    paid_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    organization = relationship("Organization")
