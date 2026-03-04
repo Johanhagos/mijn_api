@@ -27,14 +27,8 @@ try:
     for e in entries:
         print(fmt_attr(e))
 
-    # Check specific files
-    targets = [f"{remote_root}/contact.html", f"{remote_root}/contact/index.html"]
-    for t in targets:
-        try:
-            st = sftp.stat(t)
-            print(f"FOUND: {t} ({st.st_size} bytes)")
-        except IOError:
-            print(f"MISSING: {t}")
+    # Note: contact files are no longer deployed to One.com by default.
+    # Remove or check them manually using `remove_contact_onecom.py` if needed.
 
     sftp.close()
     ssh.close()

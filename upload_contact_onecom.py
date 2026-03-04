@@ -12,10 +12,8 @@ password = "[REDACTED]"
 port = 22
 
 # Files to upload
-files = [
-    (r"c:\Users\gebruiker\Desktop\mijn_api\webshop\contact.html", "webroots/dae9921c/contact.html"),
-    (r"c:\Users\gebruiker\Desktop\mijn_api\webshop\contact.html", "webroots/dae9921c/contact/index.html"),
-]
+# Disabled: do not upload contact page to One.com anymore.
+files = []
 
 print("=" * 60)
 print("Uploading files to One.com via SFTP")
