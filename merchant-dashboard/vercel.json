@@ -1,13 +1,6 @@
 {
   "env": {
     "NEXT_PUBLIC_API_URL": "https://api.apiblockchain.io"
-  },
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "destination": "https://dashboard.apiblockchain.io/login",
-      "permanent": true
-    }
-  ]
+  }
 }
 
