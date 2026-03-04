@@ -1,0 +1,975 @@
+<!DOCTYPE html><html><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width"/><meta name="next-head-count" content="2"/><link rel="preload" href="/_next/static/css/b7b43e20b0c9022a.css" as="style" crossorigin=""/><link rel="stylesheet" href="/_next/static/css/b7b43e20b0c9022a.css" crossorigin="" data-n-g=""/><noscript data-n-css=""></noscript><script defer="" crossorigin="" nomodule="" src="/_next/static/chunks/polyfills-c67a75d1b6f99dc8.js"></script><script src="/_next/static/chunks/webpack-9efb116dbf1654cc.js" defer="" crossorigin=""></script><script src="/_next/static/chunks/framework-fae63b21a27d6472.js" defer="" crossorigin=""></script><script src="/_next/static/chunks/main-22b029abc2beadb0.js" defer="" crossorigin=""></script><script src="/_next/static/chunks/pages/_app-aa095332c6637efb.js" defer="" crossorigin=""></script><script src="/_next/static/chunks/pages/index-4d7473983a5f944b.js" defer="" crossorigin=""></script><script src="/_next/static/CG4sHpsGzvGVgI9Q7UeOn/_buildManifest.js" defer="" crossorigin=""></script><script src="/_next/static/CG4sHpsGzvGVgI9Q7UeOn/_ssgManifest.js" defer="" crossorigin=""></script></head><body><div id="__next"><div style="width:100%"><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APIBlockchain - Blockchain Payment Gateway & Smart Contract Invoicing</title>
+    <meta name="description" content="Seamless blockchain payment gateway and smart contract invoicing for your webshop. Accept cryptocurrency payments with built-in compliance.">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(16, 185, 129, 0.1);
+        }
+
+        .nav-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: #333;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #10b981;
+        }
+
+        .cta-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Hero Section */
+        .hero {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 6rem 2rem;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 1rem;
+            font-weight: 800;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+            line-height: 1.8;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary {
+            background: white;
+            color: #10b981;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            padding: 1rem 2.5rem;
+            border: 2px solid white;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 700;
+            transition: all 0.3s;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-secondary:hover {
+            background: white;
+            color: #10b981;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 5rem 2rem;
+            background: #f8f9fa;
+        }
+
+        .features-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 800;
+        }
+
+        .section-subtitle {
+            text-align: center;
+            font-size: 1.1rem;
+            color: #666;
+            margin-bottom: 3rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            text-align: center;
+            transition: all 0.3s;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-card h3 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            color: #333;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.8;
+        }
+
+        /* Pricing Section */
+        .pricing {
+            padding: 5rem 2rem;
+            background: white;
+        }
+
+        .pricing-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .pricing-card {
+            background: #f8f9fa;
+            padding: 2rem;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s;
+        }
+
+        .pricing-card.featured {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            transform: scale(1.05);
+            box-shadow: 0 20px 50px rgba(16, 185, 129, 0.3);
+        }
+
+        .pricing-card h3 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .pricing-card .price {
+            font-size: 2.5rem;
+            font-weight: 800;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 0.5rem;
+        }
+
+        .pricing-card .period {
+            opacity: 0.8;
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .pricing-card ul {
+            list-style: none;
+            margin-bottom: 2rem;
+        }
+
+        .pricing-card li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .pricing-card.featured li {
+            border-bottom-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .pricing-card li:before {
+            content: "✓ ";
+            color: #10b981;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .pricing-card.featured li:before {
+            color: #fff;
+        }
+
+        .pricing-card .btn-primary {
+            width: 100%;
+            text-align: center;
+            display: block;
+        }
+
+        .pricing-card.featured .btn-primary {
+            background: white;
+            color: #10b981;
+        }
+
+        /* CTA Section */
+        .cta-section {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .cta-section h2 {
+            font-size: 2rem;
+            font-family: 'Montserrat', sans-serif;
+            margin-bottom: 1rem;
+        }
+
+        .cta-section p {
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: #10b981;
+        }
+
+        /* AI Assistant Button */
+        #aiButton {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 1.5rem;
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+            transition: all 0.3s;
+            z-index: 999;
+        }
+
+        #aiButton:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.6);
+        }
+
+        /* AI Widget */
+        .ai-widget {
+            position: fixed;
+            bottom: 100px;
+            right: 30px;
+            width: 350px;
+            max-height: 500px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            display: none;
+            flex-direction: column;
+            z-index: 998;
+            overflow: hidden;
+        }
+
+        .ai-widget.active {
+            display: flex;
+        }
+
+        .ai-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .ai-close {
+            background: none;
+            border: none;
+            color: white;
+            cursor: pointer;
+            font-size: 1.5rem;
+        }
+
+        .ai-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 10px;
+            max-width: 90%;
+        }
+
+        .message.assistant {
+            background: #f0f0f0;
+            align-self: flex-start;
+        }
+
+        .message.user {
+            background: #10b981;
+            color: white;
+            align-self: flex-end;
+            margin-left: auto;
+        }
+
+        .ai-input {
+            padding: 1rem;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .ai-input input {
+            flex: 1;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+
+        .ai-input button {
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 36px;
+            height: 36px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+
+        .ai-input button:hover {
+            background: #059669;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .hero p {
+                font-size: 1rem;
+            }
+
+            .hero-buttons {
+                flex-direction: column;
+            }
+
+            .btn-primary, .btn-secondary {
+                width: 100%;
+            }
+
+            .section-title {
+                font-size: 1.8rem;
+            }
+
+            .ai-widget {
+                width: 90vw;
+                max-width: 350px;
+                bottom: 90px;
+                right: 5%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-container">
+            <div class="logo">APIBlockchain</div>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="/contact">Contact</a></li>
+                <li><a href="https://dashboard.apiblockchain.io/login" target="_blank">Dashboard</a></li>
+            </ul>
+            <a class="cta-button" href="/checkout.html?plan=professional&price=29.99">Get Started</a>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Blockchain Payments Made Simple</h1>
+            <p>Seamless cryptocurrency payment gateway and smart contract invoicing for your webshop. Accept blockchain payments with built-in compliance.</p>
+            <div class="hero-buttons">
+                <a href="#pricing" class="btn-primary">View Pricing</a>
+                <a href="https://dashboard.apiblockchain.io/login" class="btn-secondary">Go to Dashboard</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="features-container">
+            <h2 class="section-title">Why Choose APIBlockchain?</h2>
+            <p class="section-subtitle">Everything you need for seamless blockchain payments</p>
+            
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Lightning Fast</h3>
+                    <p>Process payments in seconds with instant blockchain confirmation</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Secure & Compliant</h3>
+                    <p>Military-grade encryption with full regulatory compliance built-in</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📊</div>
+                    <h3>Smart Invoicing</h3>
+                    <p>Automated invoice generation with blockchain proof of payment</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🌐</div>
+                    <h3>Multi-Currency</h3>
+                    <p>Accept payments in multiple cryptocurrencies and stablecoins</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">🤖</div>
+                    <h3>AI-Powered</h3>
+                    <p>Smart contract automation with AI-driven payment optimization</p>
+                </div>
+                
+                <div class="feature-card">
+                    <div class="feature-icon">📈</div>
+                    <h3>Real Analytics</h3>
+                    <p>Detailed insights and reporting on all your blockchain transactions</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dashboard Section -->
+    <section style="padding: 5rem 2rem; background: white;">
+        <div style="max-width: 1200px; margin: 0 auto;">
+            <h2 class="section-title">Powerful Dashboard</h2>
+            <p class="section-subtitle">Manage all your blockchain payments in one place</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; margin-top: 3rem;">
+                <div>
+                    <h3 style="font-size: 1.8rem; font-family: 'Montserrat', sans-serif; margin-bottom: 1.5rem; color: #333;">Your Complete Payment Hub</h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;">
+                            <span style="color: #10b981; font-size: 1.5rem; margin-right: 1rem;">✓</span>
+                            <span>Real-time transaction monitoring</span>
+                        </li>
+                        <li style="padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;">
+                            <span style="color: #10b981; font-size: 1.5rem; margin-right: 1rem;">✓</span>
+                            <span>Automated invoice generation & tracking</span>
+                        </li>
+                        <li style="padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;">
+                            <span style="color: #10b981; font-size: 1.5rem; margin-right: 1rem;">✓</span>
+                            <span>Multi-currency payment processing</span>
+                        </li>
+                        <li style="padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;">
+                            <span style="color: #10b981; font-size: 1.5rem; margin-right: 1rem;">✓</span>
+                            <span>Advanced analytics & reporting</span>
+                        </li>
+                        <li style="padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;">
+                            <span style="color: #10b981; font-size: 1.5rem; margin-right: 1rem;">✓</span>
+                            <span>User management & permissions</span>
+                        </li>
+                        <li style="padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;">
+                            <span style="color: #10b981; font-size: 1.5rem; margin-right: 1rem;">✓</span>
+                            <span>API access for developers</span>
+                        </li>
+                    </ul>
+                    <a href="https://dashboard.apiblockchain.io/login" target="_blank" class="btn-primary" style="display: inline-block; margin-top: 2rem;">Access Dashboard</a>
+                </div>
+                
+                <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.1);">
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+                        <h4 style="color: #333; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; color: #666;">Dashboard Overview</h4>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <span style="color: #666;">Monthly Transactions</span>
+                            <span style="font-size: 1.5rem; font-weight: 800; color: #10b981;">€45,230</span>
+                        </div>
+                        <div style="width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;">
+                            <div style="width: 75%; height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%);"></div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;">
+                        <h4 style="color: #333; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; color: #666;">Recent Transactions</h4>
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #eee;">
+                            <span style="color: #333; font-size: 0.9rem;">Payment from Client A</span>
+                            <span style="color: #10b981; font-weight: 600;">+€1,200</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #eee;">
+                            <span style="color: #333; font-size: 0.9rem;">Invoice #INV-001</span>
+                            <span style="color: #10b981; font-weight: 600;">+€850</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; padding: 0.75rem 0;">
+                            <span style="color: #333; font-size: 0.9rem;">Payout Processing</span>
+                            <span style="color: #666; font-weight: 600;">-€500</span>
+                        </div>
+                    </div>
+                    
+                    <div style="background: white; padding: 1.5rem; border-radius: 10px;">
+                        <h4 style="color: #333; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; color: #666;">Quick Stats</h4>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <div>
+                                <p style="color: #666; font-size: 0.85rem;">Active Users</p>
+                                <p style="font-size: 1.5rem; font-weight: 800; color: #10b981;">5</p>
+                            </div>
+                            <div>
+                                <p style="color: #666; font-size: 0.85rem;">Success Rate</p>
+                                <p style="font-size: 1.5rem; font-weight: 800; color: #10b981;">99.8%</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing" id="pricing">
+        <div class="pricing-container">
+            <h2 class="section-title">Simple, Transparent Pricing</h2>
+            <p class="section-subtitle">Choose the plan that fits your needs</p>
+            
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Starter</h3>
+                    <div class="price">€20</div>
+                    <div class="period">/month</div>
+                    <ul>
+                        <li>Up to 100 transactions/month</li>
+                        <li>Basic invoicing</li>
+                        <li>Email support</li>
+                        <li>1 user account</li>
+                    </ul>
+                    <a class="btn-primary" href="/checkout.html?plan=starter&price=20">Get Started</a>
+                </div>
+
+                <div class="pricing-card featured">
+                    <h3>Professional</h3>
+                    <div class="price">€29.99</div>
+                    <div class="period">/month</div>
+                    <ul>
+                        <li>Unlimited transactions</li>
+                        <li>Advanced smart contracts</li>
+                        <li>Priority 24/7 support</li>
+                        <li>Up to 5 user accounts</li>
+                        <li>API access</li>
+                        <li>Custom branding</li>
+                        <li>Real-time analytics</li>
+                        <li>Compliance reporting</li>
+                    </ul>
+                    <a class="btn-primary" href="/checkout.html?plan=professional&price=29.99">Choose Professional</a>
+                </div>
+
+                <div class="pricing-card">
+                    <h3>Enterprise</h3>
+                    <div class="price">Custom</div>
+                    <div class="period">quote-based</div>
+                    <ul>
+                        <li>White-label solution</li>
+                        <li>Dedicated account manager</li>
+                        <li>Custom integrations</li>
+                        <li>Unlimited user accounts</li>
+                        <li>Priority support</li>
+                    </ul>
+                    <button class="btn-primary" onclick="checkout('enterprise', 0)">Contact Sales</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section" id="contact">
+        <div class="cta-content">
+            <h2>Ready to Transform Your Payments?</h2>
+            <p>Join thousands of webshop owners using APIBlockchain</p>
+            <button class="btn-secondary" onclick="document.getElementById('aiButton').click()">Chat with AI Assistant</button>
+        </div>
+    </section>
+
+    <!-- Domains Configuration -->
+    <section style="background: #f0f0f0; padding: 2rem; text-align: center; font-size: 0.85rem; color: #666;">
+        <p style="margin-bottom: 1rem; font-weight: 600;">🌐 Domains Configuration</p>
+        <p><strong>apiblockchain.io</strong> → Valid Configuration (307 Redirect)</p>
+        <p><strong>www.apiblockchain.io</strong> → Valid Configuration (Production) ✅</p>
+        <p><strong>dashboard.apiblockchain.io</strong> → Valid Configuration (Production) ✅</p>
+        <p><strong>merchant-dashboard-tau.vercel.app</strong> → Valid Configuration ✅</p>
+        <p style="margin-top: 1rem; font-size: 0.75rem; color: #999;">DNS records propagating globally...</p>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-content">
+            <p>&copy; 2026 APIBlockchain. All rights reserved.</p>
+            <div class="footer-links">
+                <a href="#">Privacy Policy</a>
+                <a href="#">Terms of Service</a>
+                <a href="#">Contact</a>
+            </div>
+            <p>G.A. Brederodestraat 100, 1132 ST Volendam, Netherlands</p>
+            <p>Email: info@apiblockchain.io | Phone: +31 6 52 82 42 45</p>
+        </div>
+    </footer>
+
+    <!-- AI Assistant -->
+        <button id="connectWalletBtn" style="position:fixed;top:30px;right:30px;background:#10b981;color:white;border:none;border-radius:50px;padding:0.75rem 1.5rem;font-weight:600;z-index:999;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.15);" onclick="connectWallet()">Connect Wallet</button>
+        <div id="walletStatus" style="position:fixed;top:70px;right:30px;background:#d1fae5;color:#333;border-radius:10px;padding:0.5rem 1rem;font-size:0.95rem;z-index:999;display:none;"></div>
+    <button id="aiButton" onclick="toggleAI()">💬</button>
+    <div class="ai-widget" id="aiWidget">
+        <div class="ai-header">
+            <h3>AI Assistant</h3>
+            <button class="ai-close" onclick="toggleAI()">×</button>
+        </div>
+        <div class="ai-messages" id="aiMessages"></div>
+        <div class="ai-input">
+            <input type="text" placeholder="Ask me anything..." id="aiInput" onkeypress="handleAIInput(event)">
+            <button onclick="sendAIMessage()">➤</button>
+        </div>
+    </div>
+
+    <script>
+                // Wallet connection: safe MetaMask detection + WalletConnect fallback
+                function loadScript(url) {
+                    return new Promise((resolve, reject) => {
+                        const s = document.createElement('script');
+                        s.src = url;
+                        s.async = true;
+                        s.onload = () => resolve();
+                        s.onerror = () => reject(new Error('Failed to load ' + url));
+                        document.head.appendChild(s);
+                    });
+                }
+
+                async function connectWithWeb3Modal(statusDiv) {
+                    try {
+                        // Load required libs dynamically (CDN)
+                        await loadScript('https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js');
+                        await loadScript('https://unpkg.com/@walletconnect/web3-provider@1.7.8/dist/umd/index.min.js');
+                        await loadScript('https://unpkg.com/web3modal@1.9.8/dist/index.js');
+
+                        const providerOptions = {
+                            walletconnect: {
+                                package: window.WalletConnectProvider.default || window.WalletConnectProvider,
+                                options: {
+                                    infuraId: "" // Optional: add Infura ID or RPC mappings
+                                }
+                            }
+                        };
+
+                        const web3Modal = new window.Web3Modal.default({ cacheProvider: false, providerOptions });
+                        const provider = await web3Modal.connect();
+                        const web3 = new window.Web3(provider);
+                        const accounts = await web3.eth.getAccounts();
+                        if (accounts && accounts[0]) {
+                            statusDiv.textContent = 'Connected: ' + accounts[0];
+                            return { provider, account: accounts[0] };
+                        }
+                        statusDiv.textContent = 'Connected (no account found)';
+                        return null;
+                    } catch (err) {
+                        console.error('Web3Modal connection failed', err);
+                        statusDiv.textContent = 'Wallet connection failed: ' + (err.message || err);
+                        return null;
+                    }
+                }
+
+                async function connectWallet() {
+                    const statusDiv = document.getElementById('walletStatus');
+                    statusDiv.style.display = 'block';
+
+                    // If MetaMask is present, prefer it
+                    if (typeof window.ethereum !== 'undefined' && window.ethereum.isMetaMask) {
+                        try {
+                            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                            if (accounts && accounts[0]) {
+                                statusDiv.textContent = 'Connected: ' + accounts[0];
+                                return { provider: window.ethereum, account: accounts[0] };
+                            }
+                        } catch (err) {
+                            console.error('MetaMask connect error', err);
+                            statusDiv.textContent = 'MetaMask connection failed: ' + (err.message || err);
+                        }
+                    }
+
+                    // No MetaMask or connection failed — try Web3Modal (WalletConnect) fallback
+                    statusDiv.textContent = 'Opening wallet selector...';
+                    const result = await connectWithWeb3Modal(statusDiv);
+                    if (result) return result;
+
+                    // Final fallback: offer install link
+                    const installUrl = 'https://metamask.io/download.html';
+                    statusDiv.innerHTML = 'No wallet connected. <a href="' + installUrl + '" target="_blank" rel="noopener">Install MetaMask</a> or try another wallet.';
+                    return null;
+                }
+
+                // Hide wallet status after a short time unless it contains a link
+                document.getElementById('connectWalletBtn').addEventListener('click', () => {
+                    setTimeout(() => {
+                        const s = document.getElementById('walletStatus');
+                        if (s && s.querySelector('a') === null) s.style.display = 'none';
+                    }, 6000);
+                });
+        function checkout(plan, amount) {
+            if (plan === 'enterprise') {
+                // For enterprise, show contact form
+                alert('Thank you for your interest in our Enterprise plan!\n\nPlease contact our sales team at:\nEmail: sales@apiblockchain.io\nPhone: +31 6 52 82 42 45');
+                window.location.href = 'mailto:sales@apiblockchain.io?subject=Enterprise%20Plan%20Inquiry';
+            } else {
+                const summary = plan.charAt(0).toUpperCase() + plan.slice(1);
+                const confirmed = confirm(`Complete ${summary} Plan Checkout?\n\nAmount: €${amount}\n\nClick OK to proceed to payment.`);
+                if (confirmed) {
+                    window.location.href = `/checkout.html?plan=${plan}&price=${amount}`;
+                }
+            }
+        }
+
+        // ...existing code...
+
+        function toggleAI() {
+            const widget = document.getElementById('aiWidget');
+            widget.classList.toggle('active');
+            if (widget.classList.contains('active')) {
+                document.getElementById('aiInput').focus();
+                // Initialize with welcome message
+                if (document.getElementById('aiMessages').children.length === 0) {
+                    addMessage('Hi! I\'m APIBlockchain\'s AI Assistant. How can I help you today?', 'assistant');
+                }
+            }
+        }
+
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('aiMessages');
+            const messageEl = document.createElement('div');
+            messageEl.className = `message ${sender}`;
+            messageEl.textContent = text;
+            messagesDiv.appendChild(messageEl);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function handleAIInput(event) {
+            if (event.key === 'Enter') {
+                sendAIMessage();
+            }
+        }
+
+        function sendAIMessage() {
+            const input = document.getElementById('aiInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            addMessage(message, 'user');
+            input.value = '';
+
+            // Simulate AI response
+            setTimeout(() => {
+                const lower = message.toLowerCase().trim();
+                let response = '';
+
+                // Check for greetings first
+                if (lower === 'hi' || lower === 'hello' || lower.includes('hey') || 
+                    lower.includes('how are you') || lower.includes('how do you do') || 
+                    lower.includes('what\'s up') || lower.includes('how\'s it going') || 
+                    lower === 'hola' || lower === 'bonjour' || lower === 'buenos días') {
+                    response = 'Hello! Welcome to APIBlockchain. 👋 I\'m here to help with any questions about our blockchain payment gateway, cryptocurrency payments, smart contract invoicing, pricing, integration, or anything else. What would you like to know?';
+                } else if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost') || lower.includes('plan')) {
+                    response = 'Starter is €20/month (up to 100 transactions). Professional is €29.99/month (unlimited transactions, dashboard, priority support). Enterprise is custom. Want the best plan for your volume?';
+                } else if (lower.includes('plugin') || lower.includes('woocommerce') || lower.includes('wordpress') || lower.includes('integrate')) {
+                    response = 'Install the APIBlockchain plugin, add your API key in settings, choose Web2/Web3 methods, and run a test checkout. Tell me your platform and I’ll give exact steps.';
+                } else if (lower.includes('crypto') || lower.includes('stablecoin') || lower.includes('usdt') || lower.includes('usdc')) {
+                    response = 'Yes, we support major stablecoins and cryptocurrencies including USDC, USDT, and ETH.';
+                } else if (lower.includes('api') || lower.includes('developer') || lower.includes('webhook')) {
+                    response = 'We provide a REST API with webhooks for real-time payment events and SDKs for common languages. Want a quick start guide?';
+                } else if (lower.includes('tax') || lower.includes('vat') || lower.includes('compliance')) {
+                    response = 'We handle tax compliance automatically across 60+ countries including EU VAT, US sales tax, and international regulations. Our system calculates taxes based on buyer/seller location and provides audit trails.';
+                } else if (lower.includes('pay') || lower.includes('payment') || lower.includes('checkout')) {
+                    response = 'Our payment gateway accepts both traditional payments (credit cards via PayPal) and cryptocurrencies (Bitcoin, Ethereum, stablecoins). You get instant settlement and transparent fees.';
+                } else if (lower.includes('invoice')) {
+                    response = 'Create smart contract invoices with automatic payment tracking, tax calculation, and multi-currency support. Customers can pay via Web2 or Web3 methods.';
+                } else if (lower.includes('refund') || lower.includes('return')) {
+                    response = 'Refunds are processed instantly. For crypto payments, we return funds to the original wallet. For traditional payments, credits go to the customer\'s payment method.';
+                } else {
+                    const responses = [
+                        'That\'s a great question! You can integrate blockchain payments into your webshop in just a few clicks.',
+                        'You\'ll get instant notifications for all transactions and can access real-time analytics 24/7.',
+                        'We offer seamless API integration that works with most popular webshop platforms.',
+                        'Our platform supports both traditional and cryptocurrency payments with automatic compliance.',
+                        'Need help with something specific? I can answer questions about payments, crypto, tax compliance, invoicing, or integration.'
+                    ];
+                    response = responses[Math.floor(Math.random() * responses.length)];
+                }
+
+                addMessage(response, 'assistant');
+            }, 500);
+        }
+
+        // Suppress harmless browser extension errors
+        window.addEventListener('error', (event) => {
+            // Suppress MetaMask and other extension-related errors silently
+            if (event.filename && (event.filename.includes('inpage') || event.filename.includes('extension') || event.filename.includes('chrome-extension'))) {
+                event.preventDefault();
+                return false;
+            }
+        }, true);
+
+        window.addEventListener('unhandledrejection', (event) => {
+            // Suppress MetaMask connection errors if extension not installed
+            if (event.reason && event.reason.message && event.reason.message.includes('MetaMask')) {
+                event.preventDefault();
+                console.log('MetaMask not available - Web3 features disabled');
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+</div></div><script id="__NEXT_DATA__" type="application/json" crossorigin="">{"props":{"pageProps":{"html":"\u003c!DOCTYPE html\u003e\r\n\u003chtml lang=\"en\"\u003e\r\n\u003chead\u003e\r\n    \u003cmeta charset=\"UTF-8\"\u003e\r\n    \u003cmeta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"\u003e\r\n    \u003ctitle\u003eAPIBlockchain - Blockchain Payment Gateway \u0026 Smart Contract Invoicing\u003c/title\u003e\r\n    \u003cmeta name=\"description\" content=\"Seamless blockchain payment gateway and smart contract invoicing for your webshop. Accept cryptocurrency payments with built-in compliance.\"\u003e\r\n    \u003clink href=\"https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800\u0026family=Inter:wght@400;500;600\u0026display=swap\" rel=\"stylesheet\"\u003e\r\n    \u003cstyle\u003e\r\n        * {\r\n            margin: 0;\r\n            padding: 0;\r\n            box-sizing: border-box;\r\n        }\r\n\r\n        body {\r\n            font-family: 'Inter', sans-serif;\r\n            line-height: 1.6;\r\n            color: #333;\r\n        }\r\n\r\n        /* Navigation */\r\n        nav {\r\n            position: sticky;\r\n            top: 0;\r\n            z-index: 1000;\r\n            background: rgba(255, 255, 255, 0.95);\r\n            backdrop-filter: blur(10px);\r\n            padding: 1rem 0;\r\n            border-bottom: 1px solid rgba(16, 185, 129, 0.1);\r\n        }\r\n\r\n        .nav-container {\r\n            max-width: 1200px;\r\n            margin: 0 auto;\r\n            padding: 0 2rem;\r\n            display: flex;\r\n            justify-content: space-between;\r\n            align-items: center;\r\n        }\r\n\r\n        .logo {\r\n            font-size: 1.5rem;\r\n            font-weight: 800;\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            -webkit-background-clip: text;\r\n            -webkit-text-fill-color: transparent;\r\n            background-clip: text;\r\n            font-family: 'Montserrat', sans-serif;\r\n        }\r\n\r\n        .nav-links {\r\n            display: flex;\r\n            gap: 2rem;\r\n            list-style: none;\r\n        }\r\n\r\n        .nav-links a {\r\n            text-decoration: none;\r\n            color: #333;\r\n            font-weight: 500;\r\n            transition: color 0.3s;\r\n        }\r\n\r\n        .nav-links a:hover {\r\n            color: #10b981;\r\n        }\r\n\r\n        .cta-button {\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            color: white;\r\n            padding: 0.75rem 1.5rem;\r\n            border-radius: 50px;\r\n            text-decoration: none;\r\n            font-weight: 600;\r\n            transition: transform 0.3s, box-shadow 0.3s;\r\n            border: none;\r\n            cursor: pointer;\r\n        }\r\n\r\n        .cta-button:hover {\r\n            transform: translateY(-2px);\r\n            box-shadow: 0 10px 25px rgba(16, 185, 129, 0.3);\r\n        }\r\n\r\n        /* Hero Section */\r\n        .hero {\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            color: white;\r\n            padding: 6rem 2rem;\r\n            text-align: center;\r\n            min-height: 100vh;\r\n            display: flex;\r\n            align-items: center;\r\n            justify-content: center;\r\n        }\r\n\r\n        .hero-content {\r\n            max-width: 800px;\r\n            margin: 0 auto;\r\n        }\r\n\r\n        .hero h1 {\r\n            font-size: 3.5rem;\r\n            font-family: 'Montserrat', sans-serif;\r\n            margin-bottom: 1rem;\r\n            font-weight: 800;\r\n            line-height: 1.2;\r\n        }\r\n\r\n        .hero p {\r\n            font-size: 1.25rem;\r\n            margin-bottom: 2rem;\r\n            opacity: 0.95;\r\n            line-height: 1.8;\r\n        }\r\n\r\n        .hero-buttons {\r\n            display: flex;\r\n            gap: 1rem;\r\n            justify-content: center;\r\n            flex-wrap: wrap;\r\n        }\r\n\r\n        .btn-primary {\r\n            background: white;\r\n            color: #10b981;\r\n            padding: 1rem 2.5rem;\r\n            border-radius: 50px;\r\n            text-decoration: none;\r\n            font-weight: 700;\r\n            transition: all 0.3s;\r\n            border: none;\r\n            cursor: pointer;\r\n            font-size: 1rem;\r\n        }\r\n\r\n        .btn-primary:hover {\r\n            transform: translateY(-3px);\r\n            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);\r\n        }\r\n\r\n        .btn-secondary {\r\n            background: transparent;\r\n            color: white;\r\n            padding: 1rem 2.5rem;\r\n            border: 2px solid white;\r\n            border-radius: 50px;\r\n            text-decoration: none;\r\n            font-weight: 700;\r\n            transition: all 0.3s;\r\n            cursor: pointer;\r\n            font-size: 1rem;\r\n        }\r\n\r\n        .btn-secondary:hover {\r\n            background: white;\r\n            color: #10b981;\r\n        }\r\n\r\n        /* Features Section */\r\n        .features {\r\n            padding: 5rem 2rem;\r\n            background: #f8f9fa;\r\n        }\r\n\r\n        .features-container {\r\n            max-width: 1200px;\r\n            margin: 0 auto;\r\n        }\r\n\r\n        .section-title {\r\n            text-align: center;\r\n            font-size: 2.5rem;\r\n            font-family: 'Montserrat', sans-serif;\r\n            margin-bottom: 0.5rem;\r\n            color: #333;\r\n            font-weight: 800;\r\n        }\r\n\r\n        .section-subtitle {\r\n            text-align: center;\r\n            font-size: 1.1rem;\r\n            color: #666;\r\n            margin-bottom: 3rem;\r\n        }\r\n\r\n        .features-grid {\r\n            display: grid;\r\n            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));\r\n            gap: 2rem;\r\n        }\r\n\r\n        .feature-card {\r\n            background: white;\r\n            padding: 2rem;\r\n            border-radius: 15px;\r\n            text-align: center;\r\n            transition: all 0.3s;\r\n            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);\r\n        }\r\n\r\n        .feature-card:hover {\r\n            transform: translateY(-10px);\r\n            box-shadow: 0 15px 40px rgba(16, 185, 129, 0.2);\r\n        }\r\n\r\n        .feature-icon {\r\n            font-size: 3rem;\r\n            margin-bottom: 1rem;\r\n        }\r\n\r\n        .feature-card h3 {\r\n            font-family: 'Montserrat', sans-serif;\r\n            font-size: 1.3rem;\r\n            margin-bottom: 0.5rem;\r\n            color: #333;\r\n        }\r\n\r\n        .feature-card p {\r\n            color: #666;\r\n            line-height: 1.8;\r\n        }\r\n\r\n        /* Pricing Section */\r\n        .pricing {\r\n            padding: 5rem 2rem;\r\n            background: white;\r\n        }\r\n\r\n        .pricing-container {\r\n            max-width: 1200px;\r\n            margin: 0 auto;\r\n        }\r\n\r\n        .pricing-grid {\r\n            display: grid;\r\n            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));\r\n            gap: 2rem;\r\n            margin-top: 3rem;\r\n        }\r\n\r\n        .pricing-card {\r\n            background: #f8f9fa;\r\n            padding: 2rem;\r\n            border-radius: 15px;\r\n            border: 2px solid #e9ecef;\r\n            transition: all 0.3s;\r\n        }\r\n\r\n        .pricing-card.featured {\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            color: white;\r\n            border: none;\r\n            transform: scale(1.05);\r\n            box-shadow: 0 20px 50px rgba(16, 185, 129, 0.3);\r\n        }\r\n\r\n        .pricing-card h3 {\r\n            font-family: 'Montserrat', sans-serif;\r\n            font-size: 1.5rem;\r\n            margin-bottom: 1rem;\r\n        }\r\n\r\n        .pricing-card .price {\r\n            font-size: 2.5rem;\r\n            font-weight: 800;\r\n            font-family: 'Montserrat', sans-serif;\r\n            margin-bottom: 0.5rem;\r\n        }\r\n\r\n        .pricing-card .period {\r\n            opacity: 0.8;\r\n            margin-bottom: 2rem;\r\n            font-size: 0.95rem;\r\n        }\r\n\r\n        .pricing-card ul {\r\n            list-style: none;\r\n            margin-bottom: 2rem;\r\n        }\r\n\r\n        .pricing-card li {\r\n            padding: 0.5rem 0;\r\n            border-bottom: 1px solid rgba(0, 0, 0, 0.1);\r\n        }\r\n\r\n        .pricing-card.featured li {\r\n            border-bottom-color: rgba(255, 255, 255, 0.2);\r\n        }\r\n\r\n        .pricing-card li:before {\r\n            content: \"✓ \";\r\n            color: #10b981;\r\n            font-weight: bold;\r\n            margin-right: 0.5rem;\r\n        }\r\n\r\n        .pricing-card.featured li:before {\r\n            color: #fff;\r\n        }\r\n\r\n        .pricing-card .btn-primary {\r\n            width: 100%;\r\n            text-align: center;\r\n            display: block;\r\n        }\r\n\r\n        .pricing-card.featured .btn-primary {\r\n            background: white;\r\n            color: #10b981;\r\n        }\r\n\r\n        /* CTA Section */\r\n        .cta-section {\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            color: white;\r\n            padding: 4rem 2rem;\r\n            text-align: center;\r\n        }\r\n\r\n        .cta-section h2 {\r\n            font-size: 2rem;\r\n            font-family: 'Montserrat', sans-serif;\r\n            margin-bottom: 1rem;\r\n        }\r\n\r\n        .cta-section p {\r\n            font-size: 1.1rem;\r\n            margin-bottom: 2rem;\r\n            opacity: 0.95;\r\n        }\r\n\r\n        /* Footer */\r\n        footer {\r\n            background: #2c3e50;\r\n            color: white;\r\n            padding: 3rem 2rem;\r\n            text-align: center;\r\n        }\r\n\r\n        .footer-content {\r\n            max-width: 1200px;\r\n            margin: 0 auto;\r\n        }\r\n\r\n        .footer-links {\r\n            display: flex;\r\n            justify-content: center;\r\n            gap: 2rem;\r\n            flex-wrap: wrap;\r\n            margin-bottom: 2rem;\r\n        }\r\n\r\n        .footer-links a {\r\n            color: white;\r\n            text-decoration: none;\r\n            transition: color 0.3s;\r\n        }\r\n\r\n        .footer-links a:hover {\r\n            color: #10b981;\r\n        }\r\n\r\n        /* AI Assistant Button */\r\n        #aiButton {\r\n            position: fixed;\r\n            bottom: 30px;\r\n            right: 30px;\r\n            width: 60px;\r\n            height: 60px;\r\n            border-radius: 50%;\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            color: white;\r\n            border: none;\r\n            cursor: pointer;\r\n            font-size: 1.5rem;\r\n            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);\r\n            transition: all 0.3s;\r\n            z-index: 999;\r\n        }\r\n\r\n        #aiButton:hover {\r\n            transform: scale(1.1);\r\n            box-shadow: 0 10px 30px rgba(16, 185, 129, 0.6);\r\n        }\r\n\r\n        /* AI Widget */\r\n        .ai-widget {\r\n            position: fixed;\r\n            bottom: 100px;\r\n            right: 30px;\r\n            width: 350px;\r\n            max-height: 500px;\r\n            background: white;\r\n            border-radius: 15px;\r\n            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);\r\n            display: none;\r\n            flex-direction: column;\r\n            z-index: 998;\r\n            overflow: hidden;\r\n        }\r\n\r\n        .ai-widget.active {\r\n            display: flex;\r\n        }\r\n\r\n        .ai-header {\r\n            background: linear-gradient(135deg, #10b981 0%, #059669 100%);\r\n            color: white;\r\n            padding: 1rem;\r\n            display: flex;\r\n            justify-content: space-between;\r\n            align-items: center;\r\n        }\r\n\r\n        .ai-close {\r\n            background: none;\r\n            border: none;\r\n            color: white;\r\n            cursor: pointer;\r\n            font-size: 1.5rem;\r\n        }\r\n\r\n        .ai-messages {\r\n            flex: 1;\r\n            overflow-y: auto;\r\n            padding: 1rem;\r\n        }\r\n\r\n        .message {\r\n            margin-bottom: 1rem;\r\n            padding: 0.75rem;\r\n            border-radius: 10px;\r\n            max-width: 90%;\r\n        }\r\n\r\n        .message.assistant {\r\n            background: #f0f0f0;\r\n            align-self: flex-start;\r\n        }\r\n\r\n        .message.user {\r\n            background: #10b981;\r\n            color: white;\r\n            align-self: flex-end;\r\n            margin-left: auto;\r\n        }\r\n\r\n        .ai-input {\r\n            padding: 1rem;\r\n            border-top: 1px solid #e0e0e0;\r\n            display: flex;\r\n            gap: 0.5rem;\r\n        }\r\n\r\n        .ai-input input {\r\n            flex: 1;\r\n            border: 1px solid #ddd;\r\n            border-radius: 20px;\r\n            padding: 0.5rem 1rem;\r\n            font-size: 0.9rem;\r\n        }\r\n\r\n        .ai-input button {\r\n            background: #10b981;\r\n            color: white;\r\n            border: none;\r\n            border-radius: 50%;\r\n            width: 36px;\r\n            height: 36px;\r\n            cursor: pointer;\r\n            display: flex;\r\n            align-items: center;\r\n            justify-content: center;\r\n            transition: background 0.3s;\r\n        }\r\n\r\n        .ai-input button:hover {\r\n            background: #059669;\r\n        }\r\n\r\n        /* Responsive */\r\n        @media (max-width: 768px) {\r\n            .nav-links {\r\n                display: none;\r\n            }\r\n\r\n            .hero h1 {\r\n                font-size: 2rem;\r\n            }\r\n\r\n            .hero p {\r\n                font-size: 1rem;\r\n            }\r\n\r\n            .hero-buttons {\r\n                flex-direction: column;\r\n            }\r\n\r\n            .btn-primary, .btn-secondary {\r\n                width: 100%;\r\n            }\r\n\r\n            .section-title {\r\n                font-size: 1.8rem;\r\n            }\r\n\r\n            .ai-widget {\r\n                width: 90vw;\r\n                max-width: 350px;\r\n                bottom: 90px;\r\n                right: 5%;\r\n            }\r\n        }\r\n    \u003c/style\u003e\r\n\u003c/head\u003e\r\n\u003cbody\u003e\r\n    \u003c!-- Navigation --\u003e\r\n    \u003cnav\u003e\r\n        \u003cdiv class=\"nav-container\"\u003e\r\n            \u003cdiv class=\"logo\"\u003eAPIBlockchain\u003c/div\u003e\r\n            \u003cul class=\"nav-links\"\u003e\r\n                \u003cli\u003e\u003ca href=\"#features\"\u003eFeatures\u003c/a\u003e\u003c/li\u003e\r\n                \u003cli\u003e\u003ca href=\"#pricing\"\u003ePricing\u003c/a\u003e\u003c/li\u003e\r\n                \u003cli\u003e\u003ca href=\"#contact\"\u003eContact\u003c/a\u003e\u003c/li\u003e\r\n                \u003cli\u003e\u003ca href=\"https://dashboard.apiblockchain.io/login\" target=\"_blank\"\u003eDashboard\u003c/a\u003e\u003c/li\u003e\r\n            \u003c/ul\u003e\r\n            \u003ca class=\"cta-button\" href=\"/checkout.html?plan=professional\u0026price=29.99\"\u003eGet Started\u003c/a\u003e\r\n        \u003c/div\u003e\r\n    \u003c/nav\u003e\r\n\r\n    \u003c!-- Hero Section --\u003e\r\n    \u003csection class=\"hero\"\u003e\r\n        \u003cdiv class=\"hero-content\"\u003e\r\n            \u003ch1\u003eBlockchain Payments Made Simple\u003c/h1\u003e\r\n            \u003cp\u003eSeamless cryptocurrency payment gateway and smart contract invoicing for your webshop. Accept blockchain payments with built-in compliance.\u003c/p\u003e\r\n            \u003cdiv class=\"hero-buttons\"\u003e\r\n                \u003ca href=\"#pricing\" class=\"btn-primary\"\u003eView Pricing\u003c/a\u003e\r\n                \u003ca href=\"https://dashboard.apiblockchain.io/login\" class=\"btn-secondary\"\u003eGo to Dashboard\u003c/a\u003e\r\n            \u003c/div\u003e\r\n        \u003c/div\u003e\r\n    \u003c/section\u003e\r\n\r\n    \u003c!-- Features Section --\u003e\r\n    \u003csection class=\"features\" id=\"features\"\u003e\r\n        \u003cdiv class=\"features-container\"\u003e\r\n            \u003ch2 class=\"section-title\"\u003eWhy Choose APIBlockchain?\u003c/h2\u003e\r\n            \u003cp class=\"section-subtitle\"\u003eEverything you need for seamless blockchain payments\u003c/p\u003e\r\n            \r\n            \u003cdiv class=\"features-grid\"\u003e\r\n                \u003cdiv class=\"feature-card\"\u003e\r\n                    \u003cdiv class=\"feature-icon\"\u003e⚡\u003c/div\u003e\r\n                    \u003ch3\u003eLightning Fast\u003c/h3\u003e\r\n                    \u003cp\u003eProcess payments in seconds with instant blockchain confirmation\u003c/p\u003e\r\n                \u003c/div\u003e\r\n                \r\n                \u003cdiv class=\"feature-card\"\u003e\r\n                    \u003cdiv class=\"feature-icon\"\u003e🔒\u003c/div\u003e\r\n                    \u003ch3\u003eSecure \u0026 Compliant\u003c/h3\u003e\r\n                    \u003cp\u003eMilitary-grade encryption with full regulatory compliance built-in\u003c/p\u003e\r\n                \u003c/div\u003e\r\n                \r\n                \u003cdiv class=\"feature-card\"\u003e\r\n                    \u003cdiv class=\"feature-icon\"\u003e📊\u003c/div\u003e\r\n                    \u003ch3\u003eSmart Invoicing\u003c/h3\u003e\r\n                    \u003cp\u003eAutomated invoice generation with blockchain proof of payment\u003c/p\u003e\r\n                \u003c/div\u003e\r\n                \r\n                \u003cdiv class=\"feature-card\"\u003e\r\n                    \u003cdiv class=\"feature-icon\"\u003e🌐\u003c/div\u003e\r\n                    \u003ch3\u003eMulti-Currency\u003c/h3\u003e\r\n                    \u003cp\u003eAccept payments in multiple cryptocurrencies and stablecoins\u003c/p\u003e\r\n                \u003c/div\u003e\r\n                \r\n                \u003cdiv class=\"feature-card\"\u003e\r\n                    \u003cdiv class=\"feature-icon\"\u003e🤖\u003c/div\u003e\r\n                    \u003ch3\u003eAI-Powered\u003c/h3\u003e\r\n                    \u003cp\u003eSmart contract automation with AI-driven payment optimization\u003c/p\u003e\r\n                \u003c/div\u003e\r\n                \r\n                \u003cdiv class=\"feature-card\"\u003e\r\n                    \u003cdiv class=\"feature-icon\"\u003e📈\u003c/div\u003e\r\n                    \u003ch3\u003eReal Analytics\u003c/h3\u003e\r\n                    \u003cp\u003eDetailed insights and reporting on all your blockchain transactions\u003c/p\u003e\r\n                \u003c/div\u003e\r\n            \u003c/div\u003e\r\n        \u003c/div\u003e\r\n    \u003c/section\u003e\r\n\r\n    \u003c!-- Dashboard Section --\u003e\r\n    \u003csection style=\"padding: 5rem 2rem; background: white;\"\u003e\r\n        \u003cdiv style=\"max-width: 1200px; margin: 0 auto;\"\u003e\r\n            \u003ch2 class=\"section-title\"\u003ePowerful Dashboard\u003c/h2\u003e\r\n            \u003cp class=\"section-subtitle\"\u003eManage all your blockchain payments in one place\u003c/p\u003e\r\n            \r\n            \u003cdiv style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; margin-top: 3rem;\"\u003e\r\n                \u003cdiv\u003e\r\n                    \u003ch3 style=\"font-size: 1.8rem; font-family: 'Montserrat', sans-serif; margin-bottom: 1.5rem; color: #333;\"\u003eYour Complete Payment Hub\u003c/h3\u003e\r\n                    \u003cul style=\"list-style: none; padding: 0;\"\u003e\r\n                        \u003cli style=\"padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;\"\u003e\r\n                            \u003cspan style=\"color: #10b981; font-size: 1.5rem; margin-right: 1rem;\"\u003e✓\u003c/span\u003e\r\n                            \u003cspan\u003eReal-time transaction monitoring\u003c/span\u003e\r\n                        \u003c/li\u003e\r\n                        \u003cli style=\"padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;\"\u003e\r\n                            \u003cspan style=\"color: #10b981; font-size: 1.5rem; margin-right: 1rem;\"\u003e✓\u003c/span\u003e\r\n                            \u003cspan\u003eAutomated invoice generation \u0026 tracking\u003c/span\u003e\r\n                        \u003c/li\u003e\r\n                        \u003cli style=\"padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;\"\u003e\r\n                            \u003cspan style=\"color: #10b981; font-size: 1.5rem; margin-right: 1rem;\"\u003e✓\u003c/span\u003e\r\n                            \u003cspan\u003eMulti-currency payment processing\u003c/span\u003e\r\n                        \u003c/li\u003e\r\n                        \u003cli style=\"padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;\"\u003e\r\n                            \u003cspan style=\"color: #10b981; font-size: 1.5rem; margin-right: 1rem;\"\u003e✓\u003c/span\u003e\r\n                            \u003cspan\u003eAdvanced analytics \u0026 reporting\u003c/span\u003e\r\n                        \u003c/li\u003e\r\n                        \u003cli style=\"padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;\"\u003e\r\n                            \u003cspan style=\"color: #10b981; font-size: 1.5rem; margin-right: 1rem;\"\u003e✓\u003c/span\u003e\r\n                            \u003cspan\u003eUser management \u0026 permissions\u003c/span\u003e\r\n                        \u003c/li\u003e\r\n                        \u003cli style=\"padding: 1rem 0; border-bottom: 1px solid #eee; display: flex; align-items: center;\"\u003e\r\n                            \u003cspan style=\"color: #10b981; font-size: 1.5rem; margin-right: 1rem;\"\u003e✓\u003c/span\u003e\r\n                            \u003cspan\u003eAPI access for developers\u003c/span\u003e\r\n                        \u003c/li\u003e\r\n                    \u003c/ul\u003e\r\n                    \u003ca href=\"https://dashboard.apiblockchain.io/login\" target=\"_blank\" class=\"btn-primary\" style=\"display: inline-block; margin-top: 2rem;\"\u003eAccess Dashboard\u003c/a\u003e\r\n                \u003c/div\u003e\r\n                \r\n                \u003cdiv style=\"background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); padding: 2rem; border-radius: 15px; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.1);\"\u003e\r\n                    \u003cdiv style=\"background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;\"\u003e\r\n                        \u003ch4 style=\"color: #333; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; color: #666;\"\u003eDashboard Overview\u003c/h4\u003e\r\n                        \u003cdiv style=\"display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;\"\u003e\r\n                            \u003cspan style=\"color: #666;\"\u003eMonthly Transactions\u003c/span\u003e\r\n                            \u003cspan style=\"font-size: 1.5rem; font-weight: 800; color: #10b981;\"\u003e€45,230\u003c/span\u003e\r\n                        \u003c/div\u003e\r\n                        \u003cdiv style=\"width: 100%; height: 6px; background: #e0e0e0; border-radius: 3px; overflow: hidden;\"\u003e\r\n                            \u003cdiv style=\"width: 75%; height: 100%; background: linear-gradient(90deg, #10b981 0%, #059669 100%);\"\u003e\u003c/div\u003e\r\n                        \u003c/div\u003e\r\n                    \u003c/div\u003e\r\n                    \r\n                    \u003cdiv style=\"background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem;\"\u003e\r\n                        \u003ch4 style=\"color: #333; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; color: #666;\"\u003eRecent Transactions\u003c/h4\u003e\r\n                        \u003cdiv style=\"display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #eee;\"\u003e\r\n                            \u003cspan style=\"color: #333; font-size: 0.9rem;\"\u003ePayment from Client A\u003c/span\u003e\r\n                            \u003cspan style=\"color: #10b981; font-weight: 600;\"\u003e+€1,200\u003c/span\u003e\r\n                        \u003c/div\u003e\r\n                        \u003cdiv style=\"display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid #eee;\"\u003e\r\n                            \u003cspan style=\"color: #333; font-size: 0.9rem;\"\u003eInvoice #INV-001\u003c/span\u003e\r\n                            \u003cspan style=\"color: #10b981; font-weight: 600;\"\u003e+€850\u003c/span\u003e\r\n                        \u003c/div\u003e\r\n                        \u003cdiv style=\"display: flex; justify-content: space-between; padding: 0.75rem 0;\"\u003e\r\n                            \u003cspan style=\"color: #333; font-size: 0.9rem;\"\u003ePayout Processing\u003c/span\u003e\r\n                            \u003cspan style=\"color: #666; font-weight: 600;\"\u003e-€500\u003c/span\u003e\r\n                        \u003c/div\u003e\r\n                    \u003c/div\u003e\r\n                    \r\n                    \u003cdiv style=\"background: white; padding: 1.5rem; border-radius: 10px;\"\u003e\r\n                        \u003ch4 style=\"color: #333; font-size: 0.9rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 1rem; color: #666;\"\u003eQuick Stats\u003c/h4\u003e\r\n                        \u003cdiv style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;\"\u003e\r\n                            \u003cdiv\u003e\r\n                                \u003cp style=\"color: #666; font-size: 0.85rem;\"\u003eActive Users\u003c/p\u003e\r\n                                \u003cp style=\"font-size: 1.5rem; font-weight: 800; color: #10b981;\"\u003e5\u003c/p\u003e\r\n                            \u003c/div\u003e\r\n                            \u003cdiv\u003e\r\n                                \u003cp style=\"color: #666; font-size: 0.85rem;\"\u003eSuccess Rate\u003c/p\u003e\r\n                                \u003cp style=\"font-size: 1.5rem; font-weight: 800; color: #10b981;\"\u003e99.8%\u003c/p\u003e\r\n                            \u003c/div\u003e\r\n                        \u003c/div\u003e\r\n                    \u003c/div\u003e\r\n                \u003c/div\u003e\r\n            \u003c/div\u003e\r\n        \u003c/div\u003e\r\n    \u003c/section\u003e\r\n\r\n    \u003c!-- Pricing Section --\u003e\r\n    \u003csection class=\"pricing\" id=\"pricing\"\u003e\r\n        \u003cdiv class=\"pricing-container\"\u003e\r\n            \u003ch2 class=\"section-title\"\u003eSimple, Transparent Pricing\u003c/h2\u003e\r\n            \u003cp class=\"section-subtitle\"\u003eChoose the plan that fits your needs\u003c/p\u003e\r\n            \r\n            \u003cdiv class=\"pricing-grid\"\u003e\r\n                \u003cdiv class=\"pricing-card\"\u003e\r\n                    \u003ch3\u003eStarter\u003c/h3\u003e\r\n                    \u003cdiv class=\"price\"\u003e€20\u003c/div\u003e\r\n                    \u003cdiv class=\"period\"\u003e/month\u003c/div\u003e\r\n                    \u003cul\u003e\r\n                        \u003cli\u003eUp to 100 transactions/month\u003c/li\u003e\r\n                        \u003cli\u003eBasic invoicing\u003c/li\u003e\r\n                        \u003cli\u003eEmail support\u003c/li\u003e\r\n                        \u003cli\u003e1 user account\u003c/li\u003e\r\n                    \u003c/ul\u003e\r\n                    \u003ca class=\"btn-primary\" href=\"/checkout.html?plan=starter\u0026price=20\"\u003eGet Started\u003c/a\u003e\r\n                \u003c/div\u003e\r\n\r\n                \u003cdiv class=\"pricing-card featured\"\u003e\r\n                    \u003ch3\u003eProfessional\u003c/h3\u003e\r\n                    \u003cdiv class=\"price\"\u003e€29.99\u003c/div\u003e\r\n                    \u003cdiv class=\"period\"\u003e/month\u003c/div\u003e\r\n                    \u003cul\u003e\r\n                        \u003cli\u003eUnlimited transactions\u003c/li\u003e\r\n                        \u003cli\u003eAdvanced smart contracts\u003c/li\u003e\r\n                        \u003cli\u003ePriority 24/7 support\u003c/li\u003e\r\n                        \u003cli\u003eUp to 5 user accounts\u003c/li\u003e\r\n                        \u003cli\u003eAPI access\u003c/li\u003e\r\n                        \u003cli\u003eCustom branding\u003c/li\u003e\r\n                        \u003cli\u003eReal-time analytics\u003c/li\u003e\r\n                        \u003cli\u003eCompliance reporting\u003c/li\u003e\r\n                    \u003c/ul\u003e\r\n                    \u003ca class=\"btn-primary\" href=\"/checkout.html?plan=professional\u0026price=29.99\"\u003eChoose Professional\u003c/a\u003e\r\n                \u003c/div\u003e\r\n\r\n                \u003cdiv class=\"pricing-card\"\u003e\r\n                    \u003ch3\u003eEnterprise\u003c/h3\u003e\r\n                    \u003cdiv class=\"price\"\u003eCustom\u003c/div\u003e\r\n                    \u003cdiv class=\"period\"\u003equote-based\u003c/div\u003e\r\n                    \u003cul\u003e\r\n                        \u003cli\u003eWhite-label solution\u003c/li\u003e\r\n                        \u003cli\u003eDedicated account manager\u003c/li\u003e\r\n                        \u003cli\u003eCustom integrations\u003c/li\u003e\r\n                        \u003cli\u003eUnlimited user accounts\u003c/li\u003e\r\n                        \u003cli\u003ePriority support\u003c/li\u003e\r\n                    \u003c/ul\u003e\r\n                    \u003cbutton class=\"btn-primary\" onclick=\"checkout('enterprise', 0)\"\u003eContact Sales\u003c/button\u003e\r\n                \u003c/div\u003e\r\n            \u003c/div\u003e\r\n        \u003c/div\u003e\r\n    \u003c/section\u003e\r\n\r\n    \u003c!-- CTA Section --\u003e\r\n    \u003csection class=\"cta-section\" id=\"contact\"\u003e\r\n        \u003cdiv class=\"cta-content\"\u003e\r\n            \u003ch2\u003eReady to Transform Your Payments?\u003c/h2\u003e\r\n            \u003cp\u003eJoin thousands of webshop owners using APIBlockchain\u003c/p\u003e\r\n            \u003cbutton class=\"btn-secondary\" onclick=\"document.getElementById('aiButton').click()\"\u003eChat with AI Assistant\u003c/button\u003e\r\n        \u003c/div\u003e\r\n    \u003c/section\u003e\r\n\r\n    \u003c!-- Domains Configuration --\u003e\r\n    \u003csection style=\"background: #f0f0f0; padding: 2rem; text-align: center; font-size: 0.85rem; color: #666;\"\u003e\r\n        \u003cp style=\"margin-bottom: 1rem; font-weight: 600;\"\u003e🌐 Domains Configuration\u003c/p\u003e\r\n        \u003cp\u003e\u003cstrong\u003eapiblockchain.io\u003c/strong\u003e → Valid Configuration (307 Redirect)\u003c/p\u003e\r\n        \u003cp\u003e\u003cstrong\u003ewww.apiblockchain.io\u003c/strong\u003e → Valid Configuration (Production) ✅\u003c/p\u003e\r\n        \u003cp\u003e\u003cstrong\u003edashboard.apiblockchain.io\u003c/strong\u003e → Valid Configuration (Production) ✅\u003c/p\u003e\r\n        \u003cp\u003e\u003cstrong\u003emerchant-dashboard-tau.vercel.app\u003c/strong\u003e → Valid Configuration ✅\u003c/p\u003e\r\n        \u003cp style=\"margin-top: 1rem; font-size: 0.75rem; color: #999;\"\u003eDNS records propagating globally...\u003c/p\u003e\r\n    \u003c/section\u003e\r\n\r\n    \u003c!-- Footer --\u003e\r\n    \u003cfooter\u003e\r\n        \u003cdiv class=\"footer-content\"\u003e\r\n            \u003cp\u003e\u0026copy; 2026 APIBlockchain. All rights reserved.\u003c/p\u003e\r\n            \u003cdiv class=\"footer-links\"\u003e\r\n                \u003ca href=\"#\"\u003ePrivacy Policy\u003c/a\u003e\r\n                \u003ca href=\"#\"\u003eTerms of Service\u003c/a\u003e\r\n                \u003ca href=\"#\"\u003eContact\u003c/a\u003e\r\n            \u003c/div\u003e\r\n            \u003cp\u003eG.A. Brederodestraat 100, 1132 ST Volendam, Netherlands\u003c/p\u003e\r\n            \u003cp\u003eEmail: info@apiblockchain.io | Phone: +31 6 52 82 42 45\u003c/p\u003e\r\n        \u003c/div\u003e\r\n    \u003c/footer\u003e\r\n\r\n    \u003c!-- AI Assistant --\u003e\r\n        \u003cbutton id=\"connectWalletBtn\" style=\"position:fixed;top:30px;right:30px;background:#10b981;color:white;border:none;border-radius:50px;padding:0.75rem 1.5rem;font-weight:600;z-index:999;cursor:pointer;box-shadow:0 2px 8px rgba(16,185,129,0.15);\" onclick=\"connectWallet()\"\u003eConnect Wallet\u003c/button\u003e\r\n        \u003cdiv id=\"walletStatus\" style=\"position:fixed;top:70px;right:30px;background:#d1fae5;color:#333;border-radius:10px;padding:0.5rem 1rem;font-size:0.95rem;z-index:999;display:none;\"\u003e\u003c/div\u003e\r\n    \u003cbutton id=\"aiButton\" onclick=\"toggleAI()\"\u003e💬\u003c/button\u003e\r\n    \u003cdiv class=\"ai-widget\" id=\"aiWidget\"\u003e\r\n        \u003cdiv class=\"ai-header\"\u003e\r\n            \u003ch3\u003eAI Assistant\u003c/h3\u003e\r\n            \u003cbutton class=\"ai-close\" onclick=\"toggleAI()\"\u003e×\u003c/button\u003e\r\n        \u003c/div\u003e\r\n        \u003cdiv class=\"ai-messages\" id=\"aiMessages\"\u003e\u003c/div\u003e\r\n        \u003cdiv class=\"ai-input\"\u003e\r\n            \u003cinput type=\"text\" placeholder=\"Ask me anything...\" id=\"aiInput\" onkeypress=\"handleAIInput(event)\"\u003e\r\n            \u003cbutton onclick=\"sendAIMessage()\"\u003e➤\u003c/button\u003e\r\n        \u003c/div\u003e\r\n    \u003c/div\u003e\r\n\r\n    \u003cscript\u003e\r\n                // Wallet connection: safe MetaMask detection + WalletConnect fallback\r\n                function loadScript(url) {\r\n                    return new Promise((resolve, reject) =\u003e {\r\n                        const s = document.createElement('script');\r\n                        s.src = url;\r\n                        s.async = true;\r\n                        s.onload = () =\u003e resolve();\r\n                        s.onerror = () =\u003e reject(new Error('Failed to load ' + url));\r\n                        document.head.appendChild(s);\r\n                    });\r\n                }\r\n\r\n                async function connectWithWeb3Modal(statusDiv) {\r\n                    try {\r\n                        // Load required libs dynamically (CDN)\r\n                        await loadScript('https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js');\r\n                        await loadScript('https://unpkg.com/@walletconnect/web3-provider@1.7.8/dist/umd/index.min.js');\r\n                        await loadScript('https://unpkg.com/web3modal@1.9.8/dist/index.js');\r\n\r\n                        const providerOptions = {\r\n                            walletconnect: {\r\n                                package: window.WalletConnectProvider.default || window.WalletConnectProvider,\r\n                                options: {\r\n                                    infuraId: \"\" // Optional: add Infura ID or RPC mappings\r\n                                }\r\n                            }\r\n                        };\r\n\r\n                        const web3Modal = new window.Web3Modal.default({ cacheProvider: false, providerOptions });\r\n                        const provider = await web3Modal.connect();\r\n                        const web3 = new window.Web3(provider);\r\n                        const accounts = await web3.eth.getAccounts();\r\n                        if (accounts \u0026\u0026 accounts[0]) {\r\n                            statusDiv.textContent = 'Connected: ' + accounts[0];\r\n                            return { provider, account: accounts[0] };\r\n                        }\r\n                        statusDiv.textContent = 'Connected (no account found)';\r\n                        return null;\r\n                    } catch (err) {\r\n                        console.error('Web3Modal connection failed', err);\r\n                        statusDiv.textContent = 'Wallet connection failed: ' + (err.message || err);\r\n                        return null;\r\n                    }\r\n                }\r\n\r\n                async function connectWallet() {\r\n                    const statusDiv = document.getElementById('walletStatus');\r\n                    statusDiv.style.display = 'block';\r\n\r\n                    // If MetaMask is present, prefer it\r\n                    if (typeof window.ethereum !== 'undefined' \u0026\u0026 window.ethereum.isMetaMask) {\r\n                        try {\r\n                            const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });\r\n                            if (accounts \u0026\u0026 accounts[0]) {\r\n                                statusDiv.textContent = 'Connected: ' + accounts[0];\r\n                                return { provider: window.ethereum, account: accounts[0] };\r\n                            }\r\n                        } catch (err) {\r\n                            console.error('MetaMask connect error', err);\r\n                            statusDiv.textContent = 'MetaMask connection failed: ' + (err.message || err);\r\n                        }\r\n                    }\r\n\r\n                    // No MetaMask or connection failed — try Web3Modal (WalletConnect) fallback\r\n                    statusDiv.textContent = 'Opening wallet selector...';\r\n                    const result = await connectWithWeb3Modal(statusDiv);\r\n                    if (result) return result;\r\n\r\n                    // Final fallback: offer install link\r\n                    const installUrl = 'https://metamask.io/download.html';\r\n                    statusDiv.innerHTML = 'No wallet connected. \u003ca href=\"' + installUrl + '\" target=\"_blank\" rel=\"noopener\"\u003eInstall MetaMask\u003c/a\u003e or try another wallet.';\r\n                    return null;\r\n                }\r\n\r\n                // Hide wallet status after a short time unless it contains a link\r\n                document.getElementById('connectWalletBtn').addEventListener('click', () =\u003e {\r\n                    setTimeout(() =\u003e {\r\n                        const s = document.getElementById('walletStatus');\r\n                        if (s \u0026\u0026 s.querySelector('a') === null) s.style.display = 'none';\r\n                    }, 6000);\r\n                });\r\n        function checkout(plan, amount) {\r\n            if (plan === 'enterprise') {\r\n                // For enterprise, show contact form\r\n                alert('Thank you for your interest in our Enterprise plan!\\n\\nPlease contact our sales team at:\\nEmail: sales@apiblockchain.io\\nPhone: +31 6 52 82 42 45');\r\n                window.location.href = 'mailto:sales@apiblockchain.io?subject=Enterprise%20Plan%20Inquiry';\r\n            } else {\r\n                const summary = plan.charAt(0).toUpperCase() + plan.slice(1);\r\n                const confirmed = confirm(`Complete ${summary} Plan Checkout?\\n\\nAmount: €${amount}\\n\\nClick OK to proceed to payment.`);\r\n                if (confirmed) {\r\n                    window.location.href = `/checkout.html?plan=${plan}\u0026price=${amount}`;\r\n                }\r\n            }\r\n        }\r\n\r\n        // ...existing code...\r\n\r\n        function toggleAI() {\r\n            const widget = document.getElementById('aiWidget');\r\n            widget.classList.toggle('active');\r\n            if (widget.classList.contains('active')) {\r\n                document.getElementById('aiInput').focus();\r\n                // Initialize with welcome message\r\n                if (document.getElementById('aiMessages').children.length === 0) {\r\n                    addMessage('Hi! I\\'m APIBlockchain\\'s AI Assistant. How can I help you today?', 'assistant');\r\n                }\r\n            }\r\n        }\r\n\r\n        function addMessage(text, sender) {\r\n            const messagesDiv = document.getElementById('aiMessages');\r\n            const messageEl = document.createElement('div');\r\n            messageEl.className = `message ${sender}`;\r\n            messageEl.textContent = text;\r\n            messagesDiv.appendChild(messageEl);\r\n            messagesDiv.scrollTop = messagesDiv.scrollHeight;\r\n        }\r\n\r\n        function handleAIInput(event) {\r\n            if (event.key === 'Enter') {\r\n                sendAIMessage();\r\n            }\r\n        }\r\n\r\n        function sendAIMessage() {\r\n            const input = document.getElementById('aiInput');\r\n            const message = input.value.trim();\r\n            \r\n            if (!message) return;\r\n\r\n            addMessage(message, 'user');\r\n            input.value = '';\r\n\r\n            // Simulate AI response\r\n            setTimeout(() =\u003e {\r\n                const lower = message.toLowerCase().trim();\r\n                let response = '';\r\n\r\n                // Check for greetings first\r\n                if (lower === 'hi' || lower === 'hello' || lower.includes('hey') || \r\n                    lower.includes('how are you') || lower.includes('how do you do') || \r\n                    lower.includes('what\\'s up') || lower.includes('how\\'s it going') || \r\n                    lower === 'hola' || lower === 'bonjour' || lower === 'buenos días') {\r\n                    response = 'Hello! Welcome to APIBlockchain. 👋 I\\'m here to help with any questions about our blockchain payment gateway, cryptocurrency payments, smart contract invoicing, pricing, integration, or anything else. What would you like to know?';\r\n                } else if (lower.includes('price') || lower.includes('pricing') || lower.includes('cost') || lower.includes('plan')) {\r\n                    response = 'Starter is €20/month (up to 100 transactions). Professional is €29.99/month (unlimited transactions, dashboard, priority support). Enterprise is custom. Want the best plan for your volume?';\r\n                } else if (lower.includes('plugin') || lower.includes('woocommerce') || lower.includes('wordpress') || lower.includes('integrate')) {\r\n                    response = 'Install the APIBlockchain plugin, add your API key in settings, choose Web2/Web3 methods, and run a test checkout. Tell me your platform and I’ll give exact steps.';\r\n                } else if (lower.includes('crypto') || lower.includes('stablecoin') || lower.includes('usdt') || lower.includes('usdc')) {\r\n                    response = 'Yes, we support major stablecoins and cryptocurrencies including USDC, USDT, and ETH.';\r\n                } else if (lower.includes('api') || lower.includes('developer') || lower.includes('webhook')) {\r\n                    response = 'We provide a REST API with webhooks for real-time payment events and SDKs for common languages. Want a quick start guide?';\r\n                } else if (lower.includes('tax') || lower.includes('vat') || lower.includes('compliance')) {\r\n                    response = 'We handle tax compliance automatically across 60+ countries including EU VAT, US sales tax, and international regulations. Our system calculates taxes based on buyer/seller location and provides audit trails.';\r\n                } else if (lower.includes('pay') || lower.includes('payment') || lower.includes('checkout')) {\r\n                    response = 'Our payment gateway accepts both traditional payments (credit cards via PayPal) and cryptocurrencies (Bitcoin, Ethereum, stablecoins). You get instant settlement and transparent fees.';\r\n                } else if (lower.includes('invoice')) {\r\n                    response = 'Create smart contract invoices with automatic payment tracking, tax calculation, and multi-currency support. Customers can pay via Web2 or Web3 methods.';\r\n                } else if (lower.includes('refund') || lower.includes('return')) {\r\n                    response = 'Refunds are processed instantly. For crypto payments, we return funds to the original wallet. For traditional payments, credits go to the customer\\'s payment method.';\r\n                } else {\r\n                    const responses = [\r\n                        'That\\'s a great question! You can integrate blockchain payments into your webshop in just a few clicks.',\r\n                        'You\\'ll get instant notifications for all transactions and can access real-time analytics 24/7.',\r\n                        'We offer seamless API integration that works with most popular webshop platforms.',\r\n                        'Our platform supports both traditional and cryptocurrency payments with automatic compliance.',\r\n                        'Need help with something specific? I can answer questions about payments, crypto, tax compliance, invoicing, or integration.'\r\n                    ];\r\n                    response = responses[Math.floor(Math.random() * responses.length)];\r\n                }\r\n\r\n                addMessage(response, 'assistant');\r\n            }, 500);\r\n        }\r\n\r\n        // Suppress harmless browser extension errors\r\n        window.addEventListener('error', (event) =\u003e {\r\n            // Suppress MetaMask and other extension-related errors silently\r\n            if (event.filename \u0026\u0026 (event.filename.includes('inpage') || event.filename.includes('extension') || event.filename.includes('chrome-extension'))) {\r\n                event.preventDefault();\r\n                return false;\r\n            }\r\n        }, true);\r\n\r\n        window.addEventListener('unhandledrejection', (event) =\u003e {\r\n            // Suppress MetaMask connection errors if extension not installed\r\n            if (event.reason \u0026\u0026 event.reason.message \u0026\u0026 event.reason.message.includes('MetaMask')) {\r\n                event.preventDefault();\r\n                console.log('MetaMask not available - Web3 features disabled');\r\n            }\r\n        });\r\n    \u003c/script\u003e\r\n\u003c/body\u003e\r\n\u003c/html\u003e\r\n\r\n\r\n"},"__N_SSG":true},"page":"/","query":{},"buildId":"CG4sHpsGzvGVgI9Q7UeOn","isFallback":false,"gsp":true,"scriptLoader":[]}</script></body></html>
