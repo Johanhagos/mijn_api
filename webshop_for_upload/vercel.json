@@ -3,7 +3,15 @@
   "public": true,
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/contact",
+      "destination": "/contact.html"
+    },
+    {
+      "source": "/contact/",
+      "destination": "/contact/index.html"
+    },
+    {
+      "source": "\\/(.*)",
       "destination": "/index.html"
     }
   ],
