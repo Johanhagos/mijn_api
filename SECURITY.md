@@ -22,5 +22,17 @@ Removing secrets from history
 Prevention
 - Add a pre-commit or CI secret-scan (gitleaks) to block commits with secrets.
 
+CI / pre-commit
+- A GitHub Actions workflow `/.github/workflows/secret-scan.yml` runs `gitleaks` on pushes and PRs and will fail checks if leaks are found.
+- A `.pre-commit-config.yaml` using `detect-secrets` is included; install `pre-commit` locally and run `pre-commit install` to enable local checks.
+
+Example local setup:
+
+```bash
+pip install pre-commit detect-secrets
+pre-commit install
+pre-commit run --all-files
+```
+
 Contact
 - If you want, I can run the repo scan now and produce a findings report.
