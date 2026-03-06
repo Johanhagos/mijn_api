@@ -1,11 +1,15 @@
 import paramiko
 import os
 
-# One.com SFTP connection details
-HOSTNAME = "[REDACTED]"
-USERNAME = "[REDACTED]"
-PASSWORD = "[REDACTED]"
-REMOTE_PATH = "/webroots/dae9921c/"
+# One.com SFTP connection details from environment variables
+HOSTNAME = os.environ.get("ONE_SFTP_HOST")
+USERNAME = os.environ.get("ONE_SFTP_USER")
+PASSWORD = os.environ.get("ONE_SFTP_PASSWORD")
+REMOTE_PATH = os.environ.get("ONE_SFTP_REMOTE_ROOT", "/webroots/dae9921c/")
+
+if not (HOSTNAME and USERNAME and PASSWORD):
+    print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+    raise SystemExit(1)
 
 print("🚀 DEPLOYING AS home.html TO BYPASS WEBSITE BUILDER")
 print("=" * 60)

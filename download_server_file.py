@@ -3,12 +3,18 @@
 Download current index.html from server to inspect it
 """
 import paramiko
+import os
 
-HOST = "[REDACTED]"
-USERNAME = "[REDACTED]"
-PASSWORD = "[REDACTED]"
-PORT = 22
-REMOTE_PATH = "/webroots/dae9921c/"
+# One.com SFTP credentials from environment
+HOST = os.environ.get("ONE_SFTP_HOST")
+USERNAME = os.environ.get("ONE_SFTP_USER")
+PASSWORD = os.environ.get("ONE_SFTP_PASSWORD")
+PORT = int(os.environ.get("ONE_SFTP_PORT", "22"))
+REMOTE_PATH = os.environ.get("ONE_SFTP_REMOTE_ROOT", "/webroots/dae9921c/")
+
+if not (HOST and USERNAME and PASSWORD):
+    print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+    raise SystemExit(1)
 
 try:
     ssh = paramiko.SSHClient()

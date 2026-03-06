@@ -3,11 +3,14 @@ import os
 from stat import S_ISDIR
 
 # One.com SFTP credentials
-hostname = "[REDACTED]"
-username = "[REDACTED]"
-password = "[REDACTED]"
-port = 22
-remote_path = "/webroots/dae9921c/"
+import os
+
+# Use environment variables for One.com SFTP credentials
+hostname = os.environ.get("ONE_SFTP_HOST")
+username = os.environ.get("ONE_SFTP_USER")
+password = os.environ.get("ONE_SFTP_PASSWORD")
+port = int(os.environ.get("ONE_SFTP_PORT", "22"))
+remote_path = os.environ.get("ONE_SFTP_REMOTE_ROOT", "/webroots/dae9921c/")
 
 print("=" * 60)
 print("🔥 FORCE OVERRIDE ONE.COM WEBSITE BUILDER")
@@ -19,7 +22,11 @@ ssh = paramiko.SSHClient()
 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
 try:
-    print(f"🔌 Connecting to {hostname}...")
+    if not (hostname and username and password):
+        print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+        raise SystemExit(1)
+
+    print(f"🔌 Connecting to {hostname}:{port} as {username}...")
     ssh.connect(hostname, port=port, username=username, password=password)
     sftp = ssh.open_sftp()
     print("✅ Connected!\n")

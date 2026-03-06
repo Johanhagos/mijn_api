@@ -9,11 +9,14 @@ import sys
 from pathlib import Path
 
 # Connection details
-HOST = "[REDACTED]"
-USERNAME = "[REDACTED]"
-PASSWORD = "[REDACTED]"
-PORT = 22
-REMOTE_PATH = "/webroots/dae9921c/"
+import os
+
+# Use environment variables for One.com SFTP credentials
+HOST = os.environ.get("ONE_SFTP_HOST")
+USERNAME = os.environ.get("ONE_SFTP_USER")
+PASSWORD = os.environ.get("ONE_SFTP_PASSWORD")
+PORT = int(os.environ.get("ONE_SFTP_PORT", "22"))
+REMOTE_PATH = os.environ.get("ONE_SFTP_REMOTE_ROOT", "/webroots/dae9921c/")
 LOCAL_PATH = "c:/Users/gebruiker/Desktop/mijn_api/webshop_for_upload"
 
 print("=" * 50)

@@ -6,10 +6,13 @@ import paramiko
 import os
 
 # Connection details
-host = "[REDACTED]"
-username = "[REDACTED]"
-password = "[REDACTED]"
-port = 22
+import os
+
+# Use environment variables for credentials
+host = os.environ.get("ONE_SFTP_HOST")
+username = os.environ.get("ONE_SFTP_USER")
+password = os.environ.get("ONE_SFTP_PASSWORD")
+port = int(os.environ.get("ONE_SFTP_PORT", "22"))
 
 # Local file to upload
 local_file = r"c:\Users\gebruiker\Desktop\mijn_api\webshop_for_upload\index.html"
@@ -23,6 +26,10 @@ print(f"Username: {username}")
 print(f"Local file: {local_file}")
 print(f"Remote path: {remote_path}")
 print()
+
+if not (host and username and password):
+    print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+    sys.exit(1)
 
 try:
     # Create SSH client

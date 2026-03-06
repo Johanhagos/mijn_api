@@ -6,12 +6,15 @@ import paramiko
 import os
 import sys
 
-HOST = "[REDACTED]"
-USERNAME = "[REDACTED]"
-PASSWORD = "[REDACTED]"
-PORT = 22
-REMOTE_PATH = "/webroots/dae9921c/"
-LOCAL_PATH = "c:/Users/gebruiker/Desktop/mijn_api/webshop_for_upload"
+import os
+
+# Use environment variables for One.com SFTP credentials
+HOST = os.environ.get("ONE_SFTP_HOST")
+USERNAME = os.environ.get("ONE_SFTP_USER")
+PASSWORD = os.environ.get("ONE_SFTP_PASSWORD")
+PORT = int(os.environ.get("ONE_SFTP_PORT", "22"))
+REMOTE_PATH = os.environ.get("ONE_SFTP_REMOTE_ROOT", "/webroots/dae9921c/")
+LOCAL_PATH = os.environ.get("ONE_LOCAL_UPLOAD_PATH", "c:/Users/gebruiker/Desktop/mijn_api/webshop_for_upload")
 
 print("=" * 70)
 print("🚀 FORCE UPLOAD - Modern Homepage to One.com")
@@ -22,7 +25,11 @@ try:
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     
-    print(f"🔌 Connecting to {HOST}...")
+    if not (HOST and USERNAME and PASSWORD):
+        print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+        raise SystemExit(1)
+
+    print(f"🔌 Connecting to {HOST}:{PORT} as {USERNAME}...")
     ssh.connect(HOST, port=PORT, username=USERNAME, password=PASSWORD, timeout=30)
     print("✅ Connected!")
     print()

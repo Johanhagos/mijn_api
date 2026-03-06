@@ -3,11 +3,17 @@
 List all PHP and config files to understand the setup
 """
 import paramiko
+import os
 
-host = "[REDACTED]"
-username = "[REDACTED]"
-password = "[REDACTED]"
-port = 22
+# One.com SFTP credentials from environment
+host = os.environ.get("ONE_SFTP_HOST")
+username = os.environ.get("ONE_SFTP_USER")
+password = os.environ.get("ONE_SFTP_PASSWORD")
+port = int(os.environ.get("ONE_SFTP_PORT", "22"))
+
+if not (host and username and password):
+    print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+    raise SystemExit(1)
 
 try:
     ssh = paramiko.SSHClient()

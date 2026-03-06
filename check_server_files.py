@@ -1,9 +1,16 @@
 import paramiko
 
-HOSTNAME = "[REDACTED]"
-USERNAME = "[REDACTED]"
-PASSWORD = "[REDACTED]"
-REMOTE_PATH = "/webroots/dae9921c/"
+import os
+
+# One.com SFTP connection details
+HOSTNAME = os.environ.get("ONE_SFTP_HOST")
+USERNAME = os.environ.get("ONE_SFTP_USER")
+PASSWORD = os.environ.get("ONE_SFTP_PASSWORD")
+REMOTE_PATH = os.environ.get("ONE_SFTP_REMOTE_ROOT", "/webroots/dae9921c/")
+
+if not (HOSTNAME and USERNAME and PASSWORD):
+    print("Missing SFTP credentials. Set ONE_SFTP_HOST, ONE_SFTP_USER, and ONE_SFTP_PASSWORD environment variables.")
+    raise SystemExit(1)
 
 print("🔍 CHECKING SERVER FILES")
 print("=" * 60)
