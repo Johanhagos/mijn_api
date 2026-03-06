@@ -228,6 +228,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Optional AI agent router (disabled by default via env var AGENT_ENABLED)
+try:
+    from agent.router import router as agent_router
+    app.include_router(agent_router, prefix="/agent")
+except Exception as _e:
+    # Do not fail startup if agent is not present or has errors.
+    print(f"[WARN] Agent router not mounted: {_e}")
+
 
 # Middleware to block debug routes when debug access is disabled.
 @app.middleware("http")
