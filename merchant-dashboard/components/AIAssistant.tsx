@@ -42,15 +42,22 @@ export default function AIAssistant({ merchantData, inline = false }: { merchant
     setIsLoading(true);
 
     try {
-      const response = await api.protectedApi('/ai/chat', 'POST', {
+      const clientLocale = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US';
+      const payload = {
         message: input,
         context: {
           ...merchantData,
           dashboard_context: 'merchant_portal',
           current_user_role: 'merchant_admin'
         },
-        history: messages.slice(-10) // Last 10 messages for better context
-      });
+        history: messages.slice(-10), // Last 10 messages for context
+        client_metadata: {
+          locale: clientLocale,
+          source: 'merchant-dashboard'
+        }
+      };
+
+      const response = await api.protectedApi('/ai/chat', 'POST', payload);
 
       const fallback = generateAIResponse(input);
       const assistantMessage: Message = {
@@ -486,6 +493,31 @@ The system handles international combinations so you stay compliant everywhere.`
     }
     if (msg.includes('fraud detection') || msg.includes('risk') || msg.includes('verification')) {
       return "AI-powered fraud detection with real-time risk scoring. 3D Secure for card payments. Multi-factor authentication options. Biometric verification available for crypto.";
+    }
+
+    // EXTRA INTENTS: pricing, integration steps, payment status, invoice sample, developer docs
+    if (msg.includes('price') || msg.includes('pricing') || msg.includes('cost') || msg.includes('plan')) {
+      return `Pricing Overview:\n\n- Starter: €20/month (up to 100 tx/mo)\n- Professional: €29.99/month (unlimited)\n- Enterprise: custom pricing - contact sales@apiblockchain.io\n\nFor transaction fees, check your dashboard billing page or contact billing@apiblockchain.io.`;
+    }
+
+    if (msg.includes('integration') || msg.includes('integrate') || msg.includes('api key') || msg.includes('setup')) {
+      return `Integration Quickstart:\n1) Create an account and get API keys (Dashboard → API Keys).\n2) Use our SDK or POST to /payments with your test key.\n3) Implement webhook endpoint to receive payment events.\n4) Move to production by swapping test keys for live keys and enabling webhooks.`;
+    }
+
+    if (msg.includes('payment status') || msg.includes('when') || msg.includes('pending') || msg.includes('confirmed')) {
+      return `Payment status guide:\n- Pending: awaiting network or payment provider confirmation.\n- Confirmed: funds settled (cards: 1-3 days, crypto: minutes).\n- Failed: payment was rejected — check provider logs or ask customer to retry.`;
+    }
+
+    if (msg.includes('invoice sample') || msg.includes('show invoice') || msg.includes('invoice example')) {
+      return `Invoice sample:\n- Invoice #: 2026-0001\n- Date: 2026-03-07\n- Description: Webshop sale\n- Subtotal: €100.00\n- VAT (21%): €21.00\n- Total: €121.00\n\nYou can download invoices from the Invoices page in your dashboard.`;
+    }
+
+    if (msg.includes('developer') || msg.includes('sdk') || msg.includes('docs') || msg.includes('api docs')) {
+      return `Developer resources:\n- API docs: https://api.apiblockchain.io/docs\n- SDKs: Node/Python/Go available on our repo\n- Sandbox keys available in your dashboard for testing`;
+    }
+
+    if (msg.includes('contact') || msg.includes('support') || msg.includes('email') || msg.includes('phone')) {
+      return `Contact & Support:\n- Email sales: sales@apiblockchain.io\n- Support: support@apiblockchain.io\n- Phone: +31 (0)6 5282 4245\n- For urgent production incidents, email incident@apiblockchain.io`;
     }
 
     // DEFAULT HELPFUL RESPONSES
