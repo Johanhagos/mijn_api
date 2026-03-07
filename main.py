@@ -2861,24 +2861,37 @@ VAT RULES BY TRANSACTION TYPE:
         openai_key = os.getenv("OPENAI_API_KEY")
         
         if openai_key:
-            # Use OpenAI if available
-            import openai
-            openai.api_key = openai_key
-            
-            messages = [
-                {"role": "system", "content": context_info},
-                *[{"role": msg["role"], "content": msg["content"]} for msg in history[-5:]],
-                {"role": "user", "content": message}
-            ]
-            
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=500,
-                temperature=0.7
-            )
-            
-            reply = response.choices[0].message.content
+            # Use OpenAI if available. Model can be overridden with OPENAI_MODEL env var.
+            try:
+                import openai
+                openai.api_key = openai_key
+
+                model_name = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+
+                # Include optional client metadata in system prompt if provided
+                client_meta = payload.get("client_metadata", {}) or {}
+                if client_meta:
+                    meta_lines = [f"{k}: {v}" for k, v in client_meta.items()]
+                    context_info += "\n\nCLIENT METADATA:\n" + "\n".join(meta_lines)
+
+                messages = [
+                    {"role": "system", "content": context_info},
+                    *[{"role": msg.get("role", "user"), "content": msg.get("content", "")} for msg in history[-8:]],
+                    {"role": "user", "content": message}
+                ]
+
+                response = openai.ChatCompletion.create(
+                    model=model_name,
+                    messages=messages,
+                    max_tokens=700,
+                    temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.6"))
+                )
+
+                reply = response.choices[0].message.content
+            except Exception as e:
+                # If OpenAI call fails, fall back to rule-based
+                print(f"[WARN] OpenAI call failed: {e}")
+                reply = generate_rule_based_response(message, stats, merchant)
         else:
             # Fallback to rule-based responses
             reply = generate_rule_based_response(message, stats, merchant)
