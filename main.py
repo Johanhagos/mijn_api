@@ -2857,22 +2857,50 @@ VAT RULES BY TRANSACTION TYPE:
     
     # Simple AI responses (can be replaced with OpenAI API)
     try:
-        # Check for OpenAI API key
+        # Determine AI provider: 'openai' (default) or 'google' (Gemini/Vertex)
+        provider = os.getenv("AI_PROVIDER", "openai").lower()
         openai_key = os.getenv("OPENAI_API_KEY")
-        
-        if openai_key:
-            # Use OpenAI if available. Model can be overridden with OPENAI_MODEL env var.
-            try:
+        google_key = os.getenv("GOOGLE_API_KEY")
+
+        # Attach optional client metadata to the system prompt
+        client_meta = payload.get("client_metadata", {}) or {}
+        if client_meta:
+            meta_lines = [f"{k}: {v}" for k, v in client_meta.items()]
+            context_info += "\n\nCLIENT METADATA:\n" + "\n".join(meta_lines)
+
+        # Try provider-specific call, fall back to rule-based responses on any failure
+        try:
+            if provider == "google":
+                # Use Google Generative models (Gemini) via google.generativeai if available.
+                try:
+                    import google.generativeai as genai
+                    if google_key:
+                        # Prefer explicit API key if provided
+                        genai.configure(api_key=google_key)
+
+                    model_name = os.getenv("GOOGLE_MODEL", "gemini-1.0")
+
+                    # Build a single prompt combining the system context, recent history, and user message
+                    history_text = "\n".join([f"{h.get('role','user')}: {h.get('content','')}" for h in history[-8:]])
+                    prompt = context_info + "\n\n" + history_text + "\n\nUser: " + message
+
+                    gen_response = genai.generate_text(model=model_name, prompt=prompt,
+                                                       max_output_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "700")),
+                                                       temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.6")))
+
+                    # Extract text from response (support different client shapes)
+                    reply = getattr(gen_response, 'text', None) or (
+                        gen_response.candidates[0].content if hasattr(gen_response, 'candidates') and gen_response.candidates else str(gen_response)
+                    )
+                except Exception as e:
+                    print(f"[WARN] Google Generative call failed: {e}")
+                    reply = generate_rule_based_response(message, stats, merchant)
+
+            elif provider == "openai" and openai_key:
                 import openai
                 openai.api_key = openai_key
 
                 model_name = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-
-                # Include optional client metadata in system prompt if provided
-                client_meta = payload.get("client_metadata", {}) or {}
-                if client_meta:
-                    meta_lines = [f"{k}: {v}" for k, v in client_meta.items()]
-                    context_info += "\n\nCLIENT METADATA:\n" + "\n".join(meta_lines)
 
                 messages = [
                     {"role": "system", "content": context_info},
@@ -2883,15 +2911,19 @@ VAT RULES BY TRANSACTION TYPE:
                 response = openai.ChatCompletion.create(
                     model=model_name,
                     messages=messages,
-                    max_tokens=700,
+                    max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", "700")),
                     temperature=float(os.getenv("OPENAI_TEMPERATURE", "0.6"))
                 )
 
                 reply = response.choices[0].message.content
-            except Exception as e:
-                # If OpenAI call fails, fall back to rule-based
-                print(f"[WARN] OpenAI call failed: {e}")
+
+            else:
+                # No provider configured or no API keys provided - use rule-based fallback
                 reply = generate_rule_based_response(message, stats, merchant)
+
+        except Exception as e:
+            print(f"[WARN] AI provider call failed: {e}")
+            reply = generate_rule_based_response(message, stats, merchant)
         else:
             # Fallback to rule-based responses
             reply = generate_rule_based_response(message, stats, merchant)
