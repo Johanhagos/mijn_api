@@ -19,7 +19,7 @@ if %errorLevel% neq 0 (
 
 set SFTP_HOST=[REDACTED]
 set SFTP_USER=[REDACTED]
-set SFTP_PASSWORD=Nathnael1997
+set /p SFTP_PASSWORD="Enter your SFTP password: "
 set SFTP_PORT=22
 set REMOTE_PATH=/home/cruerobt5/public_html
 set LOCAL_PATH=c:\Users\gebruiker\Desktop\mijn_api\webshop_for_upload

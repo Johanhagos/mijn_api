@@ -1,0 +1,28 @@
+{
+  "NL": {
+    "name": "Netherlands",
+    "standard_rate": 21.0,
+    "reduced_rates": {
+      "9%": "certain food, medicines, books, labour-intensive services"
+    },
+    "notes": "OSS threshold EUR 10000; keep records 7 years; treat crypto as payment method"
+  },
+  "SE": {
+    "name": "Sweden",
+    "standard_rate": 25.0,
+    "reduced_rates": {
+      "12%": "food, hotels, passenger transport",
+      "6%": "books, newspapers, cultural events"
+    },
+    "notes": "OSS threshold EUR 10000; keep records 7 years; treat crypto as payment method"
+  },
+  "DE": { "name": "Germany", "standard_rate": 19.0 },
+  "FR": { "name": "France", "standard_rate": 20.0 },
+  "GB": { "name": "United Kingdom", "standard_rate": 20.0 },
+  "US": { "name": "United States", "standard_rate": 0.0, "notes": "State sales tax varies; federal nil" },
+  "CA": { "name": "Canada", "standard_rate": 5.0, "notes": "GST; provinces have PST/HST" },
+  "AU": { "name": "Australia", "standard_rate": 10.0 },
+  "JP": { "name": "Japan", "standard_rate": 10.0 },
+  "IN": { "name": "India", "standard_rate": 18.0 },
+  "BR": { "name": "Brazil", "standard_rate": 15.0 }
+}

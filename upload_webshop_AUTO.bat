@@ -15,8 +15,8 @@ REM 3. Wait for completion
 setlocal enabledelayedexpansion
 
 REM ===== CONFIGURATION =====
-REM CHANGE THIS TO YOUR SFTP PASSWORD:
-set SFTP_PASSWORD=your_sftp_password_here
+REM Enter SFTP password at runtime instead of hard-coding it
+set /p SFTP_PASSWORD="Enter your SFTP password: "
 
 REM DO NOT CHANGE BELOW:
 set SFTP_HOST=[REDACTED]
@@ -42,15 +42,11 @@ if %errorLevel% neq 0 (
     exit /b 1
 )
 
-REM Check if SFTP password is set
-if "%SFTP_PASSWORD%"=="your_sftp_password_here" (
-    echo ERROR: SFTP password not set!
+REM Ensure password provided
+if "%SFTP_PASSWORD%"=="" (
+    echo ERROR: No SFTP password provided!
     echo.
-    echo Please edit this file and replace:
-    echo   your_sftp_password_here
-    echo with your actual SFTP password
-    echo.
-    echo Then run again.
+    echo Please run the script again and enter your SFTP password when prompted.
     pause
     exit /b 1
 )

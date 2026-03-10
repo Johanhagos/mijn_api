@@ -315,6 +315,17 @@ if not READ_ONLY_FS and not (DATA_DIR / "invoices.json").exists():
         except Exception as e:
             print(f"[WARN] Could not copy invoices.json: {e}")
 
+# Initialize vat_compliance.json from repo if not present in DATA_DIR
+if not READ_ONLY_FS and not (DATA_DIR / "vat_compliance.json").exists():
+    repo_vat = Path(__file__).parent / "vat_compliance.json"
+    if repo_vat.exists():
+        import shutil
+        try:
+            shutil.copy(str(repo_vat), str(DATA_DIR / "vat_compliance.json"))
+            print(f"[INFO] Initialized vat_compliance.json from repo to {DATA_DIR}")
+        except Exception as e:
+            print(f"[WARN] Could not copy vat_compliance.json: {e}")
+
 # If invoices.json exists but is empty, seed from repo copy
 if not READ_ONLY_FS and (DATA_DIR / "invoices.json").exists():
     try:
@@ -328,6 +339,20 @@ if not READ_ONLY_FS and (DATA_DIR / "invoices.json").exists():
                 print(f"[INFO] Seeded invoices.json from repo to {DATA_DIR}")
     except Exception as e:
         print(f"[WARN] Could not seed invoices.json: {e}")
+
+# If vat_compliance.json exists but is empty, seed from repo copy
+if not READ_ONLY_FS and (DATA_DIR / "vat_compliance.json").exists():
+    try:
+        existing_text = (DATA_DIR / "vat_compliance.json").read_text(encoding="utf-8").strip()
+        existing_vat = json.loads(existing_text or "{}")
+        if not existing_vat:
+            repo_vat = Path(__file__).parent / "vat_compliance.json"
+            if repo_vat.exists():
+                import shutil
+                shutil.copy(str(repo_vat), str(DATA_DIR / "vat_compliance.json"))
+                print(f"[INFO] Seeded vat_compliance.json from repo to {DATA_DIR}")
+    except Exception as e:
+        print(f"[WARN] Could not seed vat_compliance.json: {e}")
 
 # Simple in-process lock to avoid concurrent writes from multiple requests (single-process only)
 _lock = threading.Lock()
@@ -2762,15 +2787,91 @@ def get_country_vat_info(country_code: str) -> dict:
 async def ai_chat(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
     """AI assistant endpoint for merchant dashboard help - specialized in VAT & compliance."""
     message = payload.get("message", "").strip()
-    context = payload.get("context", {})
+    context = payload.get("context", {}) or {}
     history = payload.get("history", [])
+
+    # Normalize merchant context: prefer explicit merchant in payload, otherwise
+    # fall back to the authenticated `current_user` if available.
+    merchant = context.get("merchant") or (current_user if isinstance(current_user, dict) else {})
+
+    # Quick intent: if user message is just a country name (or contains one),
+    # override the merchant country for this response so users can ask e.g. "sweden".
+    def _detect_country_from_text(text: str):
+        if not text:
+            return None
+        mapping = {
+            "sweden": "SE", "swedish": "SE",
+            "netherlands": "NL", "nederland": "NL", "dutch": "NL",
+            "germany": "DE", "de": "DE", "france": "FR", "fr": "FR",
+            "belgium": "BE", "be": "BE", "spain": "ES", "es": "ES",
+            "italy": "IT", "it": "IT", "uk": "GB", "united kingdom": "GB",
+            "united states": "US", "usa": "US", "canada": "CA", "ca": "CA",
+            "australia": "AU", "au": "AU", "norway": "NO", "no": "NO",
+            "finland": "FI", "fi": "FI", "ireland": "IE", "ie": "IE",
+            "denmark": "DK", "dk": "DK",
+            "switzerland": "CH", "ch": "CH", "swiss": "CH",
+            "portugal": "PT", "pt": "PT", "greece": "GR", "gr": "GR",
+            "poland": "PL", "pl": "PL", "romania": "RO", "ro": "RO",
+            "hungary": "HU", "hu": "HU", "czech": "CZ", "czechia": "CZ",
+            "slovakia": "SK", "slovenia": "SI", "latvia": "LV", "lithuania": "LT",
+            "luxembourg": "LU", "lu": "LU", "malta": "MT", "mt": "MT",
+            "bulgaria": "BG", "bg": "BG", "ukraine": "UA", "ua": "UA",
+            "russia": "RU", "ru": "RU", "turkey": "TR", "tr": "TR",
+            "japan": "JP", "jp": "JP", "china": "CN", "cn": "CN",
+            "india": "IN", "in": "IN", "singapore": "SG", "sg": "SG",
+            "south korea": "KR", "korea": "KR", "kr": "KR",
+            "brazil": "BR", "br": "BR", "mexico": "MX", "mx": "MX",
+            "argentina": "AR", "ar": "AR", "chile": "CL", "cl": "CL",
+            "colombia": "CO", "co": "CO", "south africa": "ZA", "za": "ZA",
+            "uae": "AE", "united arab emirates": "AE", "saudi arabia": "SA", "sa": "SA",
+        }
+        txt = text.strip().lower()
+        # exact match first
+        if txt in mapping:
+            return mapping[txt]
+        # single-word fallback
+        for word in txt.replace(',', ' ').split():
+            if word in mapping:
+                return mapping[word]
+        # substring match
+        for name, code in mapping.items():
+            if name in txt:
+                return code
+        return None
+
+    detected_country = _detect_country_from_text(message)
+    if detected_country:
+        merchant = dict(merchant or {})
+        merchant['country'] = detected_country
+        # If the user explicitly asked to save/update their merchant country,
+        # persist it to `users.json` so future chats reflect the change.
+        low = (message or '').lower()
+        persist_triggers = [
+            'set my country to', 'set country to', 'remember my country', 'remember country',
+            'save my country', 'save country', 'update my country', 'change my country'
+        ]
+        should_persist = any(t in low for t in persist_triggers)
+        if should_persist and isinstance(current_user, dict) and current_user.get('id'):
+            try:
+                users = load_users()
+                changed = False
+                for u in users:
+                    if u.get('id') == current_user.get('id') or u.get('name') == current_user.get('name'):
+                        u['country'] = detected_country
+                        changed = True
+                        break
+                if changed:
+                    save_users(users)
+                    return {"reply": f"Saved your country as {detected_country} for your account."}
+            except Exception as e:
+                print(f"[WARN] Could not persist user country: {e}")
     
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
     
     # Build context string for AI
-    stats = context.get("stats", {})
-    merchant = context.get("merchant", {})
+    stats = (context.get("stats", {}) if isinstance(context, dict) else {})
+    merchant = merchant or {}
     
     # Get country-specific VAT rules
     merchant_country = merchant.get('country', 'XX')
@@ -2923,9 +3024,6 @@ VAT RULES BY TRANSACTION TYPE:
 
         except Exception as e:
             print(f"[WARN] AI provider call failed: {e}")
-            reply = generate_rule_based_response(message, stats, merchant)
-        else:
-            # Fallback to rule-based responses
             reply = generate_rule_based_response(message, stats, merchant)
             
     except Exception as e:

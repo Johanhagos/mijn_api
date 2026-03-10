@@ -1,0 +1,9 @@
+path,excerpt,reason,recommended_action
+COINBASE_COMMERCE_SETUP.md,COINBASE_COMMERCE_API_KEY=837cb701-982d-435a-8abd-724b723a3883,Hard-coded API key in repo - high risk; appears valid,Rotate the key in Coinbase, remove from repo, set `COINBASE_COMMERCE_API_KEY` in deployment secrets
+COINBASE_DEPLOYMENT_SUMMARY.md,COINBASE_COMMERCE_API_KEY: 837cb701-982d-435a-8abd-724b723a3883,Hard-coded API key in documentation - high risk; rotate & redact,Rotate key in Coinbase, redact docs and replace with placeholder, update env in Railway
+api_keys.json,"\"key\": \"sk_test_local_automation\"",Repository contains a test API key value (used for local automation); may be abused if used in prod,Remove or replace the raw key in the repo (use placeholder), rotate if used, and store real keys in secrets
+.env.local,VERCEL_OIDC_TOKEN="<long jwt...>",Long-lived token/JWT in local env file — sensitive,Remove token from repo, revoke/rotate token in Vercel, and store only in deployment secrets
+.env.prod,DATABASE_URL=postgresql://apibc:apibc@db:5432/apibc,Contains a DB connection string with credentials (example or real) — treat as sensitive,Replace with placeholder, rotate DB password if real, and configure via deployment secrets
+.env.example,JWT_SECRET_KEY=change-me-for-production,Example JWT secret present (placeholder) and possible default usage; ensure production uses strong secret,Remove secret-like defaults from repo and require env configuration; rotate production JWT_SECRET_KEY
+.github/copilot-instructions.md,example password "hunter2" in docs,Contains example password strings which flag detectors; low risk but noise,No action needed other than removing literal examples or marking allowlist for scan
+upload batch scripts (various),previous hard-coded SFTP passwords (now prompted),Previously had plaintext SFTP passwords in .bat files — fixed: scripts now prompt for password,Ensure any leaked passwords were rotated and verify history rewrite covered old commits

@@ -19,7 +19,7 @@ if %errorLevel% neq 0 (
 )
 
 REM Set credentials
-set SFTP_PASSWORD=Nathnael1997&
+set /p SFTP_PASSWORD="Enter your SFTP password: "
 set SFTP_HOST=[REDACTED]
 set SFTP_USER=[REDACTED]
 set SFTP_PORT=22
