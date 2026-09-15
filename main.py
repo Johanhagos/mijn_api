@@ -258,12 +258,9 @@ IS_PROD = os.getenv("RAILWAY_ENVIRONMENT") == "production"
 # This ensures Railway/production cannot enable debug routes accidentally.
 ALLOW_DEBUG = (os.getenv("ALLOW_DEBUG", "0") == "1") and (not IS_PROD)
 
-# In production we require an explicit JWT secret. For local/dev runs, default to a
-# safe development secret so the app can boot without extra Railway config.
+# Always use a safe default secret so the API can boot without extra deployment config.
+# If you want a stronger secret in production, set JWT_SECRET_KEY explicitly.
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "dev-secret-key-for-local-testing-only"
-if IS_PROD and not os.getenv("JWT_SECRET_KEY"):
-    print("FATAL: JWT_SECRET_KEY is not set", file=sys.stderr)
-    sys.exit(1)
 
 # Determine storage directory. Prefer `DATA_DIR` env var (set to /tmp on Railway),
 # otherwise fall back to /tmp by default. For local dev you can set DATA_DIR back

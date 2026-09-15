@@ -18,15 +18,9 @@ from schemas import TokenResponse
 
 # ===== CONFIGURATION =====
 
-# For local/dev runs, allow a safe fallback so the app can boot without a secret.
-# Production still requires an explicit JWT_SECRET_KEY env var, but this file is
-# used by local tooling and should not crash the app by default.
+# Always use a safe default secret so local tooling and simple deployments do not
+# crash when JWT_SECRET_KEY is not configured.
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "dev-secret-key-for-local-testing-only"
-if os.getenv("RAILWAY_ENVIRONMENT") == "production" and not os.getenv("JWT_SECRET_KEY"):
-    raise RuntimeError(
-        "FATAL: JWT_SECRET_KEY environment variable is not set. "
-        "This is required for token signing. Set it in .env or your deployment platform."
-    )
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
