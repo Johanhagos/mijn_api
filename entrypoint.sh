@@ -65,8 +65,11 @@ except Exception as e:
     # Do not exit non-zero; let the process continue so logs are visible
 PY
 
-# Default PORT for Railway
-PORT=${PORT:-8000}
+# Default PORT for Railway. Railway commonly exposes 8080, so prefer that when not set.
+PORT=${PORT:-8080}
+export PORT
+
+echo "Using PORT=${PORT}"
 
 # Prefer gunicorn if available, otherwise fall back to uvicorn for easier local debugging
 if command -v gunicorn >/dev/null 2>&1; then
@@ -74,7 +77,7 @@ if command -v gunicorn >/dev/null 2>&1; then
   exec gunicorn main:app \
     --worker-class uvicorn.workers.UvicornWorker \
     --workers ${GUNICORN_WORKERS:-1} \
-    --bind 0.0.0.0:$PORT \
+    --bind 0.0.0.0:${PORT} \
     --timeout 120 \
     --capture-output \
     --log-level debug \
@@ -82,5 +85,5 @@ if command -v gunicorn >/dev/null 2>&1; then
     --error-logfile -
 else
   echo "gunicorn not found; starting uvicorn directly"
-  exec python -m uvicorn main:app --host 0.0.0.0 --port $PORT --log-level debug
+  exec python -m uvicorn main:app --host 0.0.0.0 --port ${PORT} --log-level debug
 fi

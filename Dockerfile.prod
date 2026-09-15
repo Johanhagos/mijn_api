@@ -21,7 +21,7 @@ RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app \
     && chown -R app:app /app
 USER app
 
-ENV PORT=8000
+ENV PORT=8080
 EXPOSE ${PORT}
 
 # Use entrypoint to run alembic migrations inside the container, then start gunicorn
