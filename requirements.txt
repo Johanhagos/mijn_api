@@ -2,9 +2,10 @@ fastapi==0.128.0
 uvicorn==0.40.0
 pydantic==2.12.5
 pydantic-core==2.41.5
-SQLAlchemy==2.0.28
+SQLAlchemy==2.0.21
 python-dotenv==1.0.0
-psycopg2-binary==2.9.9
+# Use a prebuilt Windows wheel to avoid the missing pg_config build issue in local dev.
+psycopg2-binary==2.9.13
 python-multipart==0.0.22
 fpdf2==2.8.5
 requests>=2.28

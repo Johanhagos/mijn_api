@@ -16,6 +16,9 @@ from jose import jwt, JWTError
 from fastapi import Depends
 from fastapi.security import OAuth2PasswordBearer
 import threading
+import signal
+import smtplib
+from email.message import EmailMessage
 
 # INTERNATIONAL TAX RATES DATABASE (2026)
 # Format: 'COUNTRY_CODE': tax_rate_percentage
@@ -256,10 +259,11 @@ IS_PROD = os.getenv("RAILWAY_ENVIRONMENT") == "production"
 ALLOW_DEBUG = (os.getenv("ALLOW_DEBUG", "0") == "1") and (not IS_PROD)
 
 # In production we must have an explicit JWT secret. Fail fast if missing.
-if IS_PROD:
-    if not os.getenv("JWT_SECRET_KEY"):
-        print("FATAL: JWT_SECRET_KEY is not set", file=sys.stderr)
-        sys.exit(1)
+# For local development, use a safe fallback so the app can run and tests can exercise login.
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "dev-secret-key-for-local-testing-only"
+if IS_PROD and not os.getenv("JWT_SECRET_KEY"):
+    print("FATAL: JWT_SECRET_KEY is not set", file=sys.stderr)
+    sys.exit(1)
 
 # Determine storage directory. Prefer `DATA_DIR` env var (set to /tmp on Railway),
 # otherwise fall back to /tmp by default. For local dev you can set DATA_DIR back
@@ -365,8 +369,8 @@ BCRYPT_MAX_BYTES = 72
 
 
 # JWT / OAuth2 config
-# In production `JWT_SECRET_KEY` must be set (checked above). Do not use a hard-coded fallback.
-SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+# Keep the local-development fallback for non-production runs, while production still requires an explicit secret.
+SECRET_KEY = JWT_SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
@@ -493,6 +497,59 @@ def log_event(event: str, username: str = "-", ip: str = "-"):
             f.write(line)
 
 
+# --- Shutdown / signal diagnostics (added for deployment triage) ---
+def _excepthook(exc_type, exc_value, exc_traceback):
+    try:
+        if exc_type is SystemExit:
+            msg = f"[DIAG] SystemExit: {exc_value}"
+            print(msg, file=sys.stderr)
+            try:
+                log_event(f"SYSTEM_EXIT:{exc_value}")
+            except Exception:
+                pass
+    finally:
+        # delegate to default handler so other exceptions still print
+        try:
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        except Exception:
+            pass
+
+
+sys.excepthook = _excepthook
+
+
+def _handle_signal(signum, frame):
+    try:
+        print(f"[DIAG] Received signal {signum}", file=sys.stderr)
+        try:
+            log_event(f"SIGNAL_{signum}")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
+for _sig in ("SIGTERM", "SIGINT", "SIGHUP"):
+    if hasattr(signal, _sig):
+        try:
+            signal.signal(getattr(signal, _sig), _handle_signal)
+        except Exception:
+            # Signal registration may fail in restricted environments; ignore.
+            pass
+
+
+@app.on_event("shutdown")
+def _on_shutdown():
+    try:
+        print("[DIAG] FastAPI shutdown event triggered", file=sys.stderr)
+        try:
+            log_event("FASTAPI_SHUTDOWN")
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def get_client_ip(request: Request):
     return request.client.host if request.client else "unknown"
 
@@ -614,6 +671,52 @@ def save_contact(contact_data: dict) -> None:
         contact_data["created_at"] = datetime.now(timezone.utc).isoformat()
         contacts.append(contact_data)
         CONTACTS_FILE.write_text(json.dumps(contacts, indent=4), encoding="utf-8")
+
+
+def _send_email_smtp(to_address: str, subject: str, body: str) -> bool:
+    """Send a simple email via SMTP using environment-configured credentials.
+    Returns True on success, False on failure or when SMTP is not configured.
+    """
+    host = os.getenv("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT", "0") or 0)
+    user = os.getenv("SMTP_USER")
+    password = os.getenv("SMTP_PASS")
+    from_addr = os.getenv("FROM_EMAIL", os.getenv("SMTP_FROM", "no-reply@apiblockchain.io"))
+
+    if not host or port == 0:
+        # SMTP not configured
+        return False
+
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = subject
+        msg["From"] = from_addr
+        msg["To"] = to_address
+        msg.set_content(body)
+
+        # Use implicit SSL for SMTPS (commonly port 465), otherwise use STARTTLS
+        if port == 465:
+            if user and password:
+                server = smtplib.SMTP_SSL(host, port, timeout=10)
+                server.login(user, password)
+            else:
+                server = smtplib.SMTP_SSL(host, port, timeout=10)
+        else:
+            server = smtplib.SMTP(host, port, timeout=10)
+            try:
+                server.starttls()
+            except Exception:
+                # Some servers may not support STARTTLS; continue without it
+                pass
+            if user and password:
+                server.login(user, password)
+
+        server.send_message(msg)
+        server.quit()
+        return True
+    except Exception as e:
+        log_event(f"EMAIL_SEND_FAILED to={to_address} error={e}", to_address, "-")
+        return False
 
 
 def load_invoices() -> List[dict]:
@@ -5149,6 +5252,25 @@ async def submit_contact_form(contact: ContactMessage, request: Request):
             contact_dict['email'],
             contact_dict.get('ip', 'unknown')
         )
+
+        # Attempt to send notification email (best-effort). SMTP must be configured
+        try:
+            subject = f"Contact form: {contact_dict['subject']}"
+            body = (
+                f"Name: {contact_dict['name']}\n"
+                f"Email: {contact_dict['email']}\n"
+                f"Phone: {contact_dict.get('phone','')}\n"
+                f"Company: {contact_dict.get('company','')}\n\n"
+                f"Message:\n{contact_dict['message']}\n"
+            )
+            sent = _send_email_smtp(contact_dict.get('to', 'info@apiblockchain.io'), subject, body)
+            if sent:
+                log_event(f"CONTACT_EMAIL_SENT to={contact_dict.get('to')}", contact_dict['email'], contact_dict.get('ip', 'unknown'))
+            else:
+                log_event(f"CONTACT_EMAIL_NOT_SENT to={contact_dict.get('to')}", contact_dict['email'], contact_dict.get('ip', 'unknown'))
+        except Exception:
+            # Keep endpoint resilient — log and continue
+            log_event(f"CONTACT_EMAIL_EXCEPTION to={contact_dict.get('to')}", contact_dict['email'], contact_dict.get('ip', 'unknown'))
         
         return {
             "success": True,
