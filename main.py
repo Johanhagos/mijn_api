@@ -258,8 +258,8 @@ IS_PROD = os.getenv("RAILWAY_ENVIRONMENT") == "production"
 # This ensures Railway/production cannot enable debug routes accidentally.
 ALLOW_DEBUG = (os.getenv("ALLOW_DEBUG", "0") == "1") and (not IS_PROD)
 
-# In production we must have an explicit JWT secret. Fail fast if missing.
-# For local development, use a safe fallback so the app can run and tests can exercise login.
+# In production we require an explicit JWT secret. For local/dev runs, default to a
+# safe development secret so the app can boot without extra Railway config.
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY") or "dev-secret-key-for-local-testing-only"
 if IS_PROD and not os.getenv("JWT_SECRET_KEY"):
     print("FATAL: JWT_SECRET_KEY is not set", file=sys.stderr)
