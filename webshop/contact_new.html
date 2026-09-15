@@ -442,7 +442,7 @@
                     ✗ There was an error sending your message. Please try again or contact us directly.
                 </div>
 
-                <form id="contactForm" method="POST" action="/api/contact">
+                <form id="contactForm" method="POST" action="https://api.apiblockchain.io/api/contact">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="name">Full Name *</label>
@@ -526,7 +526,7 @@
                 submitBtn.classList.add('btn-loading');
 
                 // Send to backend API
-                const response = await fetch('/api/contact', {
+                const response = await fetch('https://api.apiblockchain.io/api/contact', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

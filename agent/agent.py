@@ -19,6 +19,11 @@ def run_agent(task: str):
     if "vat" in task_l:
         # try to extract country code or name
         parts = task.split()
+        # Prefer resolving a country name from the full task text first
+        code = lookup_country(task)
+        if code:
+            summary = format_vat_summary(code)
+            return {"task": task, "result": summary}
         # look for a 2-letter code in the task
         code = None
         for p in parts:

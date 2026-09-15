@@ -16,10 +16,11 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Send as 'name' field if it looks like a username, otherwise as 'email'
+      // The backend accepts either `name` or `email`, but some valid usernames are email-like.
+      // Send the entered value as `name` and also as `email` only when it is clearly an email-based login.
       const isEmail = identifier.includes('@');
-      console.log('Login attempt:', { isEmail, name: isEmail ? '' : identifier, email: isEmail ? identifier : undefined });
-      const res: any = await api.login(isEmail ? '' : identifier, password, isEmail ? identifier : undefined);
+      console.log('Login attempt:', { name: identifier, email: isEmail ? identifier : undefined });
+      const res: any = await api.login(identifier, password, isEmail ? identifier : undefined);
 
       // store access token under `jwt` (used by lib/api and protectedApi)
       if (res?.access_token) localStorage.setItem('jwt', res.access_token);
@@ -48,7 +49,7 @@ export default function Login() {
     try {
       const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
         ? process.env.NEXT_PUBLIC_API_URL
-        : 'https://api.apiblockchain.io';
+        : 'http://127.0.0.1:8000';
       const res = await fetch(`${apiBase}/forgot_password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

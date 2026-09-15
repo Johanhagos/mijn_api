@@ -83,13 +83,8 @@ Mount with::
     app.include_router(agent_router, prefix="/agent")
 
 """
-from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
-import os
 from .agent import run_agent
 from .memory import load_memory, save_memory
-
-router = APIRouter()
 
 AGENT_ENABLED = os.environ.get("AGENT_ENABLED", "0") == "1"
 AGENT_ALLOW_DEPLOY = os.environ.get("AGENT_ALLOW_DEPLOY", "0") == "1"

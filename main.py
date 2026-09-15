@@ -208,11 +208,14 @@ def determine_tax_rate(seller_country: str, buyer_country: str, buyer_tax_id: st
 
 app = FastAPI(title="Secure User API")
 
-# CORS configuration: lock down to known frontend origins in production, allow localhost in non-prod
+# CORS configuration: allow the production dashboard domains and localhost in local dev.
+# Vercel previews use a *.vercel.app origin, so we allow both exact hosts and Vercel subdomains.
 FRONTEND_ORIGINS = [
     "https://dashboard.apiblockchain.io",
+    "https://www.apiblockchain.io",
     "https://apiblockchain.io",
     "https://api.apiblockchain.io",
+    "https://merchant-dashboard-tau.vercel.app",
 ]
 
 # Allow localhost origins when not running in production (convenience for dev)
@@ -220,12 +223,16 @@ if os.getenv("RAILWAY_ENVIRONMENT") != "production":
     FRONTEND_ORIGINS += [
         "http://localhost:3000",
         "http://localhost:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
+        "http://127.0.0.1:3002",
     ]
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=FRONTEND_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app$|https://.*\.apiblockchain\.io$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

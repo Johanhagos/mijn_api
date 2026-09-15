@@ -35,3 +35,17 @@
 2026-02-02T18:47:45.682640+00:00 | - | - | SESSION_COMPLETED id=9baa406a-a128-47c1-b5a5-ee83f5f5ec25
 2026-02-08T15:28:39.987220+00:00 | - | - | WEBHOOK_STRIPE_SUCCESS session_id=b26a6c97 amount=99.99
 2026-02-08T15:28:54.031942+00:00 | - | - | WEBHOOK_STRIPE_SUCCESS session_id=0a5aa39d amount=99.99
+2026-03-14T18:01:25.829868+00:00 | 127.0.0.1 | tester@example.com | CONTACT_FORM_SUBMITTED from=tester@example.com subject=Subscription Request
+2026-03-14T18:01:35.997472+00:00 | - | info@apiblockchain.io | EMAIL_SEND_FAILED to=info@apiblockchain.io error=Connection unexpectedly closed: timed out
+2026-03-14T18:01:35.998115+00:00 | 127.0.0.1 | tester@example.com | CONTACT_EMAIL_NOT_SENT to=info@apiblockchain.io
+2026-03-14T18:01:45.290460+00:00 | 127.0.0.1 | tester@example.com | CONTACT_FORM_SUBMITTED from=tester@example.com subject=Subscription Request
+2026-03-14T18:01:55.347365+00:00 | - | info@apiblockchain.io | EMAIL_SEND_FAILED to=info@apiblockchain.io error=Connection unexpectedly closed: timed out
+2026-03-14T18:01:55.347992+00:00 | 127.0.0.1 | tester@example.com | CONTACT_EMAIL_NOT_SENT to=info@apiblockchain.io
+2026-03-14T18:02:25.576677+00:00 | - | - | SIGNAL_2
+2026-03-14T18:02:30.462967+00:00 | 127.0.0.1 | tester@example.com | CONTACT_FORM_SUBMITTED from=tester@example.com subject=SMTP Test - send mail
+2026-03-14T18:02:40.491657+00:00 | - | info@apiblockchain.io | EMAIL_SEND_FAILED to=info@apiblockchain.io error=Connection unexpectedly closed: timed out
+2026-03-14T18:02:40.492636+00:00 | 127.0.0.1 | tester@example.com | CONTACT_EMAIL_NOT_SENT to=info@apiblockchain.io
+2026-03-14T18:07:13.643423+00:00 | 127.0.0.1 | info@apiblockchain.io | CONTACT_FORM_SUBMITTED from=info@apiblockchain.io subject=SMTP test
+2026-03-14T18:07:15.460184+00:00 | 127.0.0.1 | info@apiblockchain.io | CONTACT_EMAIL_SENT to=info@apiblockchain.io
+2026-03-15T13:37:54.581732+00:00 | 127.0.0.1 | tester@example.com | CONTACT_FORM_SUBMITTED from=tester@example.com subject=Frontend submission test
+2026-03-15T13:37:55.464829+00:00 | 127.0.0.1 | tester@example.com | CONTACT_EMAIL_SENT to=info@apiblockchain.io

@@ -17,11 +17,17 @@ export const api = async (path, method = 'GET', data) => {
   return res.json();
 };
 
-export const login = async (name, password) => {
+export const login = async (name, password, email) => {
+  const payload = {
+    password,
+    ...(name ? { name } : {}),
+    ...(email ? { email } : {}),
+  };
+
   const res = await fetch(`${API_BASE}/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, password }),
+    body: JSON.stringify(payload),
     credentials: 'include',
   });
   if (!res.ok) throw new Error(await res.text());

@@ -1,7 +1,7 @@
 // API client for backend communication
 // Build: force regeneration with version marker
 const API_BASE_RAW = process.env.NEXT_PUBLIC_API_URL || '';
-const API_BASE = API_BASE_RAW.startsWith('http') ? API_BASE_RAW : 'https://api.apiblockchain.io';
+const API_BASE = API_BASE_RAW.startsWith('http') ? API_BASE_RAW : 'http://127.0.0.1:8000';
 
 export const api = async (path: string, method = 'GET', data?: any) => {
   const token = typeof window !== 'undefined' ? localStorage.getItem('jwt') : null;
@@ -20,17 +20,17 @@ export const api = async (path: string, method = 'GET', data?: any) => {
 };
 
 export const login = async (name: string, password: string, email?: string) => {
-  // Call backend API directly since CORS is configured for dashboard.apiblockchain.io
   const url = `${API_BASE}/login`;
+  const payload = {
+    ...(name ? { name } : {}),
+    ...(email ? { email } : {}),
+    password,
+  };
 
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      name: name || undefined,
-      email: email || undefined,
-      password 
-    }),
+    body: JSON.stringify(payload),
     credentials: 'include',
   });
   if (!res.ok) throw new Error(await res.text());
