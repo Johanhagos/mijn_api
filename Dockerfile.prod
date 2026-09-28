@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
@@ -22,7 +23,7 @@ RUN groupadd -r app && useradd -r -g app -d /app -s /sbin/nologin app \
 USER app
 
 ENV PORT=8080
-EXPOSE ${PORT}
+EXPOSE 8080
 
 # Use entrypoint to run alembic migrations inside the container, then start gunicorn
 ENTRYPOINT ["/app/entrypoint.sh"]
