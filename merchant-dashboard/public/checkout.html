@@ -480,11 +480,17 @@
                         <div class="crypto-name">USD Coin</div>
                         <div style="font-size: 12px; color: #999;">USDC</div>
                     </div>
+                    <div class="crypto-option" id="apiusdOption" onclick="selectCrypto('APIUSD')" style="display: none; grid-column: 1 / -1;">
+                        <div class="crypto-icon">APIUSD</div>
+                        <div class="crypto-name">APIBlockchain USD</div>
+                        <div style="font-size: 12px; color: #999;">APIUSD</div>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label>Your Wallet Address</label>
                     <input type="text" id="walletAddress" placeholder="0x742d35Cc6634C0532925a3b844Bc9e7595f..." required>
+                    <div id="apiusdBalanceNote" style="display: none; margin-top: 8px; font-size: 13px; color: #666;"></div>
                 </div>
 
                 <div style="background: rgba(16, 185, 129, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
@@ -494,7 +500,7 @@
                     </p>
                 </div>
 
-                <button class="submit-btn" onclick="processCryptoPayment()">Generate Crypto Invoice</button>
+                <button class="submit-btn" id="cryptoSubmitBtn" onclick="processCryptoPayment()">Generate Crypto Invoice</button>
             </div>
 
             <div class="security-info">
@@ -547,6 +553,94 @@
 
         let selectedCrypto = null;
 
+        // APIUSD is offered only in dev mode (localhost or ?dev) while the token is on Sepolia.
+        const APIUSD_SWAP_URL = 'https://apitoken-frontend-development.up.railway.app';
+        const APIUSD_TOKEN = '0x354CBbF9aCcbf79B223ef153f2fb91C2c0AeD521';
+        const SEPOLIA_RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
+        const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+        const isDevMode = ['localhost', '127.0.0.1'].includes(window.location.hostname) || params.has('dev');
+        if (isDevMode) {
+            document.getElementById('apiusdOption').style.display = '';
+        }
+
+        // Dev mode compares the EUR price 1:1 with APIUSD (6 decimals).
+        const apiusdNeeded = BigInt(Math.round(priceAmount * 1e6));
+        let apiusdHasEnough = false;
+        let apiusdCheck = 0;
+
+        async function readApiusdBalance(address) {
+            const response = await fetch(SEPOLIA_RPC_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: 1,
+                    method: 'eth_call',
+                    params: [{ to: APIUSD_TOKEN, data: '0x70a08231' + address.slice(2).toLowerCase().padStart(64, '0') }, 'latest']
+                })
+            });
+            const data = await response.json();
+            if (!data.result || data.result === '0x') {
+                throw new Error(data.error?.message || 'No balance returned');
+            }
+            return BigInt(data.result);
+        }
+
+        function formatApiusd(units) {
+            return (Number(units) / 1e6).toFixed(2);
+        }
+
+        async function refreshApiusdButton() {
+            const btn = document.getElementById('cryptoSubmitBtn');
+            const note = document.getElementById('apiusdBalanceNote');
+            const address = document.getElementById('walletAddress').value.trim();
+            const check = ++apiusdCheck;
+            apiusdHasEnough = false;
+            btn.disabled = false;
+
+            if (selectedCrypto !== 'APIUSD') {
+                btn.textContent = 'Generate Crypto Invoice';
+                note.style.display = 'none';
+                return;
+            }
+            btn.textContent = 'Swap APIUSD';
+            if (!EVM_ADDRESS.test(address)) {
+                note.style.display = 'none';
+                return;
+            }
+
+            note.style.display = 'block';
+            note.textContent = 'Checking APIUSD balance...';
+            btn.disabled = true;
+            try {
+                const balance = await readApiusdBalance(address);
+                if (check !== apiusdCheck) return;
+                apiusdHasEnough = balance >= apiusdNeeded;
+                btn.textContent = apiusdHasEnough ? 'Generate Crypto Invoice' : 'Swap APIUSD';
+                note.textContent = apiusdHasEnough
+                    ? `You have ${formatApiusd(balance)} APIUSD, enough for this plan.`
+                    : `You have ${formatApiusd(balance)} APIUSD, this plan needs ${formatApiusd(apiusdNeeded)} APIUSD.`;
+            } catch (error) {
+                if (check !== apiusdCheck) return;
+                console.error('APIUSD balance error:', error);
+                note.textContent = "Couldn't read the APIUSD balance. Please try again.";
+            }
+            btn.disabled = false;
+        }
+
+        let apiusdInputTimer = null;
+        document.getElementById('walletAddress').addEventListener('input', () => {
+            clearTimeout(apiusdInputTimer);
+            apiusdInputTimer = setTimeout(refreshApiusdButton, 400);
+        });
+
+        // Re-read the balance when the payer comes back from the swap tab.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && selectedCrypto === 'APIUSD') {
+                refreshApiusdButton();
+            }
+        });
+
         function switchPaymentMethod(method) {
             document.querySelectorAll('.payment-content').forEach(el => {
                 el.classList.remove('active');
@@ -569,6 +663,7 @@
                 option.classList.remove('selected');
             });
             event.target.closest('.crypto-option').classList.add('selected');
+            refreshApiusdButton();
         }
 
         async function processCryptoPayment() {
@@ -576,7 +671,18 @@
                 showError('Please enter your wallet address for confirmation receipts');
                 return;
             }
-            
+
+            if (selectedCrypto === 'APIUSD') {
+                if (!EVM_ADDRESS.test(document.getElementById('walletAddress').value.trim())) {
+                    showError('Enter an Ethereum wallet address (0x followed by 40 characters) to use APIUSD');
+                    return;
+                }
+                if (!apiusdHasEnough) {
+                    window.open(APIUSD_SWAP_URL, '_blank', 'noopener');
+                    return;
+                }
+            }
+
             // Disable button to prevent double-clicks
             const btn = event.target;
             btn.disabled = true;
