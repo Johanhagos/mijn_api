@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
+import { API_BASE } from '../lib/config';
 
 export default function Login() {
   const router = useRouter();
@@ -47,10 +48,7 @@ export default function Login() {
     setForgotResult(null);
     setForgotLoading(true);
     try {
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
-        ? process.env.NEXT_PUBLIC_API_URL
-        : 'http://127.0.0.1:8000';
-      const res = await fetch(`${apiBase}/forgot_password`, {
+      const res = await fetch(`${API_BASE}/forgot_password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: forgotEmail }),

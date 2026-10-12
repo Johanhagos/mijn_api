@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
+import { API_BASE } from '../lib/config';
 
 export default function Signup() {
   const router = useRouter();
@@ -36,11 +37,7 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').startsWith('http')
-        ? process.env.NEXT_PUBLIC_API_URL
-        : 'https://api.apiblockchain.io';
-
-      const res = await fetch(`${apiBase}/register`, {
+      const res = await fetch(`${API_BASE}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

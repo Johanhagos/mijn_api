@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
+import { DEV_BYPASS_AUTH } from '../lib/config';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const devBypass = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true';
+  const devBypass = DEV_BYPASS_AUTH;
 
   useEffect(() => {
     if (devBypass) {
