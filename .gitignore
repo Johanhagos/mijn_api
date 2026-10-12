@@ -17,3 +17,7 @@ node_modules/
 
 merchant-dashboard/node_modules/
 merchant-dashboard/.next/
+
+# Local secrets
+API claude key.txt
+*key*.txt

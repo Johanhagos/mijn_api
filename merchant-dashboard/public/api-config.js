@@ -4,8 +4,11 @@
  */
 
 const API_CONFIG = {
-  // Main API endpoint for invoicing, checkout, and other services
-  baseURL: 'https://api.apiblockchain.io',
+  // Main API endpoint for invoicing, checkout, and other services.
+  // Prefer the local FastAPI backend during development and Railway only in production.
+  baseURL: (typeof window !== 'undefined' && window.location.hostname === 'localhost')
+    ? 'http://127.0.0.1:8000'
+    : 'https://apiblockchain-production-production.up.railway.app',
   
   // Endpoints
   endpoints: {
