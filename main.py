@@ -11,7 +11,7 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 import uuid
 import re
-from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from time import time
 from jose import jwt, JWTError
 from fastapi import Depends
@@ -184,28 +184,6 @@ def determine_tax_rate(seller_country: str, buyer_country: str, buyer_tax_id: st
             # Apply seller's local rate (origin tax principle)
             seller_rate = get_tax_rate(seller)
             return seller_rate, False, f"International - {seller} rate applies {seller_rate}%"
-    
-    # Same country - always charge local VAT
-    if seller == buyer:
-        rate = EU_COUNTRIES.get(seller, 21.0)
-        return rate, False, f"Domestic sale - {seller} VAT"
-    
-    # Check if both in EU
-    seller_in_eu = seller in EU_COUNTRIES
-    buyer_in_eu = buyer in EU_COUNTRIES
-    
-    if seller_in_eu and buyer_in_eu:
-        # EU cross-border
-        if buyer_vat_number:
-            # B2B with valid VAT number - reverse charge
-            return 0.0, True, "EU B2B - Reverse charge (customer pays VAT)"
-        else:
-            # B2C - charge seller's VAT
-            rate = EU_COUNTRIES.get(seller, 21.0)
-            return rate, False, f"EU B2C - {seller} VAT applies"
-    else:
-        # Export outside EU - 0% VAT
-        return 0.0, False, "Export outside EU - 0% VAT"
 
 app = FastAPI(title="Secure User API")
 
@@ -280,40 +258,15 @@ if not DATA_DIR.exists():
     if not IS_PROD:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
-INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
-API_KEYS_FILE = DATA_DIR / "api_keys.json"
 CONTACTS_FILE = DATA_DIR / "contacts.json"
 
 # Detect read-only filesystem state so writes can be disabled safely.
 READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
 
-# Initialize api_keys.json from repo if not present in DATA_DIR (important for Railway deployments)
-if not READ_ONLY_FS and not (DATA_DIR / "api_keys.json").exists():
-    repo_api_keys = Path(__file__).parent / "api_keys.json"
-    if repo_api_keys.exists():
-        import shutil
-        try:
-            shutil.copy(str(repo_api_keys), str(DATA_DIR / "api_keys.json"))
-            print(f"[INFO] Initialized api_keys.json from repo to {DATA_DIR}")
-        except Exception as e:
-            print(f"[WARN] Could not copy api_keys.json: {e}")
-
-# Always copy users.json from repo to DATA_DIR on startup (ensures latest version)
-if not READ_ONLY_FS:
-    repo_users = Path(__file__).parent / "users.json"
-    if repo_users.exists():
-        import shutil
-        try:
-            shutil.copy(str(repo_users), str(DATA_DIR / "users.json"))
-            print(f"[INFO] Initialized users.json from repo to {DATA_DIR}")
-        except Exception as e:
-            print(f"[WARN] Could not copy users.json: {e}")
-
-# Invoices, checkout sessions and payments live in the database (app/store.py).
-# On first start the old invoices.json / sessions.json files (DATA_DIR and the repo copy)
-# are imported once. In production DATABASE_URL must point to PostgreSQL.
+# Invoices, checkout sessions, payments, users, API keys, logos and invoice PDFs live in
+# the database (app/store.py). On first start the old invoices.json / sessions.json /
+# users.json / api_keys.json files (DATA_DIR and the repo copy) are imported once. In production DATABASE_URL must point to PostgreSQL.
 from app import store
 store.init(DATA_DIR, IS_PROD, import_sources=[DATA_DIR, Path(__file__).parent])
 
@@ -597,22 +550,6 @@ class ContactMessage(BaseModel):
     to: str = "info@apiblockchain.io"
 
 
-def _ensure_users_file() -> None:
-    if READ_ONLY_FS:
-        # Running on read-only filesystem — don't attempt to create files.
-        return
-
-    if not USERS_FILE.exists():
-        USERS_FILE.write_text("[]", encoding="utf-8")
-
-
-def _ensure_api_keys_file() -> None:
-    if READ_ONLY_FS:
-        return
-    if not API_KEYS_FILE.exists():
-        API_KEYS_FILE.write_text("[]", encoding="utf-8")
-
-
 def _ensure_contacts_file() -> None:
     if READ_ONLY_FS:
         return
@@ -697,11 +634,7 @@ def save_invoices(invoices: List[dict]) -> None:
 
 
 def load_api_keys() -> List[dict]:
-    _ensure_api_keys_file()
-    try:
-        return json.loads(API_KEYS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    return store.load_api_keys()
 
 
 def load_sessions() -> List[dict]:
@@ -709,30 +642,15 @@ def load_sessions() -> List[dict]:
 
 
 def save_api_keys(keys: List[dict]) -> None:
-    if READ_ONLY_FS:
-        raise RuntimeError("Filesystem is read-only; cannot persist api_keys.json")
-    with _lock:
-        API_KEYS_FILE.write_text(json.dumps(keys, indent=4), encoding="utf-8")
+    store.save_api_keys(keys)
 
 
 def save_sessions(sessions: List[dict]) -> None:
     store.save_sessions(sessions)
 
 
-def ensure_invoice_pdf_dir() -> None:
-    if READ_ONLY_FS:
-        return
-    if not INVOICE_PDF_DIR.exists():
-        INVOICE_PDF_DIR.mkdir(parents=True, exist_ok=True)
-
-
 def load_users() -> List[dict]:
-    _ensure_users_file()
-    try:
-        return json.loads(USERS_FILE.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        # If the file is corrupted, return empty list (could also raise)
-        return []
+    return store.load_users()
 
 
 def _get_db_session():
@@ -824,11 +742,7 @@ def db_update_role(user_id: int, role: str):
 
 
 def save_users(users: List[dict]) -> None:
-    if READ_ONLY_FS:
-        raise RuntimeError("Filesystem is read-only; cannot persist users.json")
-
-    with _lock:
-        USERS_FILE.write_text(json.dumps(users, indent=4), encoding="utf-8")
+    store.save_users(users)
 
 
 def _hash_password(password: str) -> str:
@@ -1309,6 +1223,7 @@ async def delete_user(user_id: int, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=404, detail="User not found")
 
     removed = users.pop(idx)
+    store.delete_user(removed["id"])
     save_users(users)
 
     # Audit admin deletion
@@ -1947,11 +1862,9 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
         )
 
         pdf_bytes = render_invoice_pdf(pdf_req)
-        ensure_invoice_pdf_dir()
-        if not READ_ONLY_FS and INVOICE_PDF_DIR.exists():
-            pdf_path = INVOICE_PDF_DIR / f"invoice-{unique_id}.pdf"
-            pdf_path.write_bytes(pdf_bytes)
-            pdf_url = str(pdf_path)
+        pdf_name = f"invoice_pdfs/invoice-{unique_id}.pdf"
+        store.put_file(pdf_name, pdf_bytes, "application/pdf")
+        pdf_url = f"db:{pdf_name}"
     except Exception as e:
         logger = logging.getLogger("uvicorn.error")
         logger.exception("Error generating invoice PDF")
@@ -2304,9 +2217,13 @@ LOGO_EXTENSIONS = ("png", "jpg", "jpeg", "gif", "webp")
 LOGO_FILENAME_RE = re.compile(r"^merchant-[A-Za-z0-9_-]+-logo\.(png|jpg|jpeg|gif|webp)$")
 
 
-def _logo_public_path(logo_path: Path) -> str:
+LOGO_CONTENT_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                      "gif": "image/gif", "webp": "image/webp"}
+
+
+def _logo_public_path(filename: str, updated_at: datetime) -> str:
     """URL path (relative to the API host) that serves this logo; ?v= busts browser caches."""
-    return f"/merchant/logos/{logo_path.name}?v={int(logo_path.stat().st_mtime)}"
+    return f"/merchant/logos/{filename}?v={int(updated_at.timestamp())}"
 
 
 @app.get("/merchant/logos/{filename}")
@@ -2314,10 +2231,11 @@ async def serve_merchant_logo(filename: str):
     """Public: logos are shown on invoices, so they are not secret."""
     if not LOGO_FILENAME_RE.match(filename):
         raise HTTPException(status_code=404, detail="Logo not found")
-    logo_path = DATA_DIR / "logos" / filename
-    if not logo_path.is_file():
+    f = store.get_file(f"logos/{filename}")
+    if not f:
         raise HTTPException(status_code=404, detail="Logo not found")
-    return FileResponse(logo_path, headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "public, max-age=300"})
+    return Response(content=f["content"], media_type=f["content_type"],
+                    headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "public, max-age=300"})
 
 
 @app.post("/merchant/logo")
@@ -2338,18 +2256,13 @@ async def upload_merchant_logo(file: UploadFile = File(...), current_user: dict 
         raise HTTPException(status_code=400, detail="Logo must be png, jpg, jpeg, gif or webp")
     filename = f"merchant-{merchant_id}-logo.{ext}"
     
-    # Save to LOGOS directory
-    logo_dir = DATA_DIR / "logos"
     try:
-        logo_dir.mkdir(parents=True, exist_ok=True)
-        # Only one logo per merchant: drop older files with another extension
+        # Only one logo per merchant: drop older ones with another extension
         for old_ext in LOGO_EXTENSIONS:
-            old = logo_dir / f"merchant-{merchant_id}-logo.{old_ext}"
-            if old_ext != ext and old.exists():
-                old.unlink()
-        logo_path = logo_dir / filename
-        logo_path.write_bytes(content)
-        logo_url = _logo_public_path(logo_path)
+            if old_ext != ext:
+                store.delete_file(f"logos/merchant-{merchant_id}-logo.{old_ext}")
+        store.put_file(f"logos/{filename}", content, LOGO_CONTENT_TYPES[ext])
+        logo_url = _logo_public_path(filename, store.get_file(f"logos/{filename}")["updated_at"])
         
         return {
             "status": "success",
@@ -2364,18 +2277,17 @@ async def upload_merchant_logo(file: UploadFile = File(...), current_user: dict 
 async def get_merchant_logo(current_user: dict = Depends(get_current_user)):
     """Get merchant's uploaded logo URL if it exists."""
     merchant_id = current_user.get("id", "unknown")
-    logo_dir = DATA_DIR / "logos"
-    
-    # Check for common logo files
+
     for ext in LOGO_EXTENSIONS:
-        logo_path = logo_dir / f"merchant-{merchant_id}-logo.{ext}"
-        if logo_path.exists():
+        filename = f"merchant-{merchant_id}-logo.{ext}"
+        f = store.get_file(f"logos/{filename}")
+        if f:
             return {
                 "status": "success",
-                "logo_url": _logo_public_path(logo_path),
-                "filename": logo_path.name,
+                "logo_url": _logo_public_path(filename, f["updated_at"]),
+                "filename": filename,
             }
-    
+
     return {
         "status": "not_found",
         "logo_url": None,
@@ -2463,7 +2375,7 @@ async def revoke_api_key(key_id: int, current_user: dict = Depends(get_current_u
     if idx is None:
         raise HTTPException(status_code=404, detail="API key not found")
     removed = keys.pop(idx)
-    save_api_keys(keys)
+    store.delete_api_key(removed.get("id"))
     return {"ok": True, "id": removed.get("id")}
 
 
@@ -3825,10 +3737,15 @@ async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # If a stored pdf exists, return it
-    if inv.get("pdf_url"):
+    # Return the PDF stored when the invoice was issued (older invoices stored a file path)
+    stored_pdf = inv.get("pdf_url") or ""
+    if stored_pdf.startswith("db:"):
+        f = store.get_file(stored_pdf[3:])
+        if f:
+            return Response(content=f["content"], media_type="application/pdf")
+    elif stored_pdf:
         try:
-            path = Path(inv.get("pdf_url"))
+            path = Path(stored_pdf)
             if path.exists():
                 return Response(content=path.read_bytes(), media_type="application/pdf")
         except Exception:
@@ -4114,6 +4031,7 @@ async def admin_delete_user(user_id: int, admin: dict = Depends(require_admin)):
         raise HTTPException(status_code=404, detail="User not found")
 
     removed = users.pop(idx)
+    store.delete_user(removed["id"])
     save_users(users)
 
     return {"id": removed["id"], "name": removed["name"], "role": removed.get("role", "user")}
