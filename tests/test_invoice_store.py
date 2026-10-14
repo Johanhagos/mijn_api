@@ -35,19 +35,6 @@ OLD_SESSIONS = [
 ]
 
 
-def _reset_store_tables(db_url):
-    """Each test module starts from an empty database (TEST_DATABASE_URL is shared)."""
-    from sqlalchemy import create_engine
-    import app.store as store
-    if store._engine is not None:
-        store._engine.dispose()
-    store._engine = None
-    store._engine_url = None
-    engine = create_engine(db_url)
-    store.metadata.drop_all(engine)
-    engine.dispose()
-
-
 @pytest.fixture(scope="module")
 def env(tmp_path_factory):
     data_dir = tmp_path_factory.mktemp("data")
@@ -60,7 +47,6 @@ def env(tmp_path_factory):
     mp.setenv("DATABASE_URL", db_url)
     mp.delenv("RAILWAY_ENVIRONMENT", raising=False)
 
-    _reset_store_tables(db_url)
     import main
     importlib.reload(main)
     yield main, TestClient(main.app), data_dir

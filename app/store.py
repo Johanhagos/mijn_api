@@ -1,8 +1,6 @@
-"""Database storage for invoices, checkout sessions, payments, blockchain transactions,
-users, API keys and uploaded/generated files (logos, invoice PDFs).
+"""Database storage for invoices, checkout sessions, payments and blockchain transactions.
 
-Replaces the old invoices.json / sessions.json / users.json / api_keys.json files and the
-files written to DATA_DIR. Invoices and sessions keep their
+Replaces the old invoices.json / sessions.json files. Invoices and sessions keep their
 original dict shape (stored whole in a JSON column) so existing endpoints work unchanged;
 the frequently filtered fields are mirrored into real columns.
 
@@ -20,12 +18,11 @@ from pathlib import Path
 from typing import Iterable, List, Optional
 
 from sqlalchemy import (
-    JSON, Column, DateTime, Integer, LargeBinary, MetaData, String, Table, UniqueConstraint,
+    JSON, Column, DateTime, Integer, MetaData, String, Table, UniqueConstraint,
     create_engine, delete, insert, select, update,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.pool import StaticPool
 
 log = logging.getLogger("store")
 
@@ -82,32 +79,6 @@ blockchain_tx_table = Table(
     Column("data", JSON, nullable=True),
 )
 
-users_table = Table(
-    "store_users", metadata,
-    Column("seq", Integer, primary_key=True, autoincrement=True),
-    Column("id", String(64), nullable=False, unique=True),
-    Column("name", String(255), nullable=False, unique=True),
-    Column("role", String(32), nullable=True),
-    Column("data", JSON, nullable=False),
-)
-
-api_keys_table = Table(
-    "store_api_keys", metadata,
-    Column("seq", Integer, primary_key=True, autoincrement=True),
-    Column("id", String(64), nullable=False, unique=True),
-    Column("user_id", String(64), nullable=True, index=True),
-    Column("key_hash", String(128), nullable=True, index=True),
-    Column("data", JSON, nullable=False),
-)
-
-files_table = Table(
-    "store_files", metadata,
-    Column("name", String(255), primary_key=True),  # e.g. logos/merchant-5-logo.png
-    Column("content_type", String(100), nullable=False),
-    Column("content", LargeBinary, nullable=False),
-    Column("updated_at", DateTime, nullable=False, default=datetime.utcnow),
-)
-
 store_meta_table = Table(
     "store_meta", metadata,
     Column("key", String(64), primary_key=True),
@@ -158,15 +129,11 @@ def init(data_dir: Path, is_prod: bool, import_sources: Iterable[Path] = ()) -> 
         kwargs = {"pool_pre_ping": True}
         if url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
-            if url in ("sqlite://", "sqlite:///:memory:"):
-                # In-memory SQLite is per connection: share one so all requests see the tables.
-                kwargs["poolclass"] = StaticPool
         engine = create_engine(url, **kwargs)
         metadata.create_all(engine)
         _engine = engine
         _engine_url = url
         _import_json_once(list(import_sources))
-        _import_users_once(list(import_sources))
 
 
 # ---------------------------------------------------------------------------
@@ -207,18 +174,9 @@ def _load(table) -> List[dict]:
     return [dict(r.data) for r in rows]
 
 
-class StoreConflict(RuntimeError):
-    """Two requests created different records with the same id at the same time."""
-
-
-def _save(table, docs: List[dict], columns, identity=None) -> None:
+def _save(table, docs: List[dict], columns) -> None:
     """Upsert every document in `docs` by id. Documents not in the list are left alone,
-    so a request working on an older list cannot drop records added meanwhile; deletes
-    go through delete_user()/delete_api_key().
-
-    `identity(doc)` returns what makes a record *that* record (e.g. the username). An
-    update whose identity differs from the stored one means two requests picked the same
-    new id concurrently; that raises StoreConflict instead of overwriting the other record."""
+    so a request working on an older list cannot drop records added meanwhile."""
     cleaned = []
     for doc in docs:
         if not doc.get("id"):
@@ -231,8 +189,6 @@ def _save(table, docs: List[dict], columns, identity=None) -> None:
             if doc_id not in existing:
                 conn.execute(insert(table).values(id=doc_id, data=doc, **columns(doc)))
             elif existing[doc_id] != doc:
-                if identity and identity(existing[doc_id]) != identity(doc):
-                    raise StoreConflict(f"{table.name}: id {doc_id} is already used by another record")
                 conn.execute(update(table).where(table.c.id == doc_id).values(data=doc, **columns(doc)))
 
 
@@ -250,67 +206,6 @@ def load_sessions() -> List[dict]:
 
 def save_sessions(sessions: List[dict]) -> None:
     _save(sessions_table, sessions, _session_columns)
-
-
-# ---------------------------------------------------------------------------
-# Users and API keys
-# ---------------------------------------------------------------------------
-
-def _user_columns(doc: dict) -> dict:
-    return {"name": str(doc.get("name")), "role": _s(doc.get("role"))}
-
-
-def _api_key_columns(doc: dict) -> dict:
-    return {"user_id": _s(doc.get("user_id") or doc.get("merchant_id")), "key_hash": _s(doc.get("key_hash"))}
-
-
-def load_users() -> List[dict]:
-    return _load(users_table)
-
-
-def save_users(users: List[dict]) -> None:
-    _save(users_table, users, _user_columns, identity=lambda d: d.get("name"))
-
-
-def delete_user(user_id) -> None:
-    with get_engine().begin() as conn:
-        conn.execute(delete(users_table).where(users_table.c.id == str(user_id)))
-
-
-def load_api_keys() -> List[dict]:
-    return _load(api_keys_table)
-
-
-def save_api_keys(keys: List[dict]) -> None:
-    _save(api_keys_table, keys, _api_key_columns,
-          identity=lambda d: d.get("key_hash") or d.get("key"))
-
-
-def delete_api_key(key_id) -> None:
-    with get_engine().begin() as conn:
-        conn.execute(delete(api_keys_table).where(api_keys_table.c.id == str(key_id)))
-
-
-# ---------------------------------------------------------------------------
-# Files (merchant logos, generated invoice PDFs)
-# ---------------------------------------------------------------------------
-
-def put_file(name: str, content: bytes, content_type: str) -> None:
-    with get_engine().begin() as conn:
-        conn.execute(delete(files_table).where(files_table.c.name == name))
-        conn.execute(insert(files_table).values(name=name, content=content, content_type=content_type,
-                                                updated_at=datetime.utcnow()))
-
-
-def get_file(name: str) -> Optional[dict]:
-    with get_engine().connect() as conn:
-        row = conn.execute(select(files_table).where(files_table.c.name == name)).mappings().first()
-    return dict(row) if row else None
-
-
-def delete_file(name: str) -> None:
-    with get_engine().begin() as conn:
-        conn.execute(delete(files_table).where(files_table.c.name == name))
 
 
 # ---------------------------------------------------------------------------
@@ -468,42 +363,3 @@ def _import_json_once(sources: List[Path]) -> None:
     except IntegrityError:
         return
     log.warning("store: imported %d invoices and %d sessions from JSON", len(invoices), len(sessions))
-
-
-def _import_users_once(sources: List[Path]) -> None:
-    """Import users.json / api_keys.json once (first source wins per id and name)."""
-    engine = get_engine()
-    with engine.connect() as conn:
-        done = conn.execute(select(store_meta_table.c.value).where(
-            store_meta_table.c.key == "json_users_import_done")).scalar()
-    if done:
-        return
-
-    users, keys = [], []
-    seen_ids, seen_names, seen_keys = set(), set(), set()
-    for src in sources:
-        for doc in _read_json_list(src / "users.json"):
-            if doc.get("id") is None or not doc.get("name"):
-                continue
-            if str(doc["id"]) in seen_ids or str(doc["name"]) in seen_names:
-                continue
-            seen_ids.add(str(doc["id"]))
-            seen_names.add(str(doc["name"]))
-            users.append(doc)
-        for doc in _read_json_list(src / "api_keys.json"):
-            if doc.get("id") is not None and str(doc["id"]) not in seen_keys:
-                seen_keys.add(str(doc["id"]))
-                keys.append(doc)
-
-    try:
-        save_users(users)
-        save_api_keys(keys)
-        with engine.begin() as conn:
-            conn.execute(insert(store_meta_table).values(
-                key="json_users_import_done",
-                value=f"{datetime.utcnow().isoformat()} users={len(users)} api_keys={len(keys)}",
-            ))
-    except IntegrityError:
-        log.warning("store: user import already running in another worker")
-        return
-    log.warning("store: imported %d users and %d API keys from JSON", len(users), len(keys))
