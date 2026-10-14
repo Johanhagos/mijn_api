@@ -282,10 +282,8 @@ if not DATA_DIR.exists():
 
 USERS_FILE = DATA_DIR / "users.json"
 AUDIT_LOG_FILE = DATA_DIR / "audit.log"
-INVOICES_FILE = DATA_DIR / "invoices.json"
 INVOICE_PDF_DIR = DATA_DIR / "invoice_pdfs"
 API_KEYS_FILE = DATA_DIR / "api_keys.json"
-SESSIONS_FILE = DATA_DIR / "sessions.json"
 CONTACTS_FILE = DATA_DIR / "contacts.json"
 
 # Detect read-only filesystem state so writes can be disabled safely.
@@ -313,16 +311,11 @@ if not READ_ONLY_FS:
         except Exception as e:
             print(f"[WARN] Could not copy users.json: {e}")
 
-# Initialize invoices.json from repo if not present in DATA_DIR
-if not READ_ONLY_FS and not (DATA_DIR / "invoices.json").exists():
-    repo_invoices = Path(__file__).parent / "invoices.json"
-    if repo_invoices.exists():
-        import shutil
-        try:
-            shutil.copy(str(repo_invoices), str(DATA_DIR / "invoices.json"))
-            print(f"[INFO] Initialized invoices.json from repo to {DATA_DIR}")
-        except Exception as e:
-            print(f"[WARN] Could not copy invoices.json: {e}")
+# Invoices, checkout sessions and payments live in the database (app/store.py).
+# On first start the old invoices.json / sessions.json files (DATA_DIR and the repo copy)
+# are imported once. In production DATABASE_URL must point to PostgreSQL.
+from app import store
+store.init(DATA_DIR, IS_PROD, import_sources=[DATA_DIR, Path(__file__).parent])
 
 # Initialize vat_compliance.json from repo if not present in DATA_DIR
 if not READ_ONLY_FS and not (DATA_DIR / "vat_compliance.json").exists():
@@ -334,20 +327,6 @@ if not READ_ONLY_FS and not (DATA_DIR / "vat_compliance.json").exists():
             print(f"[INFO] Initialized vat_compliance.json from repo to {DATA_DIR}")
         except Exception as e:
             print(f"[WARN] Could not copy vat_compliance.json: {e}")
-
-# If invoices.json exists but is empty, seed from repo copy
-if not READ_ONLY_FS and (DATA_DIR / "invoices.json").exists():
-    try:
-        existing_text = (DATA_DIR / "invoices.json").read_text(encoding="utf-8").strip()
-        existing_invoices = json.loads(existing_text or "[]")
-        if not existing_invoices:
-            repo_invoices = Path(__file__).parent / "invoices.json"
-            if repo_invoices.exists():
-                import shutil
-                shutil.copy(str(repo_invoices), str(DATA_DIR / "invoices.json"))
-                print(f"[INFO] Seeded invoices.json from repo to {DATA_DIR}")
-    except Exception as e:
-        print(f"[WARN] Could not seed invoices.json: {e}")
 
 # If vat_compliance.json exists but is empty, seed from repo copy
 if not READ_ONLY_FS and (DATA_DIR / "vat_compliance.json").exists():
@@ -627,26 +606,11 @@ def _ensure_users_file() -> None:
         USERS_FILE.write_text("[]", encoding="utf-8")
 
 
-def _ensure_invoices_file() -> None:
-    if READ_ONLY_FS:
-        return
-
-    if not INVOICES_FILE.exists():
-        INVOICES_FILE.write_text("[]", encoding="utf-8")
-
-
 def _ensure_api_keys_file() -> None:
     if READ_ONLY_FS:
         return
     if not API_KEYS_FILE.exists():
         API_KEYS_FILE.write_text("[]", encoding="utf-8")
-
-
-def _ensure_sessions_file() -> None:
-    if READ_ONLY_FS:
-        return
-    if not SESSIONS_FILE.exists():
-        SESSIONS_FILE.write_text("[]", encoding="utf-8")
 
 
 def _ensure_contacts_file() -> None:
@@ -725,19 +689,11 @@ def _send_email_smtp(to_address: str, subject: str, body: str) -> bool:
 
 
 def load_invoices() -> List[dict]:
-    _ensure_invoices_file()
-    try:
-        return json.loads(INVOICES_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    return store.load_invoices()
 
 
 def save_invoices(invoices: List[dict]) -> None:
-    if READ_ONLY_FS:
-        raise RuntimeError("Filesystem is read-only; cannot persist invoices.json")
-
-    with _lock:
-        INVOICES_FILE.write_text(json.dumps(invoices, indent=4), encoding="utf-8")
+    store.save_invoices(invoices)
 
 
 def load_api_keys() -> List[dict]:
@@ -749,11 +705,7 @@ def load_api_keys() -> List[dict]:
 
 
 def load_sessions() -> List[dict]:
-    _ensure_sessions_file()
-    try:
-        return json.loads(SESSIONS_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return []
+    return store.load_sessions()
 
 
 def save_api_keys(keys: List[dict]) -> None:
@@ -764,11 +716,7 @@ def save_api_keys(keys: List[dict]) -> None:
 
 
 def save_sessions(sessions: List[dict]) -> None:
-    if READ_ONLY_FS:
-        raise RuntimeError("Filesystem is read-only; cannot persist sessions.json")
-
-    with _lock:
-        SESSIONS_FILE.write_text(json.dumps(sessions, indent=4), encoding="utf-8")
+    store.save_sessions(sessions)
 
 
 def ensure_invoice_pdf_dir() -> None:
@@ -788,6 +736,11 @@ def load_users() -> List[dict]:
 
 
 def _get_db_session():
+    # Users and API keys still live in users.json / api_keys.json. The old ORM tables are
+    # only used when explicitly enabled, so connecting DATABASE_URL (for invoices) does not
+    # silently switch user lookups to an empty database.
+    if os.getenv("USE_DB_USERS") != "1":
+        return None
     try:
         from app.db.session import SessionLocal
         return SessionLocal()
@@ -4287,14 +4240,6 @@ def create_session(
     if not key:
         return JSONResponse(status_code=403, content={"error": "Invalid API key"})
 
-    # Prefer DB-backed sessions when available
-    db_sessions_available = False
-    try:
-        from app.db.sessions import create_session as db_create_session
-        db_sessions_available = True
-    except Exception:
-        db_sessions_available = False
-
     try:
         amount = float(payload.get("amount", 0) or 0)
     except Exception:
@@ -4330,14 +4275,6 @@ def create_session(
         }
     }
 
-    if db_sessions_available:
-        try:
-            created = db_create_session(session)
-            return {"success": True, "id": created.get("id"), "url": created.get("url"), "session": created}
-        except Exception:
-            # Fall back to file-based persistence
-            pass
-
     try:
         sessions = load_sessions()
     except Exception:
@@ -4355,15 +4292,6 @@ def create_session(
 
 @app.get("/session/{session_id}")
 def get_session(session_id: str):
-    # Try DB-backed lookup first
-    try:
-        from app.db.sessions import get_session as db_get_session
-        s = db_get_session(session_id)
-        if s:
-            return {"success": True, "session": s}
-    except Exception:
-        pass
-
     try:
         sessions = load_sessions()
     except Exception:
@@ -4384,21 +4312,12 @@ def hosted_checkout(session: str = None):
         if not session:
                 return HTMLResponse("<h1>Missing session</h1>", status_code=400)
 
-        # Try DB-backed lookup first
-        s = None
         try:
-            from app.db.sessions import get_session as db_get_session
-            s = db_get_session(session)
+            sessions = load_sessions()
         except Exception:
-            s = None
+            return HTMLResponse("<h1>Failed to load sessions</h1>", status_code=500)
 
-        if not s:
-            try:
-                sessions = load_sessions()
-            except Exception:
-                return HTMLResponse("<h1>Failed to load sessions</h1>", status_code=500)
-
-            s = next((x for x in sessions if x.get("id") == session), None)
+        s = next((x for x in sessions if x.get("id") == session), None)
         if not s:
                 return HTMLResponse("<h1>Session not found</h1>", status_code=404)
 
@@ -4486,35 +4405,21 @@ def hosted_checkout(session: str = None):
 
 @app.post("/session/{session_id}/complete")
 def complete_session(session_id: str, payload: dict = Body(...)):
-        """Mark session paid, create invoice, persist to `invoices.json` and update session."""
+        """Mark session paid, create invoice and update the session."""
         payment_system = payload.get('payment_system', 'web2')
         blockchain_tx_id = payload.get('blockchain_tx_id')
 
         if READ_ONLY_FS:
                 return JSONResponse(status_code=503, content={"error": "Persistence disabled on this server"})
 
-        # Try DB-backed lookup first
-        s = None
-        db_available = False
         try:
-            from app.db.sessions import get_session as db_get_session, update_session as db_update_session
-            db_available = True
-            s = db_get_session(session_id)
+            sessions = load_sessions()
         except Exception:
-            s = None
+            return JSONResponse(status_code=500, content={"error": "Failed to load sessions storage"})
 
+        s = next((x for x in sessions if x.get('id') == session_id), None)
         if not s:
-            try:
-                sessions = load_sessions()
-            except Exception:
-                return JSONResponse(status_code=500, content={"error": "Failed to load sessions storage"})
-
-            s = next((x for x in sessions if x.get('id') == session_id), None)
-            if not s:
-                return JSONResponse(status_code=404, content={"error": "Session not found"})
-        else:
-            # s found in DB
-            pass
+            return JSONResponse(status_code=404, content={"error": "Session not found"})
 
         # ensure we don't double-pay
         if s.get('status') == 'paid':
@@ -4539,34 +4444,70 @@ def complete_session(session_id: str, payload: dict = Body(...)):
 
         invoices.append(invoice)
 
-        # update session (DB or file)
-        if db_available and s and isinstance(s, dict) and s.get('id'):
-            try:
-                db_update_session(session_id, {
-                    'status': 'paid',
-                    'paid_at': datetime.utcnow(),
-                    'payment_system': payment_system,
-                    'blockchain_tx_id': blockchain_tx_id,
-                })
-            except Exception:
-                return JSONResponse(status_code=500, content={"error": "Failed to persist DB session"})
-        else:
-            s['status'] = 'paid'
-            s['paid_at'] = datetime.utcnow().isoformat()
-            s['payment_system'] = payment_system
-            if blockchain_tx_id:
-                s['blockchain_tx_id'] = blockchain_tx_id
+        # A blockchain transaction can pay for one session only.
+        if not store.claim_blockchain_tx(blockchain_tx_id, invoice_id=invoice['id'], session_id=session_id,
+                                         amount=invoice['amount']):
+            return JSONResponse(status_code=409, content={"error": "This transaction was already used for a payment"})
 
-            try:
-                save_invoices(invoices)
-                save_sessions(sessions)
-            except Exception:
-                return JSONResponse(status_code=500, content={"error": "Failed to persist invoice/session"})
+        s['status'] = 'paid'
+        s['paid_at'] = datetime.utcnow().isoformat()
+        s['payment_system'] = payment_system
+        if blockchain_tx_id:
+            s['blockchain_tx_id'] = blockchain_tx_id
+
+        try:
+            save_invoices(invoices)
+            save_sessions(sessions)
+        except Exception:
+            store.release_blockchain_tx(blockchain_tx_id)
+            return JSONResponse(status_code=500, content={"error": "Failed to persist invoice/session"})
 
         # simple audit/event
         log_event('SESSION_COMPLETED id=' + session_id, '-', '-')
 
         return {"success": True, "invoice": invoice, "session": s}
+
+
+# Provider reference fields on an invoice; each payment is recorded once (app/store.py).
+_INVOICE_PAYMENT_REFS = (
+    ("stripe", "stripe_intent_id"),
+    ("paypal", "paypal_capture_id"),
+    ("coinbase", "coinbase_charge_id"),
+    ("onecom", "onecom_txn_id"),
+)
+
+
+def _claim_invoice_payment(invoice: dict):
+    """Record the payment behind `invoice`. Returns None if it was already processed
+    (nothing is changed then), otherwise a claim to pass to _release_invoice_payment
+    if persisting the invoice fails."""
+    amount = invoice.get('total') or invoice.get('amount')
+    claimed = []
+    for provider, field in _INVOICE_PAYMENT_REFS:
+        ref = invoice.get(field)
+        if not ref:
+            continue
+        if not store.claim_payment(provider, ref, invoice_id=invoice.get('id'), session_id=invoice.get('session_id'),
+                                   amount=amount, currency=invoice.get('currency')):
+            _release_invoice_payment(claimed)
+            return None
+        claimed.append((provider, ref))
+    tx = invoice.get('blockchain_tx_id')
+    if tx:
+        if not store.claim_blockchain_tx(tx, chain=invoice.get('blockchain_network'), invoice_id=invoice.get('id'),
+                                         session_id=invoice.get('session_id'), amount=amount):
+            _release_invoice_payment(claimed)
+            return None
+        claimed.append(("tx", tx))
+    return claimed
+
+
+def _release_invoice_payment(claimed) -> None:
+    for provider, ref in claimed or []:
+        if provider == "tx":
+            store.release_blockchain_tx(ref)
+        else:
+            store.release_payment(provider, ref)
 
 
 @app.post('/webhooks/stripe')
@@ -4628,6 +4569,11 @@ def webhook_stripe(payload: dict = Body(...), request: Request = None):
     }
     invoices.append(invoice)
     
+    claim = _claim_invoice_payment(invoice)
+    if claim is None:
+        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
+        return {"received": True, "duplicate": True, "message": "Payment already processed"}
+
     api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
@@ -4635,6 +4581,7 @@ def webhook_stripe(payload: dict = Body(...), request: Request = None):
         save_sessions(sessions)
         save_invoices(invoices)
     except Exception as e:
+        _release_invoice_payment(claim)
         log_event(f'WEBHOOK_STRIPE_PERSIST_FAILED {str(e)[:50]}', '-', '-')
         return JSONResponse(status_code=500, content={"error": "Failed to persist"})
     
@@ -4734,6 +4681,11 @@ def webhook_paypal(payload: dict = Body(...), request: Request = None):
     }
     invoices.append(invoice)
     
+    claim = _claim_invoice_payment(invoice)
+    if claim is None:
+        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
+        return {"received": True, "duplicate": True, "message": "Payment already processed"}
+
     api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
@@ -4741,6 +4693,7 @@ def webhook_paypal(payload: dict = Body(...), request: Request = None):
         save_sessions(sessions)
         save_invoices(invoices)
     except Exception as e:
+        _release_invoice_payment(claim)
         log_event(f'WEBHOOK_PAYPAL_PERSIST_FAILED {str(e)[:50]}', '-', '-')
         return JSONResponse(status_code=500, content={"error": "Failed to persist"})
     
@@ -4946,6 +4899,11 @@ async def webhook_coinbase(request: Request):
     }
     invoices.append(invoice)
     
+    claim = _claim_invoice_payment(invoice)
+    if claim is None:
+        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
+        return {"received": True, "duplicate": True, "message": "Payment already processed"}
+
     api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
@@ -4953,6 +4911,7 @@ async def webhook_coinbase(request: Request):
         save_sessions(sessions)
         save_invoices(invoices)
     except Exception as e:
+        _release_invoice_payment(claim)
         log_event(f'WEBHOOK_COINBASE_PERSIST_FAILED {str(e)[:50]}', '-', '-')
         return JSONResponse(status_code=500, content={"error": "Failed to persist"})
     
@@ -5026,6 +4985,11 @@ def webhook_onecom(payload: dict = Body(...), request: Request = None):
     }
     invoices.append(invoice)
     
+    claim = _claim_invoice_payment(invoice)
+    if claim is None:
+        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
+        return {"received": True, "duplicate": True, "message": "Payment already processed"}
+
     api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
@@ -5033,6 +4997,7 @@ def webhook_onecom(payload: dict = Body(...), request: Request = None):
         save_sessions(sessions)
         save_invoices(invoices)
     except Exception as e:
+        _release_invoice_payment(claim)
         log_event(f'WEBHOOK_ONECOM_PERSIST_FAILED {str(e)[:50]}', '-', '-')
         return JSONResponse(status_code=500, content={"error": "Failed to persist"})
     
@@ -5104,6 +5069,11 @@ def webhook_web3(payload: dict = Body(...), request: Request = None):
     }
     invoices.append(invoice)
     
+    claim = _claim_invoice_payment(invoice)
+    if claim is None:
+        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
+        return {"received": True, "duplicate": True, "message": "Payment already processed"}
+
     api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
@@ -5111,9 +5081,10 @@ def webhook_web3(payload: dict = Body(...), request: Request = None):
         save_sessions(sessions)
         save_invoices(invoices)
     except Exception as e:
+        _release_invoice_payment(claim)
         return JSONResponse(status_code=500, content={"error": str(e)})
     
-    log_event(f'WEBHOOK_WEB3_SUCCESS session_id={session_id[:8]} tx_id={payload.get("blockchain_tx_id")[:16]}', '-', '-')
+    log_event(f'WEBHOOK_WEB3_SUCCESS session_id={session_id[:8]} tx_id={(payload.get("blockchain_tx_id") or "")[:16]}', '-', '-')
     
     return {
         "success": True,
@@ -5192,7 +5163,7 @@ def process_payment(request: PaymentRequest):
             '-'
         )
         
-        # Save order to invoices file
+        # Save order with the invoices
         try:
             invoices = load_invoices()
         except Exception:
@@ -5213,12 +5184,13 @@ def process_payment(request: PaymentRequest):
                 'Smart Contract Invoicing Integration'
             ],
         }
-        invoices.append(order)
-        
-        if not READ_ONLY_FS:
+        claim = _claim_invoice_payment(order)
+        if claim is not None:
+            invoices.append(order)
             try:
                 save_invoices(invoices)
             except Exception as e:
+                _release_invoice_payment(claim)
                 print(f"[WARN] Could not save invoice: {e}")
         
         return {
