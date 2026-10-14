@@ -10,7 +10,8 @@ import sys
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 import uuid
-from fastapi.responses import JSONResponse, HTMLResponse
+import re
+from fastapi.responses import JSONResponse, HTMLResponse, FileResponse
 from time import time
 from jose import jwt, JWTError
 from fastapi import Depends
@@ -2346,6 +2347,26 @@ async def update_merchant_profile(payload: dict = Body(...), current_user: dict 
     return {"message": "Profile updated successfully", "user": user}
 
 
+LOGO_EXTENSIONS = ("png", "jpg", "jpeg", "gif", "webp")
+LOGO_FILENAME_RE = re.compile(r"^merchant-[A-Za-z0-9_-]+-logo\.(png|jpg|jpeg|gif|webp)$")
+
+
+def _logo_public_path(logo_path: Path) -> str:
+    """URL path (relative to the API host) that serves this logo; ?v= busts browser caches."""
+    return f"/merchant/logos/{logo_path.name}?v={int(logo_path.stat().st_mtime)}"
+
+
+@app.get("/merchant/logos/{filename}")
+async def serve_merchant_logo(filename: str):
+    """Public: logos are shown on invoices, so they are not secret."""
+    if not LOGO_FILENAME_RE.match(filename):
+        raise HTTPException(status_code=404, detail="Logo not found")
+    logo_path = DATA_DIR / "logos" / filename
+    if not logo_path.is_file():
+        raise HTTPException(status_code=404, detail="Logo not found")
+    return FileResponse(logo_path, headers={"X-Content-Type-Options": "nosniff", "Cache-Control": "public, max-age=300"})
+
+
 @app.post("/merchant/logo")
 async def upload_merchant_logo(file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     """Upload merchant logo for use in invoices. Returns logo URL."""
@@ -2359,16 +2380,23 @@ async def upload_merchant_logo(file: UploadFile = File(...), current_user: dict 
     
     # Generate filename
     merchant_id = current_user.get("id", "unknown")
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else "jpg"
+    if ext not in LOGO_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Logo must be png, jpg, jpeg, gif or webp")
     filename = f"merchant-{merchant_id}-logo.{ext}"
     
     # Save to LOGOS directory
     logo_dir = DATA_DIR / "logos"
     try:
         logo_dir.mkdir(parents=True, exist_ok=True)
+        # Only one logo per merchant: drop older files with another extension
+        for old_ext in LOGO_EXTENSIONS:
+            old = logo_dir / f"merchant-{merchant_id}-logo.{old_ext}"
+            if old_ext != ext and old.exists():
+                old.unlink()
         logo_path = logo_dir / filename
         logo_path.write_bytes(content)
-        logo_url = str(logo_path)
+        logo_url = _logo_public_path(logo_path)
         
         return {
             "status": "success",
@@ -2386,12 +2414,12 @@ async def get_merchant_logo(current_user: dict = Depends(get_current_user)):
     logo_dir = DATA_DIR / "logos"
     
     # Check for common logo files
-    for ext in ["png", "jpg", "jpeg", "gif", "webp"]:
+    for ext in LOGO_EXTENSIONS:
         logo_path = logo_dir / f"merchant-{merchant_id}-logo.{ext}"
         if logo_path.exists():
             return {
                 "status": "success",
-                "logo_url": str(logo_path),
+                "logo_url": _logo_public_path(logo_path),
                 "filename": logo_path.name,
             }
     
@@ -3840,7 +3868,7 @@ What would you like to know?"""
 @app.get("/invoices/{invoice_id}/pdf")
 async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_user)):
     invoices = load_invoices()
-    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
+    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
 

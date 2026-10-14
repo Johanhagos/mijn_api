@@ -14,3 +14,6 @@ export const API_BASE = (
 // The auth bypass only ever works in `next dev`; production builds ignore the flag.
 export const DEV_BYPASS_AUTH =
   process.env.NODE_ENV !== 'production' && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true';
+
+// Backend responses may return paths like /merchant/logos/x.png; make them absolute.
+export const toApiUrl = (path: string) => (path && path.startsWith('/') ? `${API_BASE}${path}` : path);

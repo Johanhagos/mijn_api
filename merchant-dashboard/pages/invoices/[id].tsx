@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import api from '../../lib/api';
+import { API_BASE } from '../../lib/config';
 import AuthGuard from '../../components/AuthGuard';
 
 interface Invoice {
@@ -73,7 +74,7 @@ export default function InvoiceDetail() {
     try {
       setDownloading(true);
       const token = typeof window !== 'undefined' ? localStorage.getItem('jwt') : null;
-      const pdfUrl = `https://api.apiblockchain.io/invoices/${id}/pdf`;
+      const pdfUrl = `${API_BASE}/invoices/${id}/pdf`;
       
       const response = await fetch(pdfUrl, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -121,7 +122,7 @@ export default function InvoiceDetail() {
       setSaving(true);
       setError(null);
       const token = typeof window !== 'undefined' ? localStorage.getItem('jwt') : null;
-      const response = await fetch(`https://api.apiblockchain.io/invoices/${id}`, {
+      const response = await fetch(`${API_BASE}/invoices/${id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

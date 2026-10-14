@@ -511,6 +511,9 @@
     </div>
 
     <script>
+        const API_BASE = ['localhost', '127.0.0.1'].includes(window.location.hostname)
+            ? 'http://127.0.0.1:8000'
+            : 'https://apiblockchain-production-production.up.railway.app';
         // Get plan from URL params
         const params = new URLSearchParams(window.location.search);
         const plan = params.get('plan') || 'professional';
@@ -693,7 +696,7 @@
                 const sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                 
                 // Call backend to create Coinbase Commerce charge
-                const response = await fetch('https://api.apiblockchain.io/api/coinbase/create-charge', {
+                const response = await fetch(`${API_BASE}/api/coinbase/create-charge`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

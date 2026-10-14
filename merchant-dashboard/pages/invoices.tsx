@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
+import { API_BASE } from '../lib/config';
 import AuthGuard from '../components/AuthGuard';
 import Header from '../components/Header';
 
@@ -49,7 +50,7 @@ export default function Invoices() {
     try {
       setDownloadingId(invoiceId);
       const token = typeof window !== 'undefined' ? localStorage.getItem('jwt') : null;
-      const pdfUrl = `https://api.apiblockchain.io/invoices/${invoiceId}/pdf`;
+      const pdfUrl = `${API_BASE}/invoices/${invoiceId}/pdf`;
       
       const response = await fetch(pdfUrl, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
@@ -81,7 +82,7 @@ export default function Invoices() {
       
       for (let i = 0; i < invoices.length; i++) {
         const invoiceId = invoices[i].id;
-        const pdfUrl = `https://api.apiblockchain.io/invoices/${invoiceId}/pdf`;
+        const pdfUrl = `${API_BASE}/invoices/${invoiceId}/pdf`;
         
         try {
           const response = await fetch(pdfUrl, {

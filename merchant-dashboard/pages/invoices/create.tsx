@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import api from '../../lib/api';
+import { API_BASE, toApiUrl } from '../../lib/config';
 import AuthGuard from '../../components/AuthGuard';
 import Header from '../../components/Header';
 
@@ -54,7 +55,7 @@ export default function CreateInvoice() {
       try {
         const response = await api.protectedApi('/merchant/logo');
         if (response.logo_url) {
-          setLogoUrl(response.logo_url);
+          setLogoUrl(toApiUrl(response.logo_url));
         }
       } catch (err) {
         console.log('No logo uploaded yet');
@@ -89,7 +90,7 @@ export default function CreateInvoice() {
       formDataUpload.append('file', file);
       
       const token = localStorage.getItem('jwt');
-      const response = await fetch('https://api.apiblockchain.io/merchant/logo', {
+      const response = await fetch(`${API_BASE}/merchant/logo`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -99,7 +100,7 @@ export default function CreateInvoice() {
 
       if (response.ok) {
         const result = await response.json();
-        setLogoUrl(result.logo_url);
+        setLogoUrl(toApiUrl(result.logo_url));
         alert('Logo uploaded successfully!');
       } else {
         alert('Failed to upload logo');
