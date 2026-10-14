@@ -268,6 +268,7 @@ READ_ONLY_FS = not os.access(DATA_DIR, os.W_OK)
 # the database (app/store.py). On first start the old invoices.json / sessions.json /
 # users.json / api_keys.json files (DATA_DIR and the repo copy) are imported once. In production DATABASE_URL must point to PostgreSQL.
 from app import store
+from app import crypto_payments
 store.init(DATA_DIR, IS_PROD, import_sources=[DATA_DIR, Path(__file__).parent])
 
 # Initialize vat_compliance.json from repo if not present in DATA_DIR
@@ -1359,6 +1360,10 @@ class InvoiceOut(BaseModel):
     due_date: Optional[str] = None
     notes: Optional[str] = None
     merchant_logo_url: Optional[str] = None
+    buyer_email: Optional[str] = None
+    items: Optional[List[dict]] = None
+    amount_paid: Optional[float] = None
+    payment_url: Optional[str] = None
 
 
 class InvoiceUpdate(BaseModel):
@@ -1738,9 +1743,12 @@ def create_credit_note_number(merchant_id: int = None) -> str:
 async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(get_current_user)):
     """Create and persist an invoice with automatic numbering and VAT calculation."""
     import uuid
-    
+
+    if (payload.status or "issued") in PAYMENT_STATUSES and not _is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Only an admin can create an invoice that is already paid")
+
     invoices = load_invoices()
-    
+
     # Generate unique ID
     unique_id = str(uuid.uuid4())
     
@@ -2454,19 +2462,7 @@ async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_
     inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    return InvoiceOut(**{
-        "id": inv.get("id"),
-        "invoice_number": inv.get("invoice_number"),
-        "order_number": inv.get("order_number"),
-        "seller_name": inv.get("seller_name"),
-        "buyer_name": inv.get("buyer_name"),
-        "subtotal": inv.get("subtotal", 0),
-        "vat_amount": inv.get("vat_amount", 0),
-        "total": inv.get("total", 0),
-        "payment_system": inv.get("payment_system"),
-        "blockchain_tx_id": inv.get("blockchain_tx_id"),
-        "pdf_url": inv.get("pdf_url"),
-    })
+    return _invoice_out(inv)
 
 
 @app.patch("/invoices/{invoice_id}", response_model=InvoiceOut)
@@ -2480,13 +2476,18 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
     # State transition validation
     current_status = inv.get("status", "draft")
     new_status = payload.status or current_status
-    
+
     if new_status != current_status:
+        # Paid / partly paid are set by verified payments; only an admin may override.
+        if (new_status in PAYMENT_STATUSES or current_status in PAYMENT_STATUSES) and not _is_admin(current_user):
+            raise HTTPException(status_code=403, detail="Only an admin can change whether an invoice is paid")
         valid_transitions = {
-            "draft": ["sent", "cancelled"],
-            "sent": ["paid", "overdue", "cancelled"],
+            "draft": ["sent", "issued", "cancelled"],
+            "issued": ["sent", "paid", "partially_paid", "overdue", "cancelled"],
+            "sent": ["paid", "partially_paid", "overdue", "cancelled"],
+            "partially_paid": ["paid", "overdue"],
             "paid": ["overdue"],
-            "overdue": ["paid"],
+            "overdue": ["paid", "partially_paid"],
             "void": [],
             "cancelled": [],
         }
@@ -2495,7 +2496,13 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
                 status_code=400,
                 detail=f"Cannot transition from '{current_status}' to '{new_status}'"
             )
-    
+        if new_status in PAYMENT_STATUSES:
+            log_event(f"INVOICE_STATUS_ADMIN_OVERRIDE id={invoice_id} {current_status}->{new_status}",
+                      current_user.get("name"), "-")
+
+    if payload.items is not None and _invoice_paid_units(inv) > 0:
+        raise HTTPException(status_code=400, detail="Items cannot be changed after a payment was received")
+
     # Update allowed fields
     if payload.status is not None:
         inv["status"] = payload.status
@@ -2563,20 +2570,251 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
     
     # Log audit event
     log_event(f"INVOICE_UPDATED id={invoice_id} status={new_status}", current_user.get("name"), "-")
-    
+
+    return _invoice_out(inv)
+
+
+# ============================================================================
+# CRYPTO INVOICE PAYMENTS (APIUSD on Sepolia, verified on-chain)
+# ============================================================================
+
+PAYMENT_STATUSES = ("paid", "partially_paid")
+PUBLIC_DASHBOARD_URL = os.getenv("PUBLIC_DASHBOARD_URL", "https://dashboard.apiblockchain.io")
+MAX_PENDING_TXS = 5
+PENDING_TX_TIMEOUT = 3600  # seconds a submitted hash may stay unknown on-chain
+
+
+def _is_admin(user: dict) -> bool:
+    return (user or {}).get("role") == "admin"
+
+
+def _invoice_total(inv: dict) -> float:
+    return float(inv.get("total") or inv.get("amount") or 0)
+
+
+def _invoice_payment_txs(inv: dict, cfg=None) -> List[dict]:
+    """Confirmed on-chain payments recorded for this invoice (app/store.py)."""
+    cfg = cfg or crypto_payments.config()
+    return [t for t in store.list_blockchain_txs()
+            if t.get("invoice_id") == str(inv.get("id")) and t.get("chain") == cfg.chain_key
+            and (t.get("data") or {}).get("units") is not None]
+
+
+def _invoice_paid_units(inv: dict, cfg=None) -> int:
+    return sum(int(t["data"]["units"]) for t in _invoice_payment_txs(inv, cfg))
+
+
+def _invoice_out(inv: dict) -> "InvoiceOut":
+    cfg = crypto_payments.config()
+    paid_units = _invoice_paid_units(inv, cfg)
     return InvoiceOut(**{
         "id": inv.get("id"),
         "invoice_number": inv.get("invoice_number"),
         "order_number": inv.get("order_number"),
         "seller_name": inv.get("seller_name"),
+        "seller_address": inv.get("seller_address"),
+        "seller_country": inv.get("seller_country"),
+        "seller_vat": inv.get("seller_vat"),
         "buyer_name": inv.get("buyer_name"),
-        "subtotal": inv.get("subtotal", 0),
-        "vat_amount": inv.get("vat_amount", 0),
-        "total": inv.get("total", 0),
+        "buyer_email": inv.get("buyer_email"),
+        "buyer_address": inv.get("buyer_address"),
+        "buyer_country": inv.get("buyer_country"),
+        "buyer_vat": inv.get("buyer_vat"),
+        "buyer_type": inv.get("buyer_type"),
+        "items": inv.get("items"),
+        "subtotal": inv.get("subtotal") or 0,
+        "vat_rate": inv.get("vat_rate"),
+        "vat_amount": inv.get("vat_amount") or 0,
+        "total": _invoice_total(inv),
         "payment_system": inv.get("payment_system"),
         "blockchain_tx_id": inv.get("blockchain_tx_id"),
         "pdf_url": inv.get("pdf_url"),
+        "status": inv.get("status") or "issued",
+        "created_at": inv.get("created_at"),
+        "due_date": inv.get("due_date"),
+        "notes": inv.get("notes"),
+        "merchant_logo_url": inv.get("merchant_logo_url"),
+        "amount_paid": float(crypto_payments.from_units(paid_units, cfg.token_decimals)),
+        "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay/{inv.get('id')}",
     })
+
+
+def _payable_invoice(invoices: List[dict], invoice_id: str) -> dict:
+    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
+    if not inv or inv.get("type") == "credit_note" or _invoice_total(inv) <= 0:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return inv
+
+
+def _created_at_ts(inv: dict) -> Optional[int]:
+    raw = inv.get("created_at")
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return int(dt.timestamp())
+    except ValueError:
+        return None
+
+
+def _apply_payment_status(inv: dict, sessions_cache: Optional[list] = None) -> None:
+    """Derive status from the confirmed payments (never from client input)."""
+    cfg = crypto_payments.config()
+    due = crypto_payments.to_units(_invoice_total(inv), cfg.token_decimals)
+    paid = _invoice_paid_units(inv, cfg)
+    if paid <= 0 or inv.get("status") in ("void", "cancelled"):
+        return
+    inv["amount_paid"] = crypto_payments.from_units(paid, cfg.token_decimals)
+    if paid >= due:
+        if inv.get("status") != "paid":
+            inv["status"] = "paid"
+            inv["paid_at"] = datetime.now(timezone.utc).isoformat()
+            inv["payment_system"] = "web3"
+            _mark_linked_session_paid(inv)
+    else:
+        inv["status"] = "partially_paid"
+
+
+def _mark_linked_session_paid(inv: dict) -> None:
+    session_id = inv.get("session_id")
+    if not session_id:
+        return
+    sessions = load_sessions()
+    s = next((x for x in sessions if x.get("id") == session_id), None)
+    if not s or s.get("status") == "paid":
+        return
+    s["status"] = "paid"
+    s["payment_status"] = "completed"
+    s["paid_at"] = datetime.now(timezone.utc).isoformat()
+    s["payment_system"] = "web3"
+    s["blockchain_tx_id"] = inv.get("blockchain_tx_id")
+    s["invoice_id"] = inv.get("id")
+    save_sessions(sessions)
+    log_event(f"SESSION_PAID_ONCHAIN session_id={session_id[:8]} invoice={str(inv.get('id'))[:8]}", "-", "-")
+
+
+def _process_tx(inv: dict, tx_hash: str) -> dict:
+    """Verify one transaction for `inv` and record it if confirmed. Mutates inv (caller saves)."""
+    cfg = crypto_payments.config()
+    existing = next((t for t in store.list_blockchain_txs() if t["tx_hash"] == tx_hash), None)
+    if existing:
+        if existing.get("invoice_id") == str(inv.get("id")):
+            return {"tx_hash": tx_hash, "state": "confirmed"}
+        return {"tx_hash": tx_hash, "state": "rejected", "reason": "This transaction was already used for another payment"}
+
+    try:
+        result = crypto_payments.verify_transfer(cfg, tx_hash)
+    except Exception as exc:
+        logging.getLogger("uvicorn.error").warning("payment RPC failed: %s", exc)
+        return {"tx_hash": tx_hash, "state": "pending", "reason": "Blockchain temporarily unreachable, retrying"}
+
+    pending = inv.setdefault("pending_txs", [])
+    first_seen = inv.setdefault("pending_since", {})
+    now = int(datetime.now(timezone.utc).timestamp())
+    if result["state"] == "pending":
+        if tx_hash not in pending:
+            pending.append(tx_hash)
+            first_seen[tx_hash] = now
+            for old in pending[:-MAX_PENDING_TXS]:
+                first_seen.pop(old, None)
+            del pending[:-MAX_PENDING_TXS]
+        # A hash that never shows up on-chain (typo, dropped tx) stops being checked.
+        if result.get("block_number") is None and now - first_seen.get(tx_hash, now) > PENDING_TX_TIMEOUT:
+            pending.remove(tx_hash)
+            first_seen.pop(tx_hash, None)
+            return {"tx_hash": tx_hash, "state": "rejected", "reason": "Transaction not found on the blockchain"}
+        return {"tx_hash": tx_hash, "state": "pending", "confirmations": result.get("confirmations", 0),
+                "required": cfg.confirmations}
+
+    if tx_hash in pending:
+        pending.remove(tx_hash)
+        first_seen.pop(tx_hash, None)
+    if result["state"] != "confirmed":
+        return {"tx_hash": tx_hash, "state": "rejected", "reason": result.get("reason")}
+
+    created = _created_at_ts(inv)
+    if created and result.get("timestamp") and result["timestamp"] < created - 300:
+        return {"tx_hash": tx_hash, "state": "rejected", "reason": "Transaction was sent before this invoice was created"}
+
+    if not store.claim_blockchain_tx(tx_hash, chain=cfg.chain_key, invoice_id=inv.get("id"),
+                                     session_id=inv.get("session_id"), amount=result["units"],
+                                     data={"units": result["units"], "payer": result.get("payer"),
+                                           "token": cfg.token_address.lower(), "block": result.get("block_number")}):
+        return _process_tx(inv, tx_hash)  # recorded concurrently; report who owns it
+
+    inv["blockchain_tx_id"] = tx_hash
+    log_event(f"INVOICE_PAYMENT_CONFIRMED invoice={str(inv.get('id'))[:8]} tx={tx_hash[:12]} units={result['units']}", "-", "-")
+    return {"tx_hash": tx_hash, "state": "confirmed", "units": result["units"]}
+
+
+def _payment_view(inv: dict, tx_results: Optional[list] = None) -> dict:
+    cfg = crypto_payments.config()
+    due = crypto_payments.to_units(_invoice_total(inv), cfg.token_decimals)
+    paid = _invoice_paid_units(inv, cfg)
+    return {
+        "invoice_id": inv.get("id"),
+        "invoice_number": inv.get("invoice_number"),
+        "seller_name": inv.get("seller_name"),
+        "buyer_name": inv.get("buyer_name"),
+        "currency": inv.get("currency") or "EUR",
+        "total": _invoice_total(inv),
+        "status": inv.get("status") or "issued",
+        "amount_due": crypto_payments.from_units(due, cfg.token_decimals),
+        "amount_paid": crypto_payments.from_units(paid, cfg.token_decimals),
+        "amount_remaining": crypto_payments.from_units(max(due - paid, 0), cfg.token_decimals),
+        "amount_remaining_units": str(max(due - paid, 0)),
+        "payable": cfg.enabled and inv.get("status") not in ("paid", "void", "cancelled", "draft"),
+        "pending_txs": inv.get("pending_txs") or [],
+        "payments": [{"tx_hash": t["tx_hash"], "amount": crypto_payments.from_units(int(t["data"]["units"]), cfg.token_decimals),
+                      "explorer_url": cfg.explorer_tx_url + t["tx_hash"]} for t in _invoice_payment_txs(inv, cfg)],
+        "results": tx_results or [],
+        "token": {"symbol": cfg.token_symbol, "address": cfg.token_address, "decimals": cfg.token_decimals},
+        "chain": {"id": cfg.chain_id, "name": cfg.chain_name},
+        "wallet_address": cfg.wallet_address,
+        "confirmations_required": cfg.confirmations,
+    }
+
+
+def _recheck_pending(invoices: List[dict], inv: dict) -> list:
+    results = [_process_tx(inv, tx) for tx in list(inv.get("pending_txs") or [])]
+    if results:
+        _apply_payment_status(inv)
+        save_invoices(invoices)
+    return results
+
+
+@app.get("/pay/{invoice_id}")
+def get_invoice_payment(invoice_id: str):
+    """Public payment info for an invoice (the invoice id is the unguessable link)."""
+    invoices = load_invoices()
+    inv = _payable_invoice(invoices, invoice_id)
+    results = _recheck_pending(invoices, inv)
+    return _payment_view(inv, results)
+
+
+@app.post("/pay/{invoice_id}/transactions")
+def submit_invoice_payment(invoice_id: str, payload: dict = Body(...)):
+    """Submit a transaction hash that pays this invoice. Status changes only after the
+    transaction is confirmed on-chain and pays the configured wallet in the configured token."""
+    cfg = crypto_payments.config()
+    if not cfg.enabled:
+        raise HTTPException(status_code=503, detail="Crypto payments are not configured")
+    tx_hash = crypto_payments.normalise_tx_hash(payload.get("tx_hash"))
+    if not tx_hash:
+        raise HTTPException(status_code=400, detail="Invalid transaction hash")
+    invoices = load_invoices()
+    inv = _payable_invoice(invoices, invoice_id)
+    if inv.get("status") in ("void", "cancelled"):
+        raise HTTPException(status_code=409, detail="This invoice can no longer be paid")
+    result = _process_tx(inv, tx_hash)
+    _apply_payment_status(inv)
+    save_invoices(invoices)
+    view = _payment_view(inv, [result])
+    if result["state"] == "rejected":
+        return JSONResponse(status_code=400, content=view)
+    return view
 
 
 # --- Country-Specific VAT & Compliance Database ---
@@ -4120,7 +4358,7 @@ def checkout(
         "merchant_id": key.get("merchant_id"),
         "amount": amount,
         "mode": mode,
-        "status": "paid" if mode == "test" else "pending",
+        "status": "pending",  # paid only after a verified payment
         "created_at": datetime.utcnow().isoformat(),
     }
 
@@ -4290,8 +4528,7 @@ def hosted_checkout(session: str = None):
             "<p><strong>Merchant:</strong> " + merchant_escaped + "</p>"
             "<p class=\"amount\"><strong>Amount:</strong> $" + f"{amount:.2f}" + "</p>"
             "<div class=\"actions\">"
-            "<button id=\"pay-web2\">Pay with Card</button>"
-            "<button id=\"pay-web3\" class=\"secondary\">Pay with Crypto</button>"
+            "<button id=\"pay-web3\">Pay with Crypto (APIUSD)</button>"
             "</div>"
             "<div id=\"status\"></div>"
             "<footer><a href=\"https://apiblockchain.io\" target=\"_blank\">Powered by APIBlockchain</a></footer>"
@@ -4299,19 +4536,16 @@ def hosted_checkout(session: str = None):
             "const sessionId = " + sess_id_js + ";"
             "const successUrl = " + success_js + ";"
             "const cancelUrl = " + cancel_js + ";"
-            "async function complete(payment_system){"
-            "document.getElementById('status').innerText = 'Processing...';"
+            "async function payCrypto(){"
+            "document.getElementById('status').innerText = 'Preparing payment...';"
             "try{"
-            "const res = await fetch('/session/' + sessionId + '/complete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_system }) });"
+            "const res = await fetch('/session/' + sessionId + '/pay-crypto', { method: 'POST' });"
             "const data = await res.json();"
-            "if(!res.ok){ document.getElementById('status').innerText = 'Error: ' + (data.error || res.statusText); return; }"
-            "document.getElementById('status').innerText = 'Payment successful';"
-            "try{ window.opener && window.opener.postMessage({ type: 'apiblockchain.checkout_complete', sessionId: sessionId }, '*'); }catch(e){}"
-            "setTimeout(()=>{ if(successUrl) window.location.href = successUrl; else document.getElementById('status').innerText += ' — You may close this window.'; }, 800);"
+            "if(!res.ok){ document.getElementById('status').innerText = 'Error: ' + (data.detail || data.error || res.statusText); return; }"
+            "window.location.href = data.payment_url;"
             "}catch(e){ document.getElementById('status').innerText = 'Network error'; }"
             "}"
-            "document.getElementById('pay-web2').addEventListener('click', ()=> complete('web2'));"
-            "document.getElementById('pay-web3').addEventListener('click', ()=> complete('web3'));"
+            "document.getElementById('pay-web3').addEventListener('click', payCrypto);"
             "</script>"
             "</div>"
             "</body>"
@@ -4321,9 +4555,44 @@ def hosted_checkout(session: str = None):
         return HTMLResponse(html)
 
 
+@app.post("/session/{session_id}/pay-crypto")
+def session_pay_crypto(session_id: str):
+    """Hosted checkout: create (once) the invoice for this session and return its payment page."""
+    sessions = load_sessions()
+    s = next((x for x in sessions if x.get("id") == session_id), None)
+    if not s:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if s.get("status") == "paid":
+        raise HTTPException(status_code=409, detail="Session already paid")
+    invoices = load_invoices()
+    inv = next((i for i in invoices if s.get("invoice_id") and str(i.get("id")) == str(s["invoice_id"])), None)
+    if not inv:
+        amount = float(s.get("amount") or 0)
+        if amount <= 0:
+            raise HTTPException(status_code=400, detail="Session has no amount")
+        inv = {
+            "id": str(uuid.uuid4()),
+            "invoice_number": get_next_invoice_number(),
+            "session_id": session_id,
+            "merchant_id": s.get("merchant_id"),
+            "amount": amount,
+            "total": amount,
+            "currency": s.get("currency") or "EUR",
+            "mode": s.get("mode"),
+            "status": "issued",
+            "payment_system": "web3",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        invoices.append(inv)
+        save_invoices(invoices)
+        s["invoice_id"] = inv["id"]
+        save_sessions(sessions)
+    return {"invoice_id": inv["id"], "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay/{inv['id']}"}
+
+
 @app.post("/session/{session_id}/complete")
-def complete_session(session_id: str, payload: dict = Body(...)):
-        """Mark session paid, create invoice and update the session."""
+def complete_session(session_id: str, payload: dict = Body(...), admin: dict = Depends(require_admin)):
+        """Admin only: manually mark a session paid (e.g. after an offline payment)."""
         payment_system = payload.get('payment_system', 'web2')
         blockchain_tx_id = payload.get('blockchain_tx_id')
 
@@ -4429,10 +4698,20 @@ def _release_invoice_payment(claimed) -> None:
 
 
 @app.post('/webhooks/stripe')
-def webhook_stripe(payload: dict = Body(...), request: Request = None):
-    """Stripe webhook: payment_intent.succeeded -> mark session PAID."""
-    if READ_ONLY_FS:
-        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
+async def webhook_stripe(request: Request):
+    """Stripe webhook: payment_intent.succeeded -> mark session PAID. Requires a valid
+    Stripe-Signature (STRIPE_WEBHOOK_SECRET)."""
+    secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if not secret:
+        return JSONResponse(status_code=503, content={"error": "Stripe webhook not configured"})
+    raw = await request.body()
+    try:
+        import stripe
+        stripe.Webhook.construct_event(raw, request.headers.get("Stripe-Signature", ""), secret)
+    except Exception:
+        log_event('WEBHOOK_STRIPE_INVALID_SIGNATURE', '-', '-')
+        return JSONResponse(status_code=401, content={"error": "Invalid signature"})
+    payload = json.loads(raw)
     
     event_type = payload.get('type', '')
     if event_type not in ['payment_intent.succeeded', 'charge.completed']:
@@ -4515,115 +4794,9 @@ def webhook_stripe(payload: dict = Body(...), request: Request = None):
 
 
 @app.post('/webhooks/paypal')
-def webhook_paypal(payload: dict = Body(...), request: Request = None):
-    """PayPal webhook: PAYMENT.CAPTURE.COMPLETED -> mark session PAID."""
-    if READ_ONLY_FS:
-        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
-    
-    event_type = payload.get('event_type', '')
-    if event_type != 'PAYMENT.CAPTURE.COMPLETED':
-        log_event(f'WEBHOOK_PAYPAL_IGNORED event_type={event_type}', '-', '-')
-        return {"received": True}
-    
-    resource = payload.get('resource', {})
-    session_id = resource.get('custom_id') or resource.get('invoice_id', '')
-    
-    if not session_id:
-        log_event('WEBHOOK_PAYPAL_NO_SESSION_ID', '-', '-')
-        return JSONResponse(status_code=400, content={"error": "No session_id in webhook"})
-    
-    try:
-        sessions = load_sessions()
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    
-    session = next((s for s in sessions if s.get('id') == session_id), None)
-    if not session:
-        log_event(f'WEBHOOK_PAYPAL_SESSION_NOT_FOUND session_id={session_id[:8]}', '-', '-')
-        return JSONResponse(status_code=404, content={"error": "Session not found"})
-    
-    if session.get('status') in ['paid', 'failed']:
-        return {"success": True, "message": f"Session already in terminal state: {session.get('status')}"}
-    
-    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
-        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
-    
-    session['status'] = 'paid'
-    session['payment_status'] = 'completed'
-    session['paid_at'] = datetime.utcnow().isoformat()
-    session['payment_provider'] = 'paypal'
-    session['paypal_capture_id'] = resource.get('id')
-    session['metadata']['webhook_sources'].append('paypal')
-    
-    try:
-        invoices = load_invoices()
-    except Exception:
-        invoices = []
-    
-    amount_value = float(resource.get('amount', {}).get('value', session.get('amount', 0)))
-    
-    # Get merchant and buyer countries for VAT calculation
-    merchant_id = session.get('merchant_id')
-    users = load_users()
-    merchant = next((u for u in users if u.get('id') == merchant_id), None)
-    seller_country = merchant.get('country', 'NL') if merchant else 'NL'
-    
-    buyer_country = session.get('metadata', {}).get('buyer_country') or session.get('metadata', {}).get('country') or 'NL'
-    buyer_vat = session.get('metadata', {}).get('buyer_vat_number') or session.get('metadata', {}).get('vat_number')
-    
-    # Calculate tax (international)
-    vat_rate, is_reverse_charge, vat_explanation = determine_tax_rate(seller_country, buyer_country, buyer_vat)
-    subtotal = amount_value / (1 + vat_rate / 100) if vat_rate > 0 else amount_value
-    vat_amount = amount_value - subtotal
-    
-    invoice = {
-        'id': str(uuid.uuid4()),
-        'session_id': session_id,
-        'merchant_id': session.get('merchant_id'),
-        'subtotal': round(subtotal, 2),
-        'vat_rate': vat_rate,
-        'vat_amount': round(vat_amount, 2),
-        'total': amount_value,
-        'amount': amount_value,
-        'currency': resource.get('amount', {}).get('currency_code', 'EUR'),
-        'seller_country': seller_country,
-        'buyer_country': buyer_country,
-        'buyer_vat': buyer_vat,
-        'is_reverse_charge': is_reverse_charge,
-        'mode': session.get('mode', 'test'),
-        'status': 'paid',
-        'payment_provider': 'paypal',
-        'paypal_capture_id': resource.get('id'),
-        'created_at': datetime.utcnow().isoformat(),
-        'notes': vat_explanation,
-    }
-    invoices.append(invoice)
-    
-    claim = _claim_invoice_payment(invoice)
-    if claim is None:
-        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
-        return {"received": True, "duplicate": True, "message": "Payment already processed"}
-
-    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
-    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
-    
-    try:
-        save_sessions(sessions)
-        save_invoices(invoices)
-    except Exception as e:
-        _release_invoice_payment(claim)
-        log_event(f'WEBHOOK_PAYPAL_PERSIST_FAILED {str(e)[:50]}', '-', '-')
-        return JSONResponse(status_code=500, content={"error": "Failed to persist"})
-    
-    log_event(f'WEBHOOK_PAYPAL_SUCCESS session_id={session_id[:8]} amount={amount_value}', '-', '-')
-    
-    return {
-        "success": True,
-        "session_id": session_id,
-        "invoice": invoice,
-        "api_key_generated": api_key.get('id'),
-        "customer_access": access_link,
-    }
+def webhook_paypal():
+    """Disabled: PayPal webhooks were accepted without verifying they came from PayPal."""
+    return JSONResponse(status_code=410, content={"error": "PayPal webhook disabled (unverified)"})
 
 
 @app.post('/api/coinbase/create-charge')
@@ -4705,18 +4878,19 @@ async def webhook_coinbase(request: Request):
     # Get raw body for signature verification
     body = await request.body()
     
-    # Verify webhook signature if secret is configured
-    if COINBASE_WEBHOOK_SECRET:
-        signature = request.headers.get('X-CC-Webhook-Signature', '')
-        expected_sig = hmac.new(
-            COINBASE_WEBHOOK_SECRET.encode('utf-8'),
-            body,
-            hashlib.sha256
-        ).hexdigest()
-        
-        if not hmac.compare_digest(signature, expected_sig):
-            log_event('WEBHOOK_COINBASE_INVALID_SIGNATURE', '-', '-')
-            return JSONResponse(status_code=401, content={"error": "Invalid signature"})
+    # Verify webhook signature; without a secret nothing can be verified, so refuse
+    if not COINBASE_WEBHOOK_SECRET:
+        return JSONResponse(status_code=503, content={"error": "Coinbase webhook not configured"})
+    signature = request.headers.get('X-CC-Webhook-Signature', '')
+    expected_sig = hmac.new(
+        COINBASE_WEBHOOK_SECRET.encode('utf-8'),
+        body,
+        hashlib.sha256
+    ).hexdigest()
+    
+    if not hmac.compare_digest(signature, expected_sig):
+        log_event('WEBHOOK_COINBASE_INVALID_SIGNATURE', '-', '-')
+        return JSONResponse(status_code=401, content={"error": "Invalid signature"})
     
     try:
         payload = json.loads(body.decode('utf-8'))
@@ -4846,172 +5020,16 @@ async def webhook_coinbase(request: Request):
 
 
 @app.post('/webhooks/onecom')
-def webhook_onecom(payload: dict = Body(...), request: Request = None):
-    """One.com webhook: payment.completed -> mark session PAID."""
-    if READ_ONLY_FS:
-        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
-    
-    event = payload.get('event', '')
-    if event != 'payment.completed':
-        log_event(f'WEBHOOK_ONECOM_IGNORED event={event}', '-', '-')
-        return {"received": True}
-    
-    session_id = payload.get('reference')
-    if not session_id:
-        log_event('WEBHOOK_ONECOM_NO_REFERENCE', '-', '-')
-        return JSONResponse(status_code=400, content={"error": "No reference (session_id) in webhook"})
-    
-    try:
-        sessions = load_sessions()
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    
-    session = next((s for s in sessions if s.get('id') == session_id), None)
-    if not session:
-        log_event(f'WEBHOOK_ONECOM_SESSION_NOT_FOUND session_id={session_id[:8]}', '-', '-')
-        return JSONResponse(status_code=404, content={"error": "Session not found"})
-    
-    if session.get('status') in ['paid', 'failed']:
-        return {"success": True, "message": f"Session already in terminal state: {session.get('status')}"}
-    
-    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
-        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
-    
-    session['status'] = 'paid'
-    session['payment_status'] = 'completed'
-    session['paid_at'] = datetime.utcnow().isoformat()
-    session['payment_provider'] = 'onecom'
-    session['onecom_txn_id'] = payload.get('payload', {}).get('txn_id')
-    session['metadata']['webhook_sources'].append('onecom')
-    
-    try:
-        invoices = load_invoices()
-    except Exception:
-        invoices = []
-    
-    invoice = {
-        'id': str(uuid.uuid4()),
-        'session_id': session_id,
-        'merchant_id': session.get('merchant_id'),
-        'amount': payload.get('amount', session.get('amount')),
-        'currency': payload.get('currency', 'USD'),
-        'mode': session.get('mode', 'test'),
-        'status': 'paid',
-        'payment_provider': 'onecom',
-        'onecom_txn_id': payload.get('payload', {}).get('txn_id'),
-        'created_at': datetime.utcnow().isoformat(),
-    }
-    invoices.append(invoice)
-    
-    claim = _claim_invoice_payment(invoice)
-    if claim is None:
-        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
-        return {"received": True, "duplicate": True, "message": "Payment already processed"}
-
-    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
-    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
-    
-    try:
-        save_sessions(sessions)
-        save_invoices(invoices)
-    except Exception as e:
-        _release_invoice_payment(claim)
-        log_event(f'WEBHOOK_ONECOM_PERSIST_FAILED {str(e)[:50]}', '-', '-')
-        return JSONResponse(status_code=500, content={"error": "Failed to persist"})
-    
-    log_event(f'WEBHOOK_ONECOM_SUCCESS session_id={session_id[:8]} amount={payload.get("amount")}', '-', '-')
-    
-    return {
-        "success": True,
-        "session_id": session_id,
-        "invoice": invoice,
-        "api_key_generated": api_key.get('id'),
-        "customer_access": access_link,
-    }
+def webhook_onecom():
+    """Disabled: one.com webhooks were accepted without any verification."""
+    return JSONResponse(status_code=410, content={"error": "one.com webhook disabled (unverified)"})
 
 
 @app.post('/webhooks/web3')
-def webhook_web3(payload: dict = Body(...), request: Request = None):
-    """Web3 webhook: blockchain payment verification."""
-    if READ_ONLY_FS:
-        return JSONResponse(status_code=503, content={"error": "Persistence disabled"})
-    
-    event = payload.get('event', '')
-    if event not in ['payment.confirmed', 'transfer.confirmed']:
-        log_event(f'WEBHOOK_WEB3_IGNORED event={event}', '-', '-')
-        return {"received": True}
-    
-    session_id = payload.get('session_id')
-    if not session_id:
-        return JSONResponse(status_code=400, content={"error": "No session_id"})
-    
-    try:
-        sessions = load_sessions()
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    
-    session = next((s for s in sessions if s.get('id') == session_id), None)
-    if not session:
-        return JSONResponse(status_code=404, content={"error": "Session not found"})
-    
-    if session.get('status') in ['paid', 'failed']:
-        return {"success": True, "message": f"Already in {session.get('status')}"}
-    
-    if not validate_payment_state_transition(session.get('status', 'created'), 'paid'):
-        return JSONResponse(status_code=409, content={"error": "Invalid state transition"})
-    
-    session['status'] = 'paid'
-    session['payment_status'] = 'completed'
-    session['paid_at'] = datetime.utcnow().isoformat()
-    session['payment_provider'] = 'web3'
-    session['blockchain_tx_id'] = payload.get('blockchain_tx_id')
-    session['blockchain_network'] = payload.get('network')
-    session['metadata']['webhook_sources'].append('web3')
-    
-    try:
-        invoices = load_invoices()
-    except Exception:
-        invoices = []
-    
-    invoice = {
-        'id': str(uuid.uuid4()),
-        'session_id': session_id,
-        'merchant_id': session.get('merchant_id'),
-        'amount': payload.get('amount', session.get('amount')),
-        'mode': session.get('mode', 'test'),
-        'status': 'paid',
-        'payment_provider': 'web3',
-        'blockchain_tx_id': payload.get('blockchain_tx_id'),
-        'blockchain_network': payload.get('network'),
-        'created_at': datetime.utcnow().isoformat(),
-    }
-    invoices.append(invoice)
-    
-    claim = _claim_invoice_payment(invoice)
-    if claim is None:
-        log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
-        return {"received": True, "duplicate": True, "message": "Payment already processed"}
-
-    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
-    access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
-    
-    try:
-        save_sessions(sessions)
-        save_invoices(invoices)
-    except Exception as e:
-        _release_invoice_payment(claim)
-        return JSONResponse(status_code=500, content={"error": str(e)})
-    
-    log_event(f'WEBHOOK_WEB3_SUCCESS session_id={session_id[:8]} tx_id={(payload.get("blockchain_tx_id") or "")[:16]}', '-', '-')
-    
-    return {
-        "success": True,
-        "session_id": session_id,
-        "invoice": invoice,
-        "api_key_generated": api_key.get('id'),
-        "customer_access": access_link,
-        "blockchain_tx": payload.get('blockchain_tx_id'),
-    }
+def webhook_web3():
+    """Disabled: trusted client-supplied transaction data. Crypto payments are verified
+    on-chain via POST /pay/{invoice_id}/transactions."""
+    return JSONResponse(status_code=410, content={"error": "Use /pay/{invoice_id}/transactions (verified on-chain)"})
 
 
 @app.get('/session/{session_id}/status')
@@ -5072,6 +5090,9 @@ def process_payment(request: PaymentRequest):
             confirm=True,
             off_session=True,
         )
+        if intent.status != "succeeded":
+            return JSONResponse(status_code=402, content={"success": False, "status": intent.status,
+                                                          "error": "Payment not completed"})
         
         # Log successful payment
         order_id = f"ORD-{int(time())}-{uuid.uuid4().hex[:8].upper()}"

@@ -3,8 +3,11 @@ and the same payment is never counted twice.
 
 Runs against SQLite by default. Set TEST_DATABASE_URL to run against PostgreSQL.
 """
+import hashlib
+import hmac
 import importlib
 import json
+import time
 import os
 import sys
 import uuid
@@ -59,6 +62,7 @@ def env(tmp_path_factory):
     db_url = os.getenv("TEST_DATABASE_URL") or f"sqlite:///{(data_dir / 'test.db').as_posix()}"
     mp.setenv("DATABASE_URL", db_url)
     mp.delenv("RAILWAY_ENVIRONMENT", raising=False)
+    mp.setenv("STRIPE_WEBHOOK_SECRET", STRIPE_SECRET)
 
     _reset_store_tables(db_url)
     import main
@@ -67,14 +71,16 @@ def env(tmp_path_factory):
     mp.undo()
 
 
-def _stripe_event(session_id, intent_id):
-    return {"type": "payment_intent.succeeded",
-            "data": {"object": {"id": intent_id, "amount": 1000, "metadata": {"session_id": session_id}}}}
+STRIPE_SECRET = "whsec_store_test"
 
 
-def _web3_event(session_id, tx):
-    return {"event": "payment.confirmed", "session_id": session_id, "blockchain_tx_id": tx,
-            "network": "sepolia", "amount": 10.0}
+def _post_stripe(client, session_id, intent_id):
+    """Send a correctly signed Stripe payment_intent.succeeded event."""
+    body = json.dumps({"type": "payment_intent.succeeded",
+                       "data": {"object": {"id": intent_id, "amount": 1000, "metadata": {"session_id": session_id}}}})
+    ts = str(int(time.time()))
+    sig = hmac.new(STRIPE_SECRET.encode(), f"{ts}.{body}".encode(), hashlib.sha256).hexdigest()
+    return client.post("/webhooks/stripe", content=body, headers={"Stripe-Signature": f"t={ts},v1={sig}"})
 
 
 def test_old_invoices_are_imported_and_listed(env):
@@ -127,12 +133,12 @@ def test_invoice_survives_restart(env):
 def test_same_stripe_payment_twice_is_counted_once(env):
     main, client, _ = env
     intent = f"pi_{uuid.uuid4().hex}"
-    first = client.post("/webhooks/stripe", json=_stripe_event("sess_a", intent))
+    first = _post_stripe(client, "sess_a", intent)
     assert first.status_code == 200, first.text
-    replay = client.post("/webhooks/stripe", json=_stripe_event("sess_a", intent))
+    replay = _post_stripe(client, "sess_a", intent)
     assert replay.status_code == 200
     # Same payment sent for another session must not pay that session too.
-    other = client.post("/webhooks/stripe", json=_stripe_event("sess_b", intent))
+    other = _post_stripe(client, "sess_b", intent)
     assert other.json().get("duplicate") is True
 
     invoices = [i for i in main.store.load_invoices() if i.get("stripe_intent_id") == intent]
@@ -145,16 +151,12 @@ def test_same_stripe_payment_twice_is_counted_once(env):
 
 
 def test_same_blockchain_tx_twice_is_counted_once(env):
-    main, client, _ = env
+    main, _, _ = env
     tx = "0x" + uuid.uuid4().hex
-    assert client.post("/webhooks/web3", json=_web3_event("sess_c", tx)).status_code == 200
-    # Same transaction, different capitalisation, for another session.
-    dup = client.post("/webhooks/web3", json=_web3_event("sess_d", tx.upper().replace("0X", "0x")))
-    assert dup.json().get("duplicate") is True
-
+    assert main.store.claim_blockchain_tx(tx, invoice_id="inv-1") is True
+    # Same transaction, different capitalisation, for another invoice.
+    assert main.store.claim_blockchain_tx(tx.upper().replace("0X", "0x"), invoice_id="inv-2") is False
     assert len([t for t in main.store.list_blockchain_txs() if t["tx_hash"] == tx.lower()]) == 1
-    assert len([i for i in main.store.load_invoices() if (i.get("blockchain_tx_id") or "").lower() == tx]) == 1
-    assert {s["id"]: s for s in main.store.load_sessions()}["sess_d"]["status"] == "created"
 
 
 def test_imported_payments_are_not_counted_again(env):
@@ -164,10 +166,9 @@ def test_imported_payments_are_not_counted_again(env):
     main.store.save_sessions(sessions)
     before = len(main.store.load_invoices())
 
-    stripe = client.post("/webhooks/stripe", json=_stripe_event("sess_replay", "pi_old_1"))
-    web3 = client.post("/webhooks/web3", json=_web3_event("sess_replay", "0xabcdef0001"))
+    stripe = _post_stripe(client, "sess_replay", "pi_old_1")
     assert stripe.json().get("duplicate") is True
-    assert web3.json().get("duplicate") is True
+    assert main.store.claim_blockchain_tx("0xabcdef0001", invoice_id="new") is False
     assert len(main.store.load_invoices()) == before
 
 

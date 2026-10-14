@@ -30,6 +30,8 @@ interface Invoice {
   due_date?: string;
   items?: any[];
   notes?: string;
+  amount_paid?: number;
+  payment_url?: string;
 }
 
 export default function InvoiceDetail() {
@@ -42,6 +44,25 @@ export default function InvoiceDetail() {
   const [editData, setEditData] = useState<any>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  useEffect(() => {
+    // The role is in the JWT; the backend enforces it, this only hides options.
+    try {
+      const token = localStorage.getItem('jwt');
+      if (token) setIsAdmin(JSON.parse(atob(token.split('.')[1])).role === 'admin');
+    } catch {
+      setIsAdmin(false);
+    }
+  }, []);
+
+  const copyPaymentLink = async () => {
+    if (!invoice?.payment_url) return;
+    await navigator.clipboard.writeText(invoice.payment_url);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   const toNumber = (value: any) => {
     const n = Number(value);
@@ -193,11 +214,20 @@ export default function InvoiceDetail() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-600 focus:border-transparent"
                   >
                     <option value="draft">Draft</option>
+                    <option value="issued">Issued</option>
                     <option value="sent">Sent</option>
-                    <option value="paid">Paid</option>
+                    {(isAdmin || invoice?.status === 'partially_paid') && (
+                      <option value="partially_paid">Partly paid</option>
+                    )}
+                    {(isAdmin || invoice?.status === 'paid') && <option value="paid">Paid</option>}
                     <option value="overdue">Overdue</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
+                  {!isAdmin && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Invoices become paid automatically once the payment is confirmed on the blockchain.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -292,11 +322,17 @@ export default function InvoiceDetail() {
                     <span className={`inline-flex items-center px-4 py-2 text-lg font-bold rounded-full ${
                       invoice.status === 'paid'
                         ? 'bg-green-100 text-green-800'
-                        : invoice.status === 'pending'
+                        : invoice.status === 'pending' || invoice.status === 'partially_paid'
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {invoice.status === 'paid' ? '✅ PAID' : invoice.status === 'pending' ? '⏳ PENDING' : invoice.status}
+                      {invoice.status === 'paid'
+                        ? '✅ PAID'
+                        : invoice.status === 'partially_paid'
+                        ? '◐ PARTLY PAID'
+                        : invoice.status === 'pending'
+                        ? '⏳ PENDING'
+                        : invoice.status}
                     </span>
                   </div>
                 </div>
@@ -490,6 +526,42 @@ export default function InvoiceDetail() {
                     <p className="text-lg font-semibold text-gray-900 capitalize">{invoice.mode || 'Production'}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* Crypto payment */}
+              <div className="bg-white rounded-lg shadow p-8 border-l-4 border-blue-600">
+                <h3 className="text-sm font-bold text-blue-700 uppercase tracking-wider mb-4">Payment (APIUSD)</h3>
+                <div className="grid grid-cols-3 gap-6 mb-4">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-medium mb-1">Total</p>
+                    <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoice.total)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-medium mb-1">Paid</p>
+                    <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoice.amount_paid)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase font-medium mb-1">Open</p>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {formatCurrency(Math.max(toNumber(invoice.total) - toNumber(invoice.amount_paid), 0))}
+                    </p>
+                  </div>
+                </div>
+                {invoice.payment_url && invoice.status !== 'paid' && (
+                  <div className="flex gap-2 items-center">
+                    <input
+                      readOnly
+                      value={invoice.payment_url}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono bg-gray-50"
+                    />
+                    <button
+                      onClick={copyPaymentLink}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-bold"
+                    >
+                      {linkCopied ? 'Copied' : 'Copy payment link'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
