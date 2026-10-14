@@ -193,7 +193,7 @@ def test_hosted_checkout_pays_through_invoice(env):
     main.store.save_sessions(sessions)
     first = c.post(f"/session/{sid}/pay-crypto").json()
     assert c.post(f"/session/{sid}/pay-crypto").json()["invoice_id"] == first["invoice_id"]  # created once
-    assert first["payment_url"].endswith(f"/pay/{first['invoice_id']}")
+    assert first["payment_url"].endswith(f"/pay?invoice={first['invoice_id']}")
     tx = _tx()
     CHAIN[tx] = _confirmed(7_000_000)
     assert _submit(env, first["invoice_id"], tx).json()["status"] == "paid"

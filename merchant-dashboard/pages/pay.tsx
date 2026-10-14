@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { API_BASE } from '../../lib/config';
+import { API_BASE } from '../lib/config';
 
 // Public page where a customer pays an invoice in APIUSD. The backend only marks the
 // invoice paid after it has verified the transaction on-chain; this page just helps send
@@ -43,7 +43,7 @@ const encodeTransfer = (to: string, units: string) =>
 
 export default function PayInvoice() {
   const router = useRouter();
-  const { id } = router.query;
+  const { invoice: id } = router.query;
   const [view, setView] = useState<PaymentView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

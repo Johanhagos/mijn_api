@@ -2635,7 +2635,7 @@ def _invoice_out(inv: dict) -> "InvoiceOut":
         "notes": inv.get("notes"),
         "merchant_logo_url": inv.get("merchant_logo_url"),
         "amount_paid": float(crypto_payments.from_units(paid_units, cfg.token_decimals)),
-        "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay/{inv.get('id')}",
+        "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay?invoice={inv.get('id')}",
     })
 
 
@@ -4587,7 +4587,7 @@ def session_pay_crypto(session_id: str):
         save_invoices(invoices)
         s["invoice_id"] = inv["id"]
         save_sessions(sessions)
-    return {"invoice_id": inv["id"], "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay/{inv['id']}"}
+    return {"invoice_id": inv["id"], "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay?invoice={inv['id']}"}
 
 
 @app.post("/session/{session_id}/complete")

@@ -138,7 +138,7 @@ export default function CreateInvoice() {
       const response = await api.protectedApi('/invoices', 'POST', payload);
 
       if (response && response.invoice_number) {
-        router.push(`/invoices/${response.id}`);
+        router.push(`/invoices/view?id=${response.id}`);
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to create invoice');

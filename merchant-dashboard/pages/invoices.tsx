@@ -242,9 +242,9 @@ export default function Invoices() {
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {invoices.map((invoice, idx) => (
-                        <tr key={invoice.id} className={`hover:bg-green-50 transition cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} onClick={() => router.push(`/invoices/${invoice.id}`)}>
+                        <tr key={invoice.id} className={`hover:bg-green-50 transition cursor-pointer ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`} onClick={() => router.push(`/invoices/view?id=${invoice.id}`)}>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <Link href={`/invoices/${invoice.id}`} className="text-sm font-bold text-green-600 hover:text-green-800 hover:underline">
+                            <Link href={`/invoices/view?id=${invoice.id}`} className="text-sm font-bold text-green-600 hover:text-green-800 hover:underline">
                               {invoice.invoice_number || invoice.id}
                             </Link>
                           </td>
