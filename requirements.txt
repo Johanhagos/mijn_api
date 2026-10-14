@@ -3,7 +3,7 @@ uvicorn==0.40.0
 gunicorn==23.0.0
 pydantic==2.12.5
 pydantic-core==2.41.5
-SQLAlchemy==2.0.21
+SQLAlchemy==2.0.54
 python-dotenv==1.0.0
 # Use a prebuilt Windows wheel to avoid the missing pg_config build issue in local dev.
 psycopg2-binary==2.9.13
