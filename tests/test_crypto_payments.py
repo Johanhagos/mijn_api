@@ -124,6 +124,36 @@ def test_underpayment_is_partially_paid_then_paid(env):
     assert _submit(env, inv, tx2).json()["status"] == "paid"
 
 
+def test_overpayment_is_overpaid(env):
+    inv = _invoice(env, 50)
+    tx = _tx()
+    CHAIN[tx] = _confirmed(60_000_000)
+    v = _submit(env, inv, tx).json()
+    assert v["status"] == "overpaid" and v["amount_paid"] == "60.000000"
+    assert v["amount_remaining"] == "0.000000" and v["payable"] is False
+    detail = env["client"].get(f"/invoices/{inv}", headers=env["merchant"]).json()
+    assert detail["status"] == "overpaid" and detail["payment_symbol"] == "APIUSD"
+    assert detail["payments"] == [{"tx_hash": tx, "amount": "60.000000",
+                                   "explorer_url": f"https://sepolia.etherscan.io/tx/{tx}"}]
+
+
+def test_paid_then_extra_payment_is_overpaid(env):
+    inv = _invoice(env, 10)
+    tx1, tx2 = _tx(), _tx()
+    CHAIN[tx1], CHAIN[tx2] = _confirmed(10_000_000), _confirmed(1_000_000)
+    assert _submit(env, inv, tx1).json()["status"] == "paid"
+    assert _submit(env, inv, tx2).json()["status"] == "overpaid"
+
+
+def test_reverted_transaction_reports_failed(env):
+    inv = _invoice(env, 10)
+    tx = _tx()
+    CHAIN[tx] = {"state": "failed", "reason": "Transaction failed on the blockchain"}
+    r = _submit(env, inv, tx)
+    assert r.status_code == 400 and r.json()["results"][0]["state"] == "failed"
+    assert r.json()["status"] == "issued"
+
+
 def test_same_transaction_counts_once(env):
     inv, other = _invoice(env, 10), _invoice(env, 10)
     tx = _tx()
