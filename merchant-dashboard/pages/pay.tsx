@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { API_BASE } from '../lib/config';
+import { QRCodeSVG } from 'qrcode.react';
+import { API_BASE, BUY_APIUSD_URL } from '../lib/config';
 
 // Public page where a customer pays an invoice in APIUSD. The backend only marks the
 // invoice paid after it has verified the transaction on-chain; this page just helps send
@@ -26,20 +27,40 @@ interface PaymentView {
   confirmations_required: number;
 }
 
+type Tone = 'yellow' | 'red' | 'green' | 'info';
+interface Notice { tone: Tone; text: string }
+
 declare global {
   interface Window {
-    ethereum?: { request: (args: { method: string; params?: any[] }) => Promise<any> };
+    ethereum?: {
+      request: (args: { method: string; params?: any[] }) => Promise<any>;
+      on?: (event: string, handler: (...args: any[]) => void) => void;
+      removeListener?: (event: string, handler: (...args: any[]) => void) => void;
+    };
   }
 }
 
-// 12.500000 -> 12.5
-const fmt = (amount: string) => String(Number(amount));
+// "12.500000" -> "12.50" (cut, not rounded, so a short balance never shows as enough)
+const fmt2 = (amount: string) => {
+  const [whole, frac = ''] = String(amount).split('.');
+  return `${whole}.${(frac + '00').slice(0, 2)}`;
+};
+
+const unitsToFixed2 = (units: bigint, decimals: number) => {
+  const s = units.toString().padStart(decimals + 1, '0');
+  return fmt2(`${s.slice(0, s.length - decimals)}.${s.slice(s.length - decimals)}`);
+};
 
 const pad32 = (hex: string) => hex.replace(/^0x/, '').padStart(64, '0');
 
 // ERC-20 transfer(address,uint256)
 const encodeTransfer = (to: string, units: string) =>
   '0xa9059cbb' + pad32(to.toLowerCase()) + pad32(BigInt(units).toString(16));
+
+// ERC-20 balanceOf(address)
+const encodeBalanceOf = (owner: string) => '0x70a08231' + pad32(owner.toLowerCase());
+
+const PAID_STATUSES = ['paid', 'overpaid'];
 
 export default function PayInvoice() {
   const router = useRouter();
@@ -48,19 +69,40 @@ export default function PayInvoice() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [manualTx, setManualTx] = useState('');
-  const [message, setMessage] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
+  const [chainId, setChainId] = useState<number | null>(null);
+  const [balance, setBalance] = useState<bigint | null>(null);
+
+  const symbol = view?.token.symbol || 'APIUSD';
+  const failedText = `Payment failed. No ${symbol} left your wallet. Please try again.`;
+
+  const noticeFor = useCallback((result?: PaymentView['results'][number], body?: PaymentView): Notice | null => {
+    if (!result) return null;
+    if (result.state === 'confirmed') return { tone: 'green', text: 'Payment received.' };
+    if (result.state === 'failed') return { tone: 'red', text: failedText };
+    if (result.state === 'rejected') return { tone: 'red', text: result.reason || 'The transaction was not accepted' };
+    if (result.state === 'pending' && body) {
+      return { tone: 'info', text: `Transaction sent. Waiting for ${body.confirmations_required} confirmations on ${body.chain.name}…` };
+    }
+    return null;
+  }, [failedText]);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
       const res = await fetch(`${API_BASE}/pay/${id}`);
       if (!res.ok) throw new Error(res.status === 404 ? 'Invoice not found' : 'Could not load the invoice');
-      setView(await res.json());
+      const body: PaymentView = await res.json();
+      setView(body);
       setError(null);
+      // Pending transactions re-checked by the backend on this load
+      const settled = body.results.find((r) => r.state !== 'pending');
+      if (settled) setNotice(noticeFor(settled, body));
     } catch (err: any) {
       setError(err.message);
     }
-  }, [id]);
+  }, [id, noticeFor]);
 
   useEffect(() => {
     load();
@@ -68,10 +110,50 @@ export default function PayInvoice() {
 
   // While a transaction waits for confirmations, poll; the backend re-checks it on each load.
   useEffect(() => {
-    if (!view || view.pending_txs.length === 0 || view.status === 'paid') return;
+    if (!view || view.pending_txs.length === 0 || PAID_STATUSES.includes(view.status)) return;
     const t = setInterval(load, 10000);
     return () => clearInterval(t);
   }, [view, load]);
+
+  const wantedChain = view?.chain.id;
+  const tokenAddress = view?.token.address;
+
+  // Reads the connected account, its network and its APIUSD balance without opening the wallet.
+  const refreshWallet = useCallback(async () => {
+    const eth = window.ethereum;
+    if (!eth || !wantedChain || !tokenAddress) return;
+    try {
+      const [acc] = await eth.request({ method: 'eth_accounts' });
+      const cid = parseInt(await eth.request({ method: 'eth_chainId' }), 16);
+      setAccount(acc || null);
+      setChainId(cid);
+      if (acc && cid === wantedChain) {
+        const raw = await eth.request({ method: 'eth_call', params: [{ to: tokenAddress, data: encodeBalanceOf(acc) }, 'latest'] });
+        setBalance(BigInt(raw && raw !== '0x' ? raw : 0));
+      } else {
+        setBalance(null);
+      }
+    } catch {
+      setBalance(null);
+    }
+  }, [wantedChain, tokenAddress]);
+
+  // Re-read on wallet changes and when the payer comes back to this tab (e.g. from the buy page).
+  useEffect(() => {
+    refreshWallet();
+    const eth = window.ethereum;
+    const onVisible = () => { if (document.visibilityState === 'visible') refreshWallet(); };
+    eth?.on?.('accountsChanged', refreshWallet);
+    eth?.on?.('chainChanged', refreshWallet);
+    window.addEventListener('focus', refreshWallet);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      eth?.removeListener?.('accountsChanged', refreshWallet);
+      eth?.removeListener?.('chainChanged', refreshWallet);
+      window.removeEventListener('focus', refreshWallet);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [refreshWallet]);
 
   const submitTx = async (txHash: string) => {
     const res = await fetch(`${API_BASE}/pay/${id}/transactions`, {
@@ -82,60 +164,79 @@ export default function PayInvoice() {
     const body = await res.json();
     if (body && body.invoice_id) setView(body);
     const result = body?.results?.[0];
-    if (!res.ok) {
-      setMessage(result?.reason || body?.detail || 'The transaction was not accepted');
-    } else if (result?.state === 'pending') {
-      setMessage(`Transaction sent. Waiting for ${body.confirmations_required} confirmations on ${body.chain.name}…`);
-    } else if (result?.state === 'confirmed') {
-      setMessage('Payment confirmed.');
+    if (!res.ok && !result) {
+      setNotice({ tone: 'red', text: body?.detail || 'The transaction was not accepted' });
+      return;
     }
+    setNotice(noticeFor(result, body));
+  };
+
+  const connectWallet = async () => {
+    if (!window.ethereum) {
+      setNotice({ tone: 'info', text: 'No wallet found. Install MetaMask, or pay from another wallet and paste the transaction hash below.' });
+      return;
+    }
+    try {
+      await window.ethereum.request({ method: 'eth_requestAccounts' });
+    } catch {
+      return; // closed or rejected in the wallet: nothing changes
+    }
+    await refreshWallet();
+  };
+
+  const switchNetwork = async () => {
+    if (!window.ethereum || !view) return;
+    const chainHex = '0x' + view.chain.id.toString(16);
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainHex }] });
+    } catch (switchErr: any) {
+      if (switchErr?.code !== 4902) return;
+      try {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: chainHex,
+            chainName: view.chain.name,
+            nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
+            blockExplorerUrls: ['https://sepolia.etherscan.io'],
+          }],
+        });
+      } catch {
+        return;
+      }
+    }
+    await refreshWallet();
   };
 
   const payWithWallet = async () => {
-    if (!view) return;
-    if (!window.ethereum) {
-      setMessage('No wallet found. Install MetaMask, or pay from another wallet and paste the transaction hash below.');
-      return;
-    }
+    if (!view || !window.ethereum || !account) return;
     setBusy(true);
-    setMessage(null);
+    setNotice(null);
     try {
-      const [from] = await window.ethereum.request({ method: 'eth_requestAccounts' });
-      const chainHex = '0x' + view.chain.id.toString(16);
-      try {
-        await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainHex }] });
-      } catch (switchErr: any) {
-        if (switchErr?.code === 4902) {
-          await window.ethereum.request({
-            method: 'wallet_addEthereumChain',
-            params: [{
-              chainId: chainHex,
-              chainName: view.chain.name,
-              nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
-              rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
-              blockExplorerUrls: ['https://sepolia.etherscan.io'],
-            }],
-          });
-        } else {
-          throw switchErr;
-        }
+      const cid = parseInt(await window.ethereum.request({ method: 'eth_chainId' }), 16);
+      if (cid !== view.chain.id) {
+        setChainId(cid); // shows the switch-network notice; nothing is sent
+        return;
       }
       const txHash = await window.ethereum.request({
         method: 'eth_sendTransaction',
-        params: [{ from, to: view.token.address, data: encodeTransfer(view.wallet_address, view.amount_remaining_units) }],
+        params: [{ from: account, to: view.token.address, data: encodeTransfer(view.wallet_address, view.amount_remaining_units) }],
       });
       await submitTx(txHash);
     } catch (err: any) {
-      setMessage(err?.code === 4001 ? 'Payment cancelled in your wallet.' : err?.message || 'Payment failed');
+      if (err?.code === 4001) return; // rejected in the wallet: back to the page, nothing changed
+      setNotice({ tone: 'red', text: failedText });
     } finally {
       setBusy(false);
+      refreshWallet();
     }
   };
 
   const submitManual = async () => {
     if (!manualTx.trim()) return;
     setBusy(true);
-    setMessage(null);
+    setNotice(null);
     try {
       await submitTx(manualTx.trim());
       setManualTx('');
@@ -151,7 +252,14 @@ export default function PayInvoice() {
     return <Shell><p className="text-gray-600">Loading…</p></Shell>;
   }
 
-  const paid = view.status === 'paid';
+  const paid = PAID_STATUSES.includes(view.status);
+  const needed = BigInt(view.amount_remaining_units || '0');
+  const wrongNetwork = !!account && chainId !== null && chainId !== view.chain.id;
+  const shortOfFunds = !!account && !wrongNetwork && balance !== null && balance < needed;
+  const canPay = !!account && !wrongNetwork && balance !== null && !shortOfFunds && !busy;
+  const amountText = fmt2(view.amount_remaining);
+  const paymentUri = `ethereum:${view.token.address}@${view.chain.id}/transfer?address=${view.wallet_address}&uint256=${view.amount_remaining_units}`;
+
   return (
     <Shell>
       <div className="flex justify-between items-start mb-6">
@@ -164,31 +272,76 @@ export default function PayInvoice() {
           paid ? 'bg-green-100 text-green-800'
             : view.status === 'partially_paid' ? 'bg-yellow-100 text-yellow-800'
             : 'bg-gray-100 text-gray-800'}`}>
-          {paid ? 'Paid' : view.status === 'partially_paid' ? 'Partly paid' : 'Open'}
+          {view.status === 'overpaid' ? 'Overpaid' : paid ? 'Paid' : view.status === 'partially_paid' ? 'Partly paid' : 'Open'}
         </span>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6 text-center">
-        <Amount label="Total" value={view.amount_due} symbol={view.token.symbol} />
-        <Amount label="Paid" value={view.amount_paid} symbol={view.token.symbol} />
-        <Amount label="Still to pay" value={view.amount_remaining} symbol={view.token.symbol} strong />
+        <Amount label="Total" value={view.amount_due} symbol={symbol} />
+        <Amount label="Paid" value={view.amount_paid} symbol={symbol} />
+        <Amount label="Still to pay" value={view.amount_remaining} symbol={symbol} strong />
       </div>
 
       {!paid && view.payable && (
         <>
-          <button
-            onClick={payWithWallet}
-            disabled={busy}
-            className="w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60 mb-4"
-          >
-            {busy ? 'Waiting for your wallet…' : `Pay ${fmt(view.amount_remaining)} ${view.token.symbol} with MetaMask`}
-          </button>
+          <p className="text-sm font-bold text-gray-700 mb-2">Pay with</p>
+          <label className="flex items-center justify-between border-2 border-blue-600 rounded-lg px-4 py-3 mb-2 cursor-pointer">
+            <span className="flex items-center gap-3">
+              <input type="radio" name="asset" checked readOnly className="accent-blue-600" />
+              <span className="font-bold text-gray-900">{symbol} — {amountText}</span>
+            </span>
+            <span className="text-xs text-gray-500">{view.chain.name}</span>
+          </label>
+          <a href={BUY_APIUSD_URL} target="_blank" rel="noopener noreferrer"
+             className="inline-block text-sm text-blue-700 hover:underline mb-4">
+            Don&apos;t have {symbol}? Buy it here
+          </a>
+
+          {wrongNetwork && (
+            <NoticeBox tone="yellow">
+              <p>Switch your wallet to {view.chain.name} to pay with {symbol}.</p>
+              <button onClick={switchNetwork} className="mt-2 px-3 py-1 rounded bg-yellow-600 text-white text-sm font-bold">
+                Switch to {view.chain.name}
+              </button>
+            </NoticeBox>
+          )}
+
+          {shortOfFunds && (
+            <NoticeBox tone="yellow">
+              <p>Not enough {symbol}. You have {unitsToFixed2(balance as bigint, view.token.decimals)} {symbol}, this invoice needs {amountText} {symbol}.</p>
+              <a href={BUY_APIUSD_URL} target="_blank" rel="noopener noreferrer"
+                 className="inline-block mt-2 px-3 py-1 rounded bg-yellow-600 text-white text-sm font-bold">
+                Buy {symbol}
+              </a>
+            </NoticeBox>
+          )}
+
+          {account ? (
+            <button
+              onClick={payWithWallet}
+              disabled={!canPay}
+              className="w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60 mb-4"
+            >
+              {busy ? 'Waiting for your wallet…' : `Pay ${amountText} ${symbol}`}
+            </button>
+          ) : (
+            <button
+              onClick={connectWallet}
+              className="w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 mb-4"
+            >
+              Connect wallet
+            </button>
+          )}
 
           <div className="text-sm text-gray-600 bg-gray-50 rounded-lg p-4 mb-4 space-y-1">
-            <p><strong>Paying from another wallet?</strong> Send exactly {fmt(view.amount_remaining)} {view.token.symbol} on {view.chain.name} to:</p>
+            <p><strong>Paying from another wallet?</strong> Scan the code, or send exactly {amountText} {symbol} on {view.chain.name} to:</p>
+            <div className="flex justify-center py-2">
+              <QRCodeSVG value={paymentUri} size={160} />
+            </div>
             <p className="font-mono break-all text-gray-900">{view.wallet_address}</p>
             <p>Token contract: <span className="font-mono break-all">{view.token.address}</span></p>
-            <div className="flex gap-2 pt-2">
+            <p>Then paste the transaction hash here:</p>
+            <div className="flex gap-2 pt-1">
               <input
                 value={manualTx}
                 onChange={(e) => setManualTx(e.target.value)}
@@ -207,7 +360,7 @@ export default function PayInvoice() {
         <p className="text-gray-600 mb-4">This invoice cannot be paid online.</p>
       )}
 
-      {message && <p className="text-sm text-gray-800 bg-blue-50 rounded p-3 mb-4">{message}</p>}
+      {notice && <NoticeBox tone={notice.tone}><p>{notice.text}</p></NoticeBox>}
 
       {view.pending_txs.length > 0 && !paid && (
         <p className="text-sm text-yellow-800 mb-4">
@@ -222,13 +375,24 @@ export default function PayInvoice() {
             <a key={p.tx_hash} href={p.explorer_url} target="_blank" rel="noopener noreferrer"
                className="flex justify-between text-sm text-blue-700 hover:underline">
               <span className="font-mono">{p.tx_hash.slice(0, 18)}…</span>
-              <span>{fmt(p.amount)} {view.token.symbol}</span>
+              <span>{fmt2(p.amount)} {symbol}</span>
             </a>
           ))}
         </div>
       )}
     </Shell>
   );
+}
+
+const TONES: Record<Tone, string> = {
+  yellow: 'bg-yellow-50 border-yellow-400 text-yellow-900',
+  red: 'bg-red-50 border-red-400 text-red-900',
+  green: 'bg-green-50 border-green-500 text-green-900',
+  info: 'bg-blue-50 border-blue-300 text-gray-800',
+};
+
+function NoticeBox({ tone, children }: { tone: Tone; children: React.ReactNode }) {
+  return <div role="status" className={`text-sm border-l-4 rounded p-3 mb-4 ${TONES[tone]}`}>{children}</div>;
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
@@ -244,7 +408,7 @@ function Amount({ label, value, symbol, strong }: { label: string; value: string
     <div>
       <p className="text-xs text-gray-500 uppercase">{label}</p>
       <p className={`${strong ? 'text-xl font-bold' : 'text-lg font-semibold'} text-gray-900`}>
-        {Number(value).toFixed(2)}
+        {fmt2(value)}
       </p>
       <p className="text-xs text-gray-500">{symbol}</p>
     </div>

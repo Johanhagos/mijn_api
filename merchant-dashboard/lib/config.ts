@@ -17,3 +17,7 @@ export const DEV_BYPASS_AUTH =
 
 // Backend responses may return paths like /merchant/logos/x.png; make them absolute.
 export const toApiUrl = (path: string) => (path && path.startsWith('/') ? `${API_BASE}${path}` : path);
+
+// Where a payer buys APIUSD (opened in a new tab from the pay page). Testnet swap page by default.
+export const BUY_APIUSD_URL =
+  process.env.NEXT_PUBLIC_BUY_APIUSD_URL || 'https://apitoken-frontend-development.up.railway.app';

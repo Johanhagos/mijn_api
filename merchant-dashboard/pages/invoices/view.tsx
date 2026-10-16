@@ -32,6 +32,8 @@ interface Invoice {
   notes?: string;
   amount_paid?: number;
   payment_url?: string;
+  payment_symbol?: string;
+  payments?: { tx_hash: string; amount: string; explorer_url: string }[];
 }
 
 export default function InvoiceDetail() {
@@ -71,6 +73,8 @@ export default function InvoiceDetail() {
 
   const formatCurrency = (value: any) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR' }).format(toNumber(value));
+
+  const formatToken = (value: any) => `${toNumber(value).toFixed(2)} ${invoice?.payment_symbol || 'APIUSD'}`;
 
   useEffect(() => {
     if (!id) return;
@@ -220,6 +224,7 @@ export default function InvoiceDetail() {
                       <option value="partially_paid">Partly paid</option>
                     )}
                     {(isAdmin || invoice?.status === 'paid') && <option value="paid">Paid</option>}
+                    {(isAdmin || invoice?.status === 'overpaid') && <option value="overpaid">Overpaid</option>}
                     <option value="overdue">Overdue</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
@@ -320,7 +325,7 @@ export default function InvoiceDetail() {
                   </div>
                   <div className="text-right">
                     <span className={`inline-flex items-center px-4 py-2 text-lg font-bold rounded-full ${
-                      invoice.status === 'paid'
+                      invoice.status === 'paid' || invoice.status === 'overpaid'
                         ? 'bg-green-100 text-green-800'
                         : invoice.status === 'pending' || invoice.status === 'partially_paid'
                         ? 'bg-yellow-100 text-yellow-800'
@@ -328,6 +333,8 @@ export default function InvoiceDetail() {
                     }`}>
                       {invoice.status === 'paid'
                         ? '✅ PAID'
+                        : invoice.status === 'overpaid'
+                        ? '✅ OVERPAID'
                         : invoice.status === 'partially_paid'
                         ? '◐ PARTLY PAID'
                         : invoice.status === 'pending'
@@ -530,24 +537,36 @@ export default function InvoiceDetail() {
 
               {/* Crypto payment */}
               <div className="bg-white rounded-lg shadow p-8 border-l-4 border-blue-600">
-                <h3 className="text-sm font-bold text-blue-700 uppercase tracking-wider mb-4">Payment (APIUSD)</h3>
+                <h3 className="text-sm font-bold text-blue-700 uppercase tracking-wider mb-4">Payment ({invoice.payment_symbol || 'APIUSD'})</h3>
                 <div className="grid grid-cols-3 gap-6 mb-4">
                   <div>
                     <p className="text-xs text-gray-500 uppercase font-medium mb-1">Total</p>
-                    <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoice.total)}</p>
+                    <p className="text-lg font-semibold text-gray-900">{formatToken(invoice.total)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase font-medium mb-1">Paid</p>
-                    <p className="text-lg font-semibold text-gray-900">{formatCurrency(invoice.amount_paid)}</p>
+                    <p className="text-lg font-semibold text-gray-900">{formatToken(invoice.amount_paid)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 uppercase font-medium mb-1">Open</p>
                     <p className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(Math.max(toNumber(invoice.total) - toNumber(invoice.amount_paid), 0))}
+                      {formatToken(Math.max(toNumber(invoice.total) - toNumber(invoice.amount_paid), 0))}
                     </p>
                   </div>
                 </div>
-                {invoice.payment_url && invoice.status !== 'paid' && (
+                {invoice.payments && invoice.payments.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 uppercase font-medium mb-2">Received payments</p>
+                    {invoice.payments.map((p) => (
+                      <a key={p.tx_hash} href={p.explorer_url} target="_blank" rel="noopener noreferrer"
+                         className="flex justify-between text-sm text-blue-700 hover:underline py-1">
+                        <span className="font-mono">{p.tx_hash.slice(0, 18)}…</span>
+                        <span>{formatToken(p.amount)}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+                {invoice.payment_url && invoice.status !== 'paid' && invoice.status !== 'overpaid' && (
                   <div className="flex gap-2 items-center">
                     <input
                       readOnly

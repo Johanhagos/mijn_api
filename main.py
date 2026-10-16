@@ -1364,6 +1364,8 @@ class InvoiceOut(BaseModel):
     items: Optional[List[dict]] = None
     amount_paid: Optional[float] = None
     payment_url: Optional[str] = None
+    payment_symbol: Optional[str] = None
+    payments: Optional[List[dict]] = None
 
 
 class InvoiceUpdate(BaseModel):
@@ -2483,11 +2485,12 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
             raise HTTPException(status_code=403, detail="Only an admin can change whether an invoice is paid")
         valid_transitions = {
             "draft": ["sent", "issued", "cancelled"],
-            "issued": ["sent", "paid", "partially_paid", "overdue", "cancelled"],
-            "sent": ["paid", "partially_paid", "overdue", "cancelled"],
-            "partially_paid": ["paid", "overdue"],
-            "paid": ["overdue"],
-            "overdue": ["paid", "partially_paid"],
+            "issued": ["sent", "paid", "partially_paid", "overpaid", "overdue", "cancelled"],
+            "sent": ["paid", "partially_paid", "overpaid", "overdue", "cancelled"],
+            "partially_paid": ["paid", "overpaid", "overdue"],
+            "paid": ["overpaid", "overdue"],
+            "overpaid": ["paid", "overdue"],
+            "overdue": ["paid", "partially_paid", "overpaid"],
             "void": [],
             "cancelled": [],
         }
@@ -2578,7 +2581,7 @@ async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: 
 # CRYPTO INVOICE PAYMENTS (APIUSD on Sepolia, verified on-chain)
 # ============================================================================
 
-PAYMENT_STATUSES = ("paid", "partially_paid")
+PAYMENT_STATUSES = ("paid", "partially_paid", "overpaid")
 PUBLIC_DASHBOARD_URL = os.getenv("PUBLIC_DASHBOARD_URL", "https://dashboard.apiblockchain.io")
 MAX_PENDING_TXS = 5
 PENDING_TX_TIMEOUT = 3600  # seconds a submitted hash may stay unknown on-chain
@@ -2604,9 +2607,15 @@ def _invoice_paid_units(inv: dict, cfg=None) -> int:
     return sum(int(t["data"]["units"]) for t in _invoice_payment_txs(inv, cfg))
 
 
+def _payments_out(txs: List[dict], cfg) -> List[dict]:
+    return [{"tx_hash": t["tx_hash"], "amount": crypto_payments.from_units(int(t["data"]["units"]), cfg.token_decimals),
+             "explorer_url": cfg.explorer_tx_url + t["tx_hash"]} for t in txs]
+
+
 def _invoice_out(inv: dict) -> "InvoiceOut":
     cfg = crypto_payments.config()
-    paid_units = _invoice_paid_units(inv, cfg)
+    txs = _invoice_payment_txs(inv, cfg)
+    paid_units = sum(int(t["data"]["units"]) for t in txs)
     return InvoiceOut(**{
         "id": inv.get("id"),
         "invoice_number": inv.get("invoice_number"),
@@ -2636,6 +2645,8 @@ def _invoice_out(inv: dict) -> "InvoiceOut":
         "merchant_logo_url": inv.get("merchant_logo_url"),
         "amount_paid": float(crypto_payments.from_units(paid_units, cfg.token_decimals)),
         "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay?invoice={inv.get('id')}",
+        "payment_symbol": cfg.token_symbol,
+        "payments": _payments_out(txs, cfg),
     })
 
 
@@ -2668,11 +2679,11 @@ def _apply_payment_status(inv: dict, sessions_cache: Optional[list] = None) -> N
         return
     inv["amount_paid"] = crypto_payments.from_units(paid, cfg.token_decimals)
     if paid >= due:
-        if inv.get("status") != "paid":
-            inv["status"] = "paid"
+        if inv.get("status") not in ("paid", "overpaid"):
             inv["paid_at"] = datetime.now(timezone.utc).isoformat()
             inv["payment_system"] = "web3"
             _mark_linked_session_paid(inv)
+        inv["status"] = "overpaid" if paid > due else "paid"
     else:
         inv["status"] = "partially_paid"
 
@@ -2731,6 +2742,8 @@ def _process_tx(inv: dict, tx_hash: str) -> dict:
     if tx_hash in pending:
         pending.remove(tx_hash)
         first_seen.pop(tx_hash, None)
+    if result["state"] == "failed":
+        return {"tx_hash": tx_hash, "state": "failed", "reason": result.get("reason")}
     if result["state"] != "confirmed":
         return {"tx_hash": tx_hash, "state": "rejected", "reason": result.get("reason")}
 
@@ -2765,10 +2778,9 @@ def _payment_view(inv: dict, tx_results: Optional[list] = None) -> dict:
         "amount_paid": crypto_payments.from_units(paid, cfg.token_decimals),
         "amount_remaining": crypto_payments.from_units(max(due - paid, 0), cfg.token_decimals),
         "amount_remaining_units": str(max(due - paid, 0)),
-        "payable": cfg.enabled and inv.get("status") not in ("paid", "void", "cancelled", "draft"),
+        "payable": cfg.enabled and inv.get("status") not in ("paid", "overpaid", "void", "cancelled", "draft"),
         "pending_txs": inv.get("pending_txs") or [],
-        "payments": [{"tx_hash": t["tx_hash"], "amount": crypto_payments.from_units(int(t["data"]["units"]), cfg.token_decimals),
-                      "explorer_url": cfg.explorer_tx_url + t["tx_hash"]} for t in _invoice_payment_txs(inv, cfg)],
+        "payments": _payments_out(_invoice_payment_txs(inv, cfg), cfg),
         "results": tx_results or [],
         "token": {"symbol": cfg.token_symbol, "address": cfg.token_address, "decimals": cfg.token_decimals},
         "chain": {"id": cfg.chain_id, "name": cfg.chain_name},
@@ -2812,7 +2824,7 @@ def submit_invoice_payment(invoice_id: str, payload: dict = Body(...)):
     _apply_payment_status(inv)
     save_invoices(invoices)
     view = _payment_view(inv, [result])
-    if result["state"] == "rejected":
+    if result["state"] in ("rejected", "failed"):
         return JSONResponse(status_code=400, content=view)
     return view
 
