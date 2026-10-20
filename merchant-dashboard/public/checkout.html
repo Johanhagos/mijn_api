@@ -480,7 +480,7 @@
                         <div class="crypto-name">USD Coin</div>
                         <div style="font-size: 12px; color: #999;">USDC</div>
                     </div>
-                    <div class="crypto-option" id="apiusdOption" onclick="selectCrypto('APIUSD')" style="display: none; grid-column: 1 / -1;">
+                    <div class="crypto-option" id="apiusdOption" onclick="selectCrypto('APIUSD')" style="grid-column: 1 / -1;">
                         <div class="crypto-icon">APIUSD</div>
                         <div class="crypto-name">APIBlockchain USD</div>
                         <div style="font-size: 12px; color: #999;">APIUSD</div>
@@ -556,17 +556,12 @@
 
         let selectedCrypto = null;
 
-        // APIUSD is offered only in dev mode (localhost or ?dev) while the token is on Sepolia.
         const APIUSD_SWAP_URL = 'https://apitoken-frontend-development.up.railway.app';
         const APIUSD_TOKEN = '0x354CBbF9aCcbf79B223ef153f2fb91C2c0AeD521';
         const SEPOLIA_RPC_URL = 'https://ethereum-sepolia-rpc.publicnode.com';
         const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
-        const isDevMode = ['localhost', '127.0.0.1'].includes(window.location.hostname) || params.has('dev');
-        if (isDevMode) {
-            document.getElementById('apiusdOption').style.display = '';
-        }
 
-        // Dev mode compares the EUR price 1:1 with APIUSD (6 decimals).
+        // The EUR price is compared 1:1 with APIUSD (6 decimals).
         const apiusdNeeded = BigInt(Math.round(priceAmount * 1e6));
         let apiusdHasEnough = false;
         let apiusdCheck = 0;
