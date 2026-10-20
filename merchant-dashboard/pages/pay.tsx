@@ -256,7 +256,8 @@ export default function PayInvoice() {
   const needed = BigInt(view.amount_remaining_units || '0');
   const wrongNetwork = !!account && chainId !== null && chainId !== view.chain.id;
   const shortOfFunds = !!account && !wrongNetwork && balance !== null && balance < needed;
-  const canPay = !!account && !wrongNetwork && balance !== null && !shortOfFunds && !busy;
+  const confirming = view.pending_txs.length > 0;
+  const canPay = !!account && !wrongNetwork && balance !== null && !shortOfFunds && !busy && !confirming;
   const amountText = fmt2(view.amount_remaining);
   const paymentUri = `ethereum:${view.token.address}@${view.chain.id}/transfer?address=${view.wallet_address}&uint256=${view.amount_remaining_units}`;
 
@@ -320,9 +321,15 @@ export default function PayInvoice() {
             <button
               onClick={payWithWallet}
               disabled={!canPay}
-              className="w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60 mb-4"
+              className="w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60 mb-4 flex items-center justify-center gap-2"
             >
-              {busy ? 'Waiting for your wallet…' : `Pay ${amountText} ${symbol}`}
+              {busy ? (
+                <><Spinner /> Waiting for your wallet…</>
+              ) : confirming ? (
+                <><Spinner /> Confirming payment…</>
+              ) : (
+                `Pay ${amountText} ${symbol}`
+              )}
             </button>
           ) : (
             <button
@@ -393,6 +400,15 @@ const TONES: Record<Tone, string> = {
 
 function NoticeBox({ tone, children }: { tone: Tone; children: React.ReactNode }) {
   return <div role="status" className={`text-sm border-l-4 rounded p-3 mb-4 ${TONES[tone]}`}>{children}</div>;
+}
+
+function Spinner() {
+  return (
+    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25" />
+      <path d="M22 12a10 10 0 0 1-10 10" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
