@@ -369,6 +369,12 @@ export default function PayInvoice() {
 
       {notice && <NoticeBox tone={notice.tone}><p>{notice.text}</p></NoticeBox>}
 
+      {paid && (
+        <a href="/dashboard" className="block w-full text-center py-3 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 mb-4">
+          Go to dashboard
+        </a>
+      )}
+
       {view.pending_txs.length > 0 && !paid && (
         <p className="text-sm text-yellow-800 mb-4">
           Waiting for {view.confirmations_required} blockchain confirmations. This page updates by itself.
