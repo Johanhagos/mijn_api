@@ -536,6 +536,7 @@ export default function InvoiceDetail() {
               </div>
 
               {/* Crypto payment */}
+              {(invoice.payment_system === 'web3' || (invoice.payments?.length ?? 0) > 0) && (
               <div className="bg-white rounded-lg shadow p-8 border-l-4 border-blue-600">
                 <h3 className="text-sm font-bold text-blue-700 uppercase tracking-wider mb-4">Payment ({invoice.payment_symbol || 'APIUSD'})</h3>
                 <div className="grid grid-cols-3 gap-6 mb-4">
@@ -566,7 +567,7 @@ export default function InvoiceDetail() {
                     ))}
                   </div>
                 )}
-                {invoice.payment_url && invoice.status !== 'paid' && invoice.status !== 'overpaid' && (
+                {invoice.payment_system === 'web3' && invoice.payment_url && invoice.status !== 'paid' && invoice.status !== 'overpaid' && (
                   <div className="flex gap-2 items-center">
                     <input
                       readOnly
@@ -582,6 +583,7 @@ export default function InvoiceDetail() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex gap-4 justify-center flex-wrap">

@@ -24,6 +24,8 @@ interface PaymentView {
   token: { symbol: string; address: string; decimals: number };
   chain: { id: number; name: string };
   wallet_address: string;
+  payment_system?: string;
+  currency?: string;
   confirmations_required: number;
 }
 
@@ -269,6 +271,7 @@ export default function PayInvoice() {
   const confirming = view.pending_txs.length > 0;
   const canPay = !!account && !wrongNetwork && balance !== null && !shortOfFunds && !busy && !confirming;
   const amountText = fmt2(view.amount_remaining);
+  const unit = view.payment_system === 'web2' ? (view.currency || 'EUR') : symbol;
   const paymentUri = `ethereum:${view.token.address}@${view.chain.id}/transfer?address=${view.wallet_address}&uint256=${view.amount_remaining_units}`;
 
   return (
@@ -288,9 +291,9 @@ export default function PayInvoice() {
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-6 text-center">
-        <Amount label="Total" value={view.amount_due} symbol={symbol} />
-        <Amount label="Paid" value={view.amount_paid} symbol={symbol} />
-        <Amount label="Still to pay" value={view.amount_remaining} symbol={symbol} strong />
+        <Amount label="Total" value={view.amount_due} symbol={unit} />
+        <Amount label="Paid" value={view.amount_paid} symbol={unit} />
+        <Amount label="Still to pay" value={view.amount_remaining} symbol={unit} strong />
       </div>
 
       {!paid && view.payable && (
@@ -374,7 +377,13 @@ export default function PayInvoice() {
       )}
 
       {!paid && !view.payable && (
-        <p className="text-gray-600 mb-4">This invoice cannot be paid online.</p>
+        view.payment_system === 'web2' ? (
+          <NoticeBox tone="info">
+            <p>This invoice is paid by bank transfer or card, not in {symbol}. Please contact {view.seller_name || 'the seller'} for the payment details.</p>
+          </NoticeBox>
+        ) : (
+          <p className="text-gray-600 mb-4">This invoice cannot be paid online.</p>
+        )
       )}
 
       {notice && <NoticeBox tone={notice.tone}><p>{notice.text}</p></NoticeBox>}
