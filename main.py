@@ -2650,6 +2650,10 @@ def _invoice_out(inv: dict) -> "InvoiceOut":
     })
 
 
+def _payment_system(inv: dict) -> str:
+    return inv.get("payment_system") or "web2"
+
+
 def _payable_invoice(invoices: List[dict], invoice_id: str) -> dict:
     inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
     if not inv or inv.get("type") == "credit_note" or _invoice_total(inv) <= 0:
@@ -2778,7 +2782,9 @@ def _payment_view(inv: dict, tx_results: Optional[list] = None) -> dict:
         "amount_paid": crypto_payments.from_units(paid, cfg.token_decimals),
         "amount_remaining": crypto_payments.from_units(max(due - paid, 0), cfg.token_decimals),
         "amount_remaining_units": str(max(due - paid, 0)),
-        "payable": cfg.enabled and inv.get("status") not in ("paid", "overpaid", "void", "cancelled", "draft"),
+        "payment_system": _payment_system(inv),
+        "payable": (cfg.enabled and _payment_system(inv) == "web3"
+                    and inv.get("status") not in ("paid", "overpaid", "void", "cancelled", "draft")),
         "pending_txs": inv.get("pending_txs") or [],
         "payments": _payments_out(_invoice_payment_txs(inv, cfg), cfg),
         "results": tx_results or [],
@@ -2820,6 +2826,8 @@ def submit_invoice_payment(invoice_id: str, payload: dict = Body(...)):
     inv = _payable_invoice(invoices, invoice_id)
     if inv.get("status") in ("void", "cancelled"):
         raise HTTPException(status_code=409, detail="This invoice can no longer be paid")
+    if _payment_system(inv) != "web3":
+        raise HTTPException(status_code=409, detail="This invoice is not paid in crypto")
     result = _process_tx(inv, tx_hash)
     _apply_payment_status(inv)
     save_invoices(invoices)

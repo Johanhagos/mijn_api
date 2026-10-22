@@ -78,10 +78,11 @@ def _login(client, name, password):
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
-def _invoice(env, total=10.0):
+def _invoice(env, total=10.0, payment_system="web3"):
     r = env["client"].post("/invoices", headers=env["merchant"], json={
         "seller_name": "Shop", "seller_country": "NL", "buyer_name": "Buyer", "buyer_country": "NL",
-        "items": [{"description": "x", "quantity": 1, "unit_price": total}], "vat_rate": 0, "total": total})
+        "items": [{"description": "x", "quantity": 1, "unit_price": total}], "vat_rate": 0, "total": total,
+        "payment_system": payment_system})
     assert r.status_code == 201, r.text
     return r.json()["id"]
 
@@ -152,6 +153,16 @@ def test_reverted_transaction_reports_failed(env):
     r = _submit(env, inv, tx)
     assert r.status_code == 400 and r.json()["results"][0]["state"] == "failed"
     assert r.json()["status"] == "issued"
+
+
+def test_web2_invoice_is_not_paid_in_crypto(env):
+    inv = _invoice(env, 10, payment_system="web2")
+    view = env["client"].get(f"/pay/{inv}").json()
+    assert view["payable"] is False and view["payment_system"] == "web2"
+    tx = _tx()
+    CHAIN[tx] = _confirmed(10_000_000)
+    assert _submit(env, inv, tx).status_code == 409
+    assert env["client"].get(f"/pay/{inv}").json()["status"] == "issued"
 
 
 def test_same_transaction_counts_once(env):
