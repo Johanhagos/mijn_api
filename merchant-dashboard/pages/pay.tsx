@@ -155,6 +155,16 @@ export default function PayInvoice() {
     };
   }, [refreshWallet]);
 
+  // The wallet can answer from a slightly old block, so keep re-reading while the balance is short.
+  const neededUnits = view?.amount_remaining_units;
+  useEffect(() => {
+    if (!account || balance === null || !neededUnits || balance >= BigInt(neededUnits)) return;
+    const t = setInterval(() => {
+      if (document.visibilityState === 'visible') refreshWallet();
+    }, 4000);
+    return () => clearInterval(t);
+  }, [account, balance, neededUnits, refreshWallet]);
+
   const submitTx = async (txHash: string) => {
     const res = await fetch(`${API_BASE}/pay/${id}/transactions`, {
       method: 'POST',
@@ -368,12 +378,6 @@ export default function PayInvoice() {
       )}
 
       {notice && <NoticeBox tone={notice.tone}><p>{notice.text}</p></NoticeBox>}
-
-      {paid && (
-        <a href="/dashboard" className="block w-full text-center py-3 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 mb-4">
-          Go to dashboard
-        </a>
-      )}
 
       {view.pending_txs.length > 0 && !paid && (
         <p className="text-sm text-yellow-800 mb-4">
