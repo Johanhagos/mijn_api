@@ -959,6 +959,7 @@ PLATFORM_NAME = os.getenv("PLATFORM_NAME", "APIBlockchain")
 PLATFORM_COUNTRY = os.getenv("PLATFORM_COUNTRY", "NL").upper()
 PLATFORM_VAT_NUMBER = os.getenv("PLATFORM_VAT_NUMBER", "")
 PLATFORM_ADDRESS = os.getenv("PLATFORM_ADDRESS", "")
+PLATFORM_KVK_NUMBER = os.getenv("PLATFORM_KVK_NUMBER", "")  # Chamber of Commerce number, required on Dutch invoices
 
 
 def _vies_valid(vat_number: str) -> Optional[bool]:
@@ -3102,6 +3103,7 @@ async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(
             "seller_country": PLATFORM_COUNTRY,
             "seller_vat": PLATFORM_VAT_NUMBER or None,
             "seller_address": PLATFORM_ADDRESS or None,
+            "seller_registration_number": f"KvK {PLATFORM_KVK_NUMBER}" if PLATFORM_KVK_NUMBER else None,
             "buyer_name": user.get("business_name") or user.get("name"),
             "buyer_email": user.get("email"),
             "buyer_address": user.get("address"),

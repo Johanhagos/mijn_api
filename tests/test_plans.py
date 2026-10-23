@@ -335,3 +335,15 @@ def test_quote_shows_prices_with_vat(env):
     q = c.get("/plans/quote", headers=auth).json()
     prices = {p["id"]: p for p in q["plans"]}
     assert q["country"] == "DE" and prices["starter"]["total"] == 23.80 and prices["professional"]["vat_rate"] == 19.0
+
+
+def test_plan_invoice_shows_platform_vat_kvk_and_address(env):
+    c, main, mp = env["client"], env["main"], env["mp"]
+    mp.setattr(main, "PLATFORM_VAT_NUMBER", "NL005511005B38")
+    mp.setattr(main, "PLATFORM_KVK_NUMBER", "42121823")
+    mp.setattr(main, "PLATFORM_ADDRESS", "G.A. Brederodestraat 100, 1132 ST Volendam")
+    _, auth = _merchant(c)
+    buy = _buy(env, auth)
+    inv = next(i for i in main.store.load_invoices() if i["id"] == buy["invoice_id"])
+    assert inv["seller_vat"] == "NL005511005B38" and inv["seller_registration_number"] == "KvK 42121823"
+    assert inv["seller_address"] == "G.A. Brederodestraat 100, 1132 ST Volendam" and inv["seller_country"] == "NL"
