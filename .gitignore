@@ -21,3 +21,18 @@ merchant-dashboard/.next/
 # Local secrets
 API claude key.txt
 *key*.txt
+
+# Never commit secrets or customer data (this repo is public)
+.env.prod
+.env.production.local
+users.json
+api_keys.json
+invoices.json
+sessions.json
+contacts.json
+*.db
+sftp_*.ps1
+sftp_*.txt
+winscp_session.ini
+detect-secrets-report.*
+.venv-test/

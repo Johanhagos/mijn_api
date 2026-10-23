@@ -13,6 +13,13 @@ def test_login_works_without_env_secret_in_dev(monkeypatch, tmp_path):
     app_dir = Path(__file__).resolve().parent.parent
     monkeypatch.delenv("JWT_SECRET_KEY", raising=False)
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.delenv("DATABASE_URL", raising=False)  # SQLite in DATA_DIR
+    # The test's own account (users.json is no longer in the repo)
+    from passlib.context import CryptContext
+    import json
+    (tmp_path / "users.json").write_text(json.dumps([{
+        "id": 1, "name": "merchant_test@example.com", "role": "merchant",
+        "password": CryptContext(schemes=["bcrypt"]).hash("merchant123")}]), encoding="utf-8")
 
     import main
     importlib.reload(main)
