@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
 import AuthGuard from '../components/AuthGuard';
+import { CountryOptions } from '../lib/countries';
 import Link from 'next/link';
 
 export default function AccountPage() {
@@ -24,6 +25,7 @@ export default function AccountPage() {
     businessType: '',
     website: '',
     description: '',
+    payoutWallet: '',
   });
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export default function AccountPage() {
           businessType: data.business_type || '',
           website: data.website || '',
           description: data.description || '',
+          payoutWallet: data.payout_wallet || '',
         });
       } catch (error) {
         console.error('Failed to fetch merchant:', error);
@@ -88,7 +91,7 @@ export default function AccountPage() {
   };
 
   return (
-    <AuthGuard>
+    <AuthGuard requirePlan={false}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-gray-200">
@@ -262,19 +265,43 @@ export default function AccountPage() {
                       <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-2">
                         Country *
                       </label>
-                      <input
-                        type="text"
+                      <select
                         id="country"
                         name="country"
                         value={formData.country}
                         onChange={handleChange}
                         required
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        placeholder="Netherlands"
-                      />
+                      >
+                        <CountryOptions />
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">Decides the VAT on your plan.</p>
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Payouts */}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-1">Payouts</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Your customers&apos; APIUSD payments go straight to this wallet (Sepolia). APIBlockchain never holds your money.
+                </p>
+                <label htmlFor="payoutWallet" className="block text-sm font-medium text-gray-700 mb-2">
+                  Payout wallet address
+                </label>
+                <input
+                  type="text"
+                  id="payoutWallet"
+                  name="payoutWallet"
+                  value={formData.payoutWallet}
+                  onChange={handleChange}
+                  pattern="^0x[0-9a-fA-F]{40}$"
+                  title="An Ethereum address: 0x followed by 40 characters"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="0x…"
+                />
+                <p className="text-xs text-gray-500 mt-1">Use a wallet you control. New invoices and checkouts are paid to the address saved here.</p>
               </div>
 
               {/* Business Details */}

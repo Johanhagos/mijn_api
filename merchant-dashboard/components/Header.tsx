@@ -80,9 +80,12 @@ export default function Header() {
         </div>
       </div>
 
+      <a href="/plans" className="ml-auto btn btn-ghost">
+        Plan
+      </a>
       <button
         onClick={logout}
-        className="ml-auto btn btn-ghost"
+        className="btn btn-ghost"
       >
         Logout
       </button>

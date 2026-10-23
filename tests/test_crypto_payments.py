@@ -40,7 +40,7 @@ def _confirmed(units, ts=None, confirmations=3):
 
 
 @pytest.fixture(scope="module")
-def env(tmp_path_factory):
+def env(tmp_path_factory, give_plan):
     from passlib.context import CryptContext
     data_dir = tmp_path_factory.mktemp("data")
     (data_dir / "users.json").write_text(json.dumps([
@@ -67,6 +67,7 @@ def env(tmp_path_factory):
     admin = _login(client, ADMIN["name"], ADMIN["password"])
     name = f"merchant_{uuid.uuid4().hex[:6]}"
     client.post("/register", json={"name": name, "email": f"{name}@example.com", "password": "merchant-pass-1"})
+    give_plan(name)
     merchant = _login(client, name, "merchant-pass-1")
     yield {"main": main, "client": client, "admin": admin, "merchant": merchant, "mp": mp}
     mp.undo()
@@ -209,7 +210,8 @@ def test_no_unverified_paths_to_paid(env):
     assert c.post("/webhooks/stripe", json={"type": "payment_intent.succeeded"}).status_code == 503
     assert c.post("/session/whatever/complete", json={"payment_system": "web3"},
                   headers=env["merchant"]).status_code == 403
-    r = c.post("/checkout", headers={"X-API-Key": "dev"}, json={"amount": 5, "mode": "test"})
+    key = c.post("/api-keys", headers=env["merchant"], json={"label": "shop", "mode": "test"}).json()["key"]
+    r = c.post("/checkout", headers={"X-API-Key": key}, json={"amount": 5, "mode": "test"})
     assert r.json()["invoice"]["status"] == "pending"
 
 
@@ -227,9 +229,10 @@ def test_stripe_webhook_requires_valid_signature(env):
 
 def test_hosted_checkout_pays_through_invoice(env):
     main, c = env["main"], env["client"]
+    merchant_id = c.get("/merchant/me", headers=env["merchant"]).json()["id"]  # paid to their wallet
     sessions = main.store.load_sessions()
     sid = f"sess_{uuid.uuid4().hex[:8]}"
-    sessions.append({"id": sid, "merchant_id": 1, "amount": 7.0, "mode": "live", "status": "created",
+    sessions.append({"id": sid, "merchant_id": merchant_id, "amount": 7.0, "mode": "live", "status": "created",
                      "metadata": {"webhook_sources": []}})
     main.store.save_sessions(sessions)
     first = c.post(f"/session/{sid}/pay-crypto").json()

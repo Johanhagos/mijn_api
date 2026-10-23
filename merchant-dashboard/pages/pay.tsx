@@ -27,6 +27,8 @@ interface PaymentView {
   payment_system?: string;
   currency?: string;
   confirmations_required: number;
+  kind?: 'plan' | 'invoice';
+  return_url?: string | null;
 }
 
 type Tone = 'yellow' | 'red' | 'green' | 'info';
@@ -387,6 +389,13 @@ export default function PayInvoice() {
       )}
 
       {notice && <NoticeBox tone={notice.tone}><p>{notice.text}</p></NoticeBox>}
+
+      {paid && view.return_url && (
+        <a href={view.return_url}
+           className="block w-full py-3 mb-4 rounded-lg bg-green-600 text-white font-bold text-center hover:bg-green-700">
+          {view.kind === 'plan' ? 'Your plan is active — go to the dashboard' : 'Back to the shop'}
+        </a>
+      )}
 
       {view.pending_txs.length > 0 && !paid && (
         <p className="text-sm text-yellow-800 mb-4">

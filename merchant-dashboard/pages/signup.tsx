@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/router';
 import api from '../lib/api';
 import { API_BASE } from '../lib/config';
+import { CountryOptions } from '../lib/countries';
 
 export default function Signup() {
   const router = useRouter();
@@ -11,11 +12,12 @@ export default function Signup() {
     password: '',
     confirmPassword: '',
     businessName: '',
+    country: '',
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -45,6 +47,7 @@ export default function Signup() {
           email: formData.email,
           password: formData.password,
           business_name: formData.businessName,
+          country: formData.country,
         }),
       });
 
@@ -60,7 +63,9 @@ export default function Signup() {
         localStorage.setItem('jwt', data.access_token);
         if (data.merchant_id) localStorage.setItem('merchant_id', String(data.merchant_id));
         if (data.email) localStorage.setItem('merchant_email', String(data.email));
-        window.location.href = '/dashboard';
+        // A new account has no plan yet: pick and pay one first
+        const plan = typeof router.query.plan === 'string' ? router.query.plan : '';
+        window.location.href = `/plans${plan ? `?plan=${encodeURIComponent(plan)}` : ''}`;
       } else {
         // If no auto-login, redirect to login page
         router.push('/login?registered=true');
@@ -134,6 +139,23 @@ export default function Signup() {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
               placeholder="Your Business Inc."
             />
+          </div>
+
+          <div>
+            <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+              Country *
+            </label>
+            <select
+              id="country"
+              name="country"
+              value={formData.country}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              required
+            >
+              <CountryOptions />
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Where your business is based (used for VAT on your plan)</p>
           </div>
 
           <div>

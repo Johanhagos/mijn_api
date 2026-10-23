@@ -1,39 +1,39 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import api from '../lib/api';
+import { API_BASE } from '../lib/config';
 import AuthGuard from '../components/AuthGuard';
 import Toast from '../components/Toast';
 
+// Connect a webshop: create a live API key, then install the WooCommerce plugin (or call
+// the API from your own shop's server). The key is shown once and must stay server-side.
+
 function PluginSetup() {
   const [key, setKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [snippetMode, setSnippetMode] = useState<'live'|'test'>('live');
   const [showToast, setShowToast] = useState(false);
+  const [wallet, setWallet] = useState<string | null | undefined>(undefined);
 
-  const loadKey = async () => {
+  useEffect(() => {
+    api.protectedApi('/merchant/me').then((me) => setWallet(me?.payout_wallet || null)).catch(() => setWallet(undefined));
+  }, []);
+
+  const copy = async (text: string) => {
     try {
-      const keys = await api.protectedApi('/api-keys');
-      // Prefer live key if present; listing does not include raw key material
-      const live = keys?.find((k: any) => (k.mode || 'live') === 'live');
-      setKey('');
-    } catch (err) {
-      console.error(err);
-    }
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setShowToast(true);
+      setTimeout(() => { setCopied(false); setShowToast(false); }, 1500);
+    } catch { /* clipboard not available */ }
   };
-
-  useEffect(() => { loadKey(); }, []);
 
   const createKey = async () => {
     try {
       setCreating(true);
-      const newKey = await api.protectedApi('/api-keys', 'POST', { mode: 'live', label: 'plugin-live' });
-      const raw = newKey.key || '';
-      setKey(raw);
-      setShowModal(true);
-      try { await navigator.clipboard.writeText(raw); setCopied(true); setTimeout(()=>setCopied(false),1500); setShowToast(true); setTimeout(()=>setShowToast(false),1500);} catch { }
+      const newKey = await api.protectedApi('/api-keys', 'POST', { mode: 'live', label: 'webshop' });
+      setKey(newKey.key || '');
+      if (newKey.key) copy(newKey.key);
     } catch (err) {
       console.error(err);
       alert('Failed to create key: ' + err);
@@ -42,68 +42,64 @@ function PluginSetup() {
     }
   };
 
-  const snippet = (k: string) => ` <script src="https://cdn.apiblockchain.io/plugin.min.js"></script>\n<script>\n  ApiBlockchain.init({\n    apiKey: "${k}",\n    mode: "${snippetMode}"\n  });\n</script>`;
+  const curl = `curl -X POST ${API_BASE}/create_session \\
+  -H "X-API-Key: ${key || 'sk_live_...'}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"amount": 12.50, "order_id": "1042", "customer_email": "jane@example.com",
+       "success_url": "https://yourshop.com/thanks", "cancel_url": "https://yourshop.com/cart"}'`;
 
   return (
     <AuthGuard>
-      <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold">Plugin Setup</h1>
-        <div className="flex gap-2">
-          {!key && (
-            <button onClick={createKey} disabled={creating} className="bg-green-600 text-white px-3 py-1 rounded">
-              {creating ? 'Creating…' : 'Create API Key'}
-            </button>
-          )}
-          {key && (
-            <button onClick={() => { navigator.clipboard?.writeText(snippet(key)); }} className="bg-green-600 text-white px-3 py-1 rounded">
-              Copy snippet
-            </button>
-          )}
-        </div>
-      </div>
+      <div className="p-8 max-w-3xl">
+        <h1 className="text-3xl font-bold mb-2">Plugin Setup</h1>
+        <p className="text-gray-600 mb-8">Let your webshop customers pay in APIUSD. Orders are marked paid only after the payment is verified on-chain.</p>
 
-      <p>Copy the snippet below to integrate the plugin:</p>
-
-      <div className="mt-4">
-        <div className="mb-2 flex items-center gap-2">
-          <label className="text-sm">Mode</label>
-          <select value={showKey ? 'show' : 'hide'} onChange={() => { setShowKey(s => !s); }} className="border rounded p-1">
-            <option value="hide">Hide key</option>
-            <option value="show">Show key</option>
-          </select>
-          <div className="ml-4">
-            <label className="text-sm">Snippet mode</label>
-            <select id="snippet-mode" value={snippetMode} onChange={(e)=>setSnippetMode(e.target.value as any)} className="border rounded p-1 ml-2">
-              <option value="live">live</option>
-              <option value="test">test</option>
-            </select>
-          </div>
-        </div>
-
-        <pre className="bg-gray-100 p-4 rounded text-sm">
-{showKey ? key || 'No key available' : '••••••••••••••••••'}
-        </pre>
-
-        {showModal && key && (
-          <div className="mt-4 p-4 border rounded bg-yellow-50">
-            <p className="font-medium">New key created — copied to clipboard</p>
-            <div className="flex items-center gap-4 mt-2">
-              <pre className="bg-white p-2 rounded break-all">{key}</pre>
-              <div className="flex flex-col gap-2">
-                <button onClick={async () => { try { await navigator.clipboard.writeText(key); setCopied(true); setTimeout(()=>setCopied(false),1500);} catch{} }} className="bg-green-600 text-white px-3 py-1 rounded">{copied ? 'Copied!' : 'Copy'}</button>
-                <button onClick={() => setShowModal(false)} className="bg-gray-300 text-gray-800 px-3 py-1 rounded">Close</button>
-              </div>
-            </div>
+        {wallet === null && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-900 rounded p-4 mb-8">
+            Set your payout wallet first: your customers pay straight into it.{' '}
+            <a href="/account" className="font-bold underline">Account settings</a>
           </div>
         )}
+        {wallet && <p className="text-sm text-gray-600 mb-8">Payments go to your wallet <span className="font-mono">{wallet}</span>.</p>}
 
-          <pre className="bg-gray-50 p-4 mt-4 rounded text-sm">
-{snippet(key || '')}
-        </pre>
+        <section className="mb-8">
+          <h2 className="text-xl font-bold mb-2">1. Create an API key</h2>
+          <p className="text-gray-600 mb-3">The key is shown only once. Keep it secret: paste it in your shop&apos;s settings, never in website code.</p>
+          {key ? (
+            <div className="p-4 border rounded bg-yellow-50">
+              <p className="font-medium mb-2">Your new key {copied ? '(copied)' : ''}</p>
+              <div className="flex items-center gap-3">
+                <pre className="bg-white p-2 rounded break-all flex-1 text-sm">{key}</pre>
+                <button onClick={() => copy(key)} className="bg-green-600 text-white px-3 py-1 rounded">Copy</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={createKey} disabled={creating} className="bg-green-600 text-white px-4 py-2 rounded font-bold disabled:opacity-60">
+              {creating ? 'Creating…' : 'Create live API key'}
+            </button>
+          )}
+        </section>
+
+        <section className="mb-8">
+          <h2 className="text-xl font-bold mb-2">2. WooCommerce</h2>
+          <ol className="list-decimal ml-5 space-y-1 text-gray-700">
+            <li><a href="/downloads/apiblockchain-apiusd.zip" className="text-blue-700 underline" download>Download the plugin (apiblockchain-apiusd.zip)</a></li>
+            <li>In WordPress: Plugins &gt; Add New &gt; Upload Plugin, choose the zip and activate it.</li>
+            <li>WooCommerce &gt; Settings &gt; Payments &gt; <strong>APIBlockchain (APIUSD)</strong>: enable it and paste your API key.</li>
+            <li>Your shop currency must be EUR. Customers now see &quot;Pay with APIUSD&quot; at checkout.</li>
+          </ol>
+        </section>
+
+        <section>
+          <h2 className="text-xl font-bold mb-2">Other shops: use the API</h2>
+          <p className="text-gray-600 mb-3">
+            From your shop&apos;s server, create a checkout session and send the customer to the returned <code>url</code>.
+            Check <code>GET /session/&lt;id&gt;/status</code>: when <code>status</code> is <code>paid</code>, complete the order.
+          </p>
+          <pre className="bg-gray-100 p-4 rounded text-xs overflow-auto">{curl}</pre>
+        </section>
       </div>
-    </div>
-    <Toast open={showToast} message={key ? 'API key created and copied' : 'API key created'} />
+      <Toast open={showToast} message="Copied" />
     </AuthGuard>
   );
 }

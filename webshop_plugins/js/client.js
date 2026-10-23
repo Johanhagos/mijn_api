@@ -1,8 +1,10 @@
-// Simple JavaScript client for webshop plugins to call the invoicing API
+// Server-side JavaScript client for connecting a webshop to APIBlockchain.
+// Keep the API key on the server; never ship it to the browser.
 // Usage:
 // const client = require('./client')
-// const api = client({ apiUrl: 'https://api.example.com', apiKey: 'REPLACE' })
-// await api.createInvoice({ ...invoicePayload })
+// const api = client({ apiUrl: 'https://apiblockchain-production-production.up.railway.app', apiKey: process.env.APIBLOCKCHAIN_KEY })
+// const session = await api.createSession({ amount: 12.5, order_id: '1042', success_url, cancel_url })
+// redirect the customer to session.url, later: (await api.getSessionStatus(session.id)).status === 'paid'
 
 const fetch = require('node-fetch')
 
@@ -35,9 +37,12 @@ function createClient({ apiUrl, apiKey, timeout = 10000 }) {
   }
 
   return {
+    // Hosted APIUSD checkout for an order; send the customer to the returned `url`
+    createSession: async (session) => request('/create_session', { method: 'POST', body: session }),
+    // `status` is 'paid' once the APIUSD payment is verified on-chain
+    getSessionStatus: async (id) => request(`/session/${encodeURIComponent(id)}/status`),
     createInvoice: async (invoice) => request('/invoices', { method: 'POST', body: invoice }),
-    getInvoice: async (idOrNumber) => request(`/invoices/${encodeURIComponent(idOrNumber)}`),
-    refreshToken: async () => request('/refresh', { method: 'POST' }),
+    getInvoice: async (id) => request(`/invoices/${encodeURIComponent(id)}`),
   }
 }
 

@@ -3,7 +3,8 @@ import { useRouter } from 'next/router';
 import api from '../lib/api';
 import { DEV_BYPASS_AUTH } from '../lib/config';
 
-export default function AuthGuard({ children }: { children: React.ReactNode }) {
+// requirePlan={false}: pages a merchant needs before buying a plan (e.g. account settings)
+export default function AuthGuard({ children, requirePlan = true }: { children: React.ReactNode; requirePlan?: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const devBypass = DEV_BYPASS_AUTH;
@@ -16,16 +17,22 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     let mounted = true;
     (async () => {
       try {
-        // Try a simple authenticated call; protectedApi will attempt refresh if needed
-        await api.protectedApi('/merchant/usage');
-        if (mounted) setLoading(false);
+        // Authenticated call (protectedApi refreshes the token if needed). The dashboard
+        // is only for merchants with a paid plan; the backend enforces this as well.
+        const me = await api.protectedApi('/merchant/me');
+        if (!mounted) return;
+        if (requirePlan && !me?.plan_active) {
+          router.replace('/plans');
+          return;
+        }
+        setLoading(false);
       } catch (err) {
         // If unauthorized, protectedApi already redirects on 401, but ensure router replacement
         if (mounted) router.replace('/login');
       }
     })();
     return () => { mounted = false; };
-  }, [router]);
+  }, [router, requirePlan]);
 
   if (loading) return <div className="p-8">Checking authentication…</div>;
   if (devBypass) {

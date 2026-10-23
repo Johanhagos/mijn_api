@@ -56,6 +56,10 @@ def env(tmp_path_factory):
     data_dir = tmp_path_factory.mktemp("data")
     (data_dir / "invoices.json").write_text(json.dumps(OLD_INVOICES), encoding="utf-8")
     (data_dir / "sessions.json").write_text(json.dumps(OLD_SESSIONS), encoding="utf-8")
+    from datetime import datetime, timedelta, timezone
+    (data_dir / "users.json").write_text(json.dumps([
+        {"id": 1, "name": "dev_merchant", "password": "-", "role": "merchant", "plan": "professional",
+         "plan_expires_at": (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()}]), encoding="utf-8")
 
     mp = pytest.MonkeyPatch()
     mp.setenv("DATA_DIR", str(data_dir))
@@ -84,12 +88,13 @@ def _post_stripe(client, session_id, intent_id):
 
 
 def test_old_invoices_are_imported_and_listed(env):
+    # /invoices only lists the caller's own invoices, so check the store itself
     main, client, _ = env
-    ids = {i["id"] for i in client.get("/invoices").json()}
-    assert {"old-inv-stripe", "old-inv-web3", "old-inv-rich"} <= ids
-    rich = client.get("/invoices/old-inv-rich").json()
-    assert rich["invoice_number"] == "INV-2026-0001"
-    assert float(rich["total"]) == 24.2
+    by_id = {i["id"]: i for i in main.store.load_invoices()}
+    assert {"old-inv-stripe", "old-inv-web3", "old-inv-rich"} <= set(by_id)
+    rich = main._invoice_out(by_id["old-inv-rich"])
+    assert rich.invoice_number == "INV-2026-0001"
+    assert float(rich.total) == 24.2
 
 
 def test_import_runs_only_once(env):

@@ -73,12 +73,13 @@ def _login(client, name, password):
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
-def test_everything_survives_a_redeploy(env):
+def test_everything_survives_a_redeploy(env, give_plan):
     main, client = env["main"], env["client"]
     name = f"merchant_{uuid.uuid4().hex[:8]}"
     reg = client.post("/register", json={"name": name, "email": f"{name}@example.com",
                                          "password": "merchant-pass-1", "business_name": "Shop", "country": "NL"})
     assert reg.status_code in (200, 201), reg.text
+    give_plan(name)
     auth = _login(client, name, "merchant-pass-1")
 
     key = client.post("/api-keys", json={"label": "shop", "mode": "test"}, headers=auth)
@@ -113,11 +114,12 @@ def test_users_are_not_overwritten_from_repo_on_start(env):
     assert not (Path(os.environ["DATA_DIR"]) / "users.json").exists()
 
 
-def test_deleted_user_and_revoked_key_stay_deleted(env):
+def test_deleted_user_and_revoked_key_stay_deleted(env, give_plan):
     main, client = env["main"], env["client"]
     admin = _login(client, ADMIN["name"], ADMIN["password"])
     name = f"tmp_{uuid.uuid4().hex[:8]}"
     client.post("/register", json={"name": name, "email": f"{name}@example.com", "password": "tmp-pass-12345"})
+    give_plan(name)
     auth = _login(client, name, "tmp-pass-12345")
     key_id = client.post("/api-keys", json={"label": "x"}, headers=auth).json()["id"]
     assert client.delete(f"/api-keys/{key_id}", headers=auth).status_code == 200

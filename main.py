@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Body, Response, Request, UploadFile,
 from fastapi.middleware.cors import CORSMiddleware
 import hashlib
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 import json
 from pathlib import Path
 import os
@@ -27,10 +27,10 @@ from email.message import EmailMessage
 # EU countries - VAT rates
 EU_COUNTRIES = {
     'AT': 20.0,  'BE': 21.0,  'BG': 20.0,  'HR': 25.0,  'CY': 19.0,
-    'CZ': 21.0,  'DK': 25.0,  'EE': 22.0,  'FI': 25.5,  'FR': 20.0,
+    'CZ': 21.0,  'DK': 25.0,  'EE': 24.0,  'FI': 25.5,  'FR': 20.0,
     'DE': 19.0,  'GR': 24.0,  'HU': 27.0,  'IE': 23.0,  'IT': 22.0,
     'LV': 21.0,  'LT': 21.0,  'LU': 17.0,  'MT': 18.0,  'NL': 21.0,
-    'PL': 23.0,  'PT': 23.0,  'RO': 19.0,  'SK': 20.0,  'SI': 22.0,
+    'PL': 23.0,  'PT': 23.0,  'RO': 21.0,  'SK': 23.0,  'SI': 22.0,
     'ES': 21.0,  'SE': 25.0,
 }
 
@@ -321,7 +321,9 @@ PAYPAL_SECRET = os.getenv("PAYPAL_SECRET", "EDpVfkShOT0lnfla4G221mvPeVtMsDGTpw-G
 PAYPAL_MODE = os.getenv("PAYPAL_MODE", "live")  # "sandbox" or "live"
 
 # Coinbase Commerce configuration
-COINBASE_COMMERCE_API_KEY = os.getenv("COINBASE_COMMERCE_API_KEY", "837cb701-982d-435a-8abd-724b723a3883")
+COINBASE_COMMERCE_API_KEY = os.getenv("COINBASE_COMMERCE_API_KEY", "")
+# Public URL of this backend, used in hosted checkout links sent to webshops
+HOSTED_CHECKOUT_BASE = os.getenv("HOSTED_CHECKOUT_BASE", "https://apiblockchain-production-production.up.railway.app").rstrip("/")
 COINBASE_WEBHOOK_SECRET = os.getenv("COINBASE_WEBHOOK_SECRET", "")
 
 # Brute-force protection
@@ -388,8 +390,42 @@ def generate_customer_access_link(session_id: str, merchant_id: int, expires_day
     return {
         "token": token,
         "expires_at": expires.isoformat(),
-        "access_url": f"{os.getenv('HOSTED_CHECKOUT_BASE', 'https://api.apiblockchain.io')}/access/{session_id}?token={token}"
+        "access_url": f"{HOSTED_CHECKOUT_BASE}/access/{session_id}?token={token}"
     }
+
+
+def _hash_api_key(raw: str) -> str:
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _api_key_fields(raw: str) -> dict:
+    """What is stored for a new API key: its hash, never the key itself."""
+    prefix = next((p for p in ("sk_live_", "sk_test_") if raw.startswith(p)), "")
+    return {"key_hash": _hash_api_key(raw), "key_prefix": prefix, "key_last4": raw[-4:]}
+
+
+def _mask_api_key(k: dict) -> Optional[str]:
+    raw = k.get("key")  # keys created before hashing still have the raw value
+    if raw:
+        prefix = next((p for p in ("sk_live_", "sk_test_") if raw.startswith(p)), "")
+        return f"{prefix}****{raw[-4:]}"
+    if k.get("key_last4"):
+        return f"{k.get('key_prefix') or ''}****{k['key_last4']}"
+    return None
+
+
+def _find_api_key(raw: Optional[str]) -> Optional[dict]:
+    if not raw:
+        return None
+    keys = load_api_keys()
+    key_hash = _hash_api_key(raw)
+    return (next((k for k in keys if k.get("key_hash") == key_hash), None)
+            or next((k for k in keys if k.get("key") and k.get("key") == raw), None))
+
+
+def _api_key_merchant(key: dict) -> Optional[dict]:
+    uid = key.get("user_id") or key.get("merchant_id")
+    return next((u for u in load_users() if str(u.get("id")) == str(uid)), None)
 
 
 def auto_unlock_api_keys(merchant_id: int, session: dict) -> dict:
@@ -405,8 +441,9 @@ def auto_unlock_api_keys(merchant_id: int, session: dict) -> dict:
     
     new_key = {
         "id": max((k.get("id", 0) for k in keys), default=0) + 1,
+        "user_id": merchant_id,
         "merchant_id": merchant_id,
-        "key": raw_key,
+        **_api_key_fields(raw_key),
         "label": f"Auto-generated from session {session.get('id')[:8]}",
         "mode": "test",
         "created_at": datetime.utcnow().isoformat(),
@@ -833,7 +870,7 @@ async def get_current_user(request: Request):
             if not row:
                 row = next((k for k in keys if k.get("key") == api_key), None)
             if row:
-                uid = row.get("user_id")
+                uid = row.get("user_id") or row.get("merchant_id")
                 # Prefer DB-backed user if available
                 try:
                     from app.models.user import User as ORMUser
@@ -899,6 +936,135 @@ admin_required = role_required("admin")
 
 # Backwards-compatible name requested in examples
 require_admin = admin_required
+
+
+# ========== PLANS ==========
+# A merchant can use the dashboard, the API and webshop checkout only while they have a
+# paid plan. A plan is bought by paying its invoice in APIUSD; the plan is activated when
+# that payment is verified on-chain (see _apply_payment_status). Prices live here, never
+# in the browser.
+PLANS = {
+    "starter": {"name": "Starter", "price": 20.0, "monthly_invoices": 100,
+                "description": "Up to 100 invoices/checkouts per month"},
+    "professional": {"name": "Professional", "price": 29.99, "monthly_invoices": None,
+                     "description": "Unlimited invoices and checkouts"},
+    # Custom quote: granted by an admin, cannot be bought online
+    "enterprise": {"name": "Enterprise", "price": None, "monthly_invoices": None,
+                   "description": "Custom integrations and enterprise support"},
+}
+PLAN_PERIOD_DAYS = int(os.getenv("PLAN_PERIOD_DAYS", "30"))
+# Plan invoices are issued by the platform itself, not by a merchant
+PLATFORM_MERCHANT_ID = "apiblockchain"
+PLATFORM_NAME = os.getenv("PLATFORM_NAME", "APIBlockchain")
+PLATFORM_COUNTRY = os.getenv("PLATFORM_COUNTRY", "NL").upper()
+PLATFORM_VAT_NUMBER = os.getenv("PLATFORM_VAT_NUMBER", "")
+PLATFORM_ADDRESS = os.getenv("PLATFORM_ADDRESS", "")
+
+
+def _vies_valid(vat_number: str) -> Optional[bool]:
+    """Check an EU VAT number in VIES. None when VIES cannot be reached."""
+    import requests
+    vat = (vat_number or "").upper().replace(" ", "")
+    if len(vat) < 4 or not vat[:2].isalpha():
+        return False
+    country = "EL" if vat[:2] == "GR" else vat[:2]
+    try:
+        r = requests.get(f"https://ec.europa.eu/taxation_customs/vies/rest-api/ms/{country}/vat/{vat[2:]}", timeout=8)
+        if r.status_code != 200:
+            return None
+        body = r.json()
+        if body.get("userError") not in (None, "VALID", "INVALID"):
+            return None  # e.g. MS_UNAVAILABLE: the member state's service is down
+        return bool(body.get("isValid"))
+    except Exception:
+        return None
+
+
+def _plan_vat(user: dict) -> dict:
+    """VAT on a plan, by the customer's country (digital service):
+    - same country as the platform: that country's VAT
+    - other EU country: that country's VAT (OSS), or 0% reverse charge for a business
+      with a VAT number of that country that VIES confirms
+    - outside the EU: 0%"""
+    country = str((user or {}).get("country") or "").upper()
+    vat_number = str((user or {}).get("vat_number") or "").upper().replace(" ", "")
+    if country in EU_COUNTRIES:
+        rate = EU_COUNTRIES[country]
+        if country != PLATFORM_COUNTRY and vat_number:
+            prefix = "EL" if country == "GR" else country
+            valid = _vies_valid(vat_number) if vat_number.startswith(prefix) else False
+            if valid:
+                return {"rate": 0.0, "scheme": "reverse_charge", "country": country,
+                        "note": f"VAT reverse charged (article 196 EU VAT Directive). Customer VAT number {vat_number}."}
+        scheme = "domestic" if country == PLATFORM_COUNTRY else "oss"
+        note = f"{country} VAT {rate:g}%" + (" (EU One-Stop-Shop)" if scheme == "oss" else "")
+        return {"rate": rate, "scheme": scheme, "country": country, "note": note}
+    return {"rate": 0.0, "scheme": "outside_eu", "country": country,
+            "note": "Service supplied outside the EU: no EU VAT charged."}
+
+
+def _plan_amounts(plan: dict, vat: dict) -> dict:
+    net = round(float(plan["price"]), 2)
+    vat_amount = round(net * vat["rate"] / 100, 2)
+    return {"subtotal": net, "vat_rate": vat["rate"], "vat_amount": vat_amount, "total": round(net + vat_amount, 2)}
+
+
+def _parse_ts(value) -> Optional[datetime]:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _plan_active(user: dict) -> bool:
+    if (user or {}).get("role") == "admin":
+        return True
+    expires = _parse_ts((user or {}).get("plan_expires_at"))
+    return (user or {}).get("plan") in PLANS and expires is not None and expires > datetime.now(timezone.utc)
+
+
+def _plan_status(user: dict) -> dict:
+    plan = PLANS.get((user or {}).get("plan") or "")
+    return {
+        "plan": (user or {}).get("plan"),
+        "plan_name": plan["name"] if plan else None,
+        "plan_expires_at": (user or {}).get("plan_expires_at"),
+        "plan_active": _plan_active(user),
+        "monthly_invoices": plan["monthly_invoices"] if plan else None,
+    }
+
+
+def _require_active_plan(user: dict) -> None:
+    if not _plan_active(user):
+        raise HTTPException(status_code=402, detail="An active plan is required. Choose a plan in the dashboard under Plans.")
+
+
+def _check_monthly_limit(user: dict) -> None:
+    """Starter allows a limited number of invoices/checkouts per calendar month."""
+    if (user or {}).get("role") == "admin":
+        return
+    limit = (PLANS.get(user.get("plan") or "") or {}).get("monthly_invoices")
+    if not limit:
+        return
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    uid = str(user.get("id"))
+    used = sum(1 for i in load_invoices()
+               if str(i.get("merchant_id")) == uid and i.get("type") != "credit_note"
+               and str(i.get("created_at") or "").startswith(month))
+    used += sum(1 for s in load_sessions()
+                if str(s.get("merchant_id")) == uid and not s.get("invoice_id")
+                and str(s.get("created_at") or "").startswith(month))
+    if used >= limit:
+        raise HTTPException(status_code=402, detail=f"Your plan allows {limit} invoices/checkouts per month. Upgrade to Professional for unlimited use.")
+
+
+async def get_plan_user(current_user: dict = Depends(get_current_user)):
+    """Like get_current_user, but only for merchants with an active (paid) plan."""
+    _require_active_plan(current_user)
+    return current_user
 
 
 @app.get("/", response_model=dict)
@@ -1683,12 +1849,40 @@ async def invoice_pdf(req: InvoicePDFRequest):
         raise HTTPException(status_code=500, detail="Internal server error while generating PDF")
 
 
+# ========== INVOICE OWNERSHIP ==========
+def _is_invoice_owner(inv: dict, merchant_id=None, merchant_name: str = None) -> bool:
+    """An invoice belongs to the merchant in its `merchant_id`; older invoices without one
+    belong to the user named in `created_by`."""
+    if inv.get("merchant_id") is not None:
+        return merchant_id is not None and str(inv["merchant_id"]) == str(merchant_id)
+    return bool(merchant_name) and inv.get("created_by") == merchant_name
+
+
+def _merchant_invoices(invoices: List[dict], merchant_id=None, merchant_name: str = None) -> List[dict]:
+    return [i for i in invoices if _is_invoice_owner(i, merchant_id, merchant_name)]
+
+
+def _user_invoices(invoices: List[dict], user: dict) -> List[dict]:
+    return _merchant_invoices(invoices, (user or {}).get("id"), (user or {}).get("name"))
+
+
+def _accessible_invoice(invoices: List[dict], invoice_id: str, user: dict) -> dict:
+    """The invoice with this id if the user owns it (admins may open any); otherwise 404,
+    so other merchants cannot tell whether the invoice exists."""
+    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
+    if not inv or not (_is_admin(user) or _is_invoice_owner(inv, user.get("id"), user.get("name"))):
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return inv
+
+
 # ========== INVOICE NUMBERING HELPERS ==========
-def get_next_invoice_number(merchant_id: int = None) -> str:
-    """Get next sequential invoice number (e.g., INV-2026-0001)."""
+def get_next_invoice_number(merchant_id=None, merchant_name: str = None) -> str:
+    """Get next sequential invoice number (e.g., INV-2026-0001). Each merchant has its own sequence."""
     invoices = load_invoices()
+    if merchant_id is not None or merchant_name:
+        invoices = _merchant_invoices(invoices, merchant_id, merchant_name)
     year = datetime.now(timezone.utc).year
-    
+
     # Find max invoice number for this year
     max_num = 0
     for inv in invoices:
@@ -1722,9 +1916,11 @@ def calculate_vat(subtotal: float, vat_rate: float = 0) -> tuple:
     return vat_amount, total
 
 
-def create_credit_note_number(merchant_id: int = None) -> str:
-    """Generate credit note number (e.g., CN-2026-0001)."""
+def create_credit_note_number(merchant_id=None, merchant_name: str = None) -> str:
+    """Generate credit note number (e.g., CN-2026-0001). Each merchant has its own sequence."""
     invoices = load_invoices()
+    if merchant_id is not None or merchant_name:
+        invoices = _merchant_invoices(invoices, merchant_id, merchant_name)
     year = datetime.now(timezone.utc).year
     
     max_num = 0
@@ -1742,12 +1938,16 @@ def create_credit_note_number(merchant_id: int = None) -> str:
 
 
 @app.post("/invoices", response_model=InvoiceOut, status_code=201)
-async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(get_current_user)):
+async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(get_plan_user)):
     """Create and persist an invoice with automatic numbering and VAT calculation."""
     import uuid
 
     if (payload.status or "issued") in PAYMENT_STATUSES and not _is_admin(current_user):
         raise HTTPException(status_code=403, detail="Only an admin can create an invoice that is already paid")
+    _check_monthly_limit(current_user)
+    pay_to = _merchant_pay_to(current_user.get("id"))
+    if (payload.payment_system or "web2") == "web3" and not pay_to:
+        raise HTTPException(status_code=400, detail="Set your payout wallet (Account settings) before creating crypto invoices")
 
     invoices = load_invoices()
 
@@ -1755,7 +1955,7 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
     unique_id = str(uuid.uuid4())
     
     # Auto-generate invoice number if not provided
-    invoice_number = payload.invoice_number or get_next_invoice_number()
+    invoice_number = payload.invoice_number or get_next_invoice_number(current_user.get("id"), current_user.get("name"))
     
     def _to_number(value, default=0.0):
         try:
@@ -1833,6 +2033,8 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
         "notes": payload.notes,
         "status": payload.status or "issued",
         "merchant_logo_url": payload.merchant_logo_url,
+        "merchant_id": current_user.get("id"),
+        "pay_to": pay_to,
         "created_by": current_user.get("name"),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1916,8 +2118,11 @@ async def create_invoice(payload: InvoiceCreate, current_user: dict = Depends(ge
 
 
 @app.get("/invoices", response_model=List[InvoiceOut])
-async def list_invoices(current_user: dict = Depends(get_current_user)):
+async def list_invoices(all: bool = False, current_user: dict = Depends(get_plan_user)):
+    """The current merchant's invoices. Admins can pass ?all=true to list every merchant's."""
     invoices = load_invoices()
+    if not (all and _is_admin(current_user)):
+        invoices = _user_invoices(invoices, current_user)
     return [InvoiceOut(**{
         "id": inv.get("id"),
         "invoice_number": inv.get("invoice_number"),
@@ -1945,14 +2150,11 @@ async def list_invoices(current_user: dict = Depends(get_current_user)):
 
 
 @app.post("/invoices/{invoice_id}/void")
-async def void_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def void_invoice(invoice_id: str, current_user: dict = Depends(get_plan_user)):
     """Mark an invoice as VOID without reusing its number. Only works for non-sent invoices."""
     invoices = load_invoices()
-    inv = next((i for i in invoices if i.get("id") == invoice_id), None)
-    
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    
+    inv = _accessible_invoice(invoices, invoice_id, current_user)
+
     # Only allow voiding drafted/non-sent invoices
     if inv.get("status") in ["paid", "refunded"]:
         raise HTTPException(status_code=400, detail="Cannot void a paid or refunded invoice")
@@ -1970,20 +2172,25 @@ async def void_invoice(invoice_id: str, current_user: dict = Depends(get_current
 
 
 @app.post("/credit-notes", response_model=CreditNoteOut, status_code=201)
-async def create_credit_note(payload: CreditNoteCreate, current_user: dict = Depends(get_current_user)):
+async def create_credit_note(payload: CreditNoteCreate, current_user: dict = Depends(get_plan_user)):
     """Create a credit note referencing an original invoice. This handles refunds without modifying the original."""
     invoices = load_invoices()
     
     # Find original invoice
-    original_inv = next((i for i in invoices if i.get("id") == payload.invoice_id), None)
-    if not original_inv:
+    try:
+        original_inv = _accessible_invoice(invoices, payload.invoice_id, current_user)
+    except HTTPException:
         raise HTTPException(status_code=404, detail="Referenced invoice not found")
-    
-    credit_note_num = create_credit_note_number()
-    
+
+    # The credit note belongs to the merchant of the original invoice
+    owner_id = original_inv.get("merchant_id")
+    owner_name = original_inv.get("created_by")
+    credit_note_num = create_credit_note_number(owner_id, owner_name)
+
     credit_note = {
         "id": str(uuid.uuid4()),
         "type": "credit_note",
+        "merchant_id": owner_id,
         "credit_note_number": credit_note_num,
         "invoice_reference": original_inv.get("invoice_number"),
         "invoice_id": payload.invoice_id,
@@ -2019,15 +2226,13 @@ async def create_credit_note(payload: CreditNoteCreate, current_user: dict = Dep
 
 
 @app.get("/invoices/{invoice_id}/credit-notes", response_model=List[CreditNoteOut])
-async def get_invoice_credit_notes(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_invoice_credit_notes(invoice_id: str, current_user: dict = Depends(get_plan_user)):
     """Get all credit notes for an invoice."""
     invoices = load_invoices()
     
     # Find original invoice
-    original_inv = next((i for i in invoices if i.get("id") == invoice_id), None)
-    if not original_inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    
+    _accessible_invoice(invoices, invoice_id, current_user)
+
     credit_notes = []
     for cn in invoices:
         if cn.get("type") == "credit_note" and cn.get("invoice_id") == invoice_id:
@@ -2159,7 +2364,8 @@ async def merchant_me(current_user: dict = Depends(get_current_user)):
     users = load_users()
     user = next((u for u in users if u["id"] == current_user.get("id")), None)
     if not user:
-        return {"id": current_user.get("id"), "name": current_user.get("name"), "email": current_user.get("email")}
+        return {"id": current_user.get("id"), "name": current_user.get("name"), "email": current_user.get("email"),
+                **_plan_status(current_user)}
     
     # Return full profile data
     return {
@@ -2177,6 +2383,8 @@ async def merchant_me(current_user: dict = Depends(get_current_user)):
         "business_type": user.get("business_type"),
         "website": user.get("website"),
         "description": user.get("description"),
+        "payout_wallet": user.get("payout_wallet"),
+        **_plan_status(user),
     }
 
 
@@ -2188,37 +2396,29 @@ async def update_merchant_profile(payload: dict = Body(...), current_user: dict 
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Update allowed fields
-    allowed_fields = [
-        "username", "business_name", "email", "phone_number",
-        "address", "city", "postal_code", "country",
-        "vat_number", "business_type", "website", "description"
-    ]
-    
-    for field in allowed_fields:
-        if field in payload:
-            # Map camelCase to snake_case
-            snake_field = field
-            camel_field = field
-            
-            # Convert camelCase keys from frontend
-            field_mapping = {
-                "businessName": "business_name",
-                "contactEmail": "email",
-                "phoneNumber": "phone_number",
-                "postalCode": "postal_code",
-                "vatNumber": "vat_number",
-                "businessType": "business_type",
-            }
-            
-            if camel_field in field_mapping:
-                snake_field = field_mapping[camel_field]
-            
-            # Check for both camelCase and snake_case
-            value = payload.get(camel_field) or payload.get(snake_field)
-            if value is not None:
-                user[snake_field] = value
-    
+    # Fields the dashboard may change; it sends camelCase names (businessName, vatNumber, ...)
+    fields = {
+        "username": "username", "business_name": "business_name", "businessName": "business_name",
+        "email": "email", "contactEmail": "email", "phone_number": "phone_number", "phoneNumber": "phone_number",
+        "address": "address", "city": "city", "postal_code": "postal_code", "postalCode": "postal_code",
+        "country": "country", "vat_number": "vat_number", "vatNumber": "vat_number",
+        "business_type": "business_type", "businessType": "business_type", "website": "website",
+        "description": "description", "payout_wallet": "payout_wallet", "payoutWallet": "payout_wallet",
+    }
+    for key, field in fields.items():
+        if key not in payload or payload[key] is None:
+            continue
+        value = payload[key].strip() if isinstance(payload[key], str) else payload[key]
+        if field == "country":
+            value = str(value).upper()
+            if not re.fullmatch(r"[A-Z]{2}", value):
+                raise HTTPException(status_code=400, detail="country must be a 2-letter country code, e.g. NL")
+        if field == "vat_number":
+            value = str(value).upper().replace(" ", "").replace(".", "")
+        if field == "payout_wallet" and value and not crypto_payments.ADDRESS_RE.match(str(value)):
+            raise HTTPException(status_code=400, detail="Payout wallet must be an Ethereum address (0x followed by 40 characters)")
+        user[field] = value
+
     save_users(users)
     return {"message": "Profile updated successfully", "user": user}
 
@@ -2311,20 +2511,10 @@ class APIKeyCreate(BaseModel):
 
 
 @app.get("/api-keys")
-async def list_api_keys(current_user: dict = Depends(get_current_user)):
+async def list_api_keys(current_user: dict = Depends(get_plan_user)):
     """List API keys for the current user (does NOT return raw key material)."""
     keys = load_api_keys()
     my = [k for k in keys if k.get("merchant_id") == current_user.get("id") or k.get("user_id") == current_user.get("id")]
-
-    def mask_key(raw: str | None) -> str | None:
-        if not raw:
-            return None
-        # preserve prefix and last 4 chars
-        for p in ("sk_live_", "sk_test_"):
-            if raw.startswith(p):
-                return f"{p}****{raw[-4:]}"
-        # generic mask
-        return f"****{raw[-4:]}"
 
     # Return safe fields including masked key
     return [{
@@ -2332,16 +2522,16 @@ async def list_api_keys(current_user: dict = Depends(get_current_user)):
         "label": k.get("label"),
         "mode": k.get("mode"),
         "created_at": k.get("created_at"),
-        "key_masked": mask_key(k.get("key"))
+        "key_masked": _mask_api_key(k),
     } for k in my]
 
 
 @app.post("/api-keys")
-async def create_api_key(payload: APIKeyCreate, current_user: dict = Depends(get_current_user)):
+async def create_api_key(payload: APIKeyCreate, current_user: dict = Depends(get_plan_user)):
     """Create a new API key for the current user and return the raw key once.
 
-    Keys are prefixed with `sk_test_` or `sk_live_`. We persist the raw key (masked in listings),
-    along with `merchant_id`, `mode` and `created_at` as requested.
+    Keys are prefixed with `sk_test_` or `sk_live_`. Only a SHA-256 hash of the key is
+    stored (plus its prefix and last 4 characters for the masked listing).
     """
     if READ_ONLY_FS:
         raise HTTPException(status_code=500, detail="Storage is read-only; cannot create API keys")
@@ -2358,12 +2548,11 @@ async def create_api_key(payload: APIKeyCreate, current_user: dict = Depends(get
     next_id = (max((k.get("id", 0) for k in keys), default=0) + 1)
     now = datetime.now(timezone.utc).isoformat()
 
-    # Persist the raw key and merchant association
     new = {
         "id": next_id,
         "user_id": current_user.get("id"),
         "merchant_id": current_user.get("id"),
-        "key": raw,
+        **_api_key_fields(raw),
         "label": payload.label,
         "mode": mode,
         "created_at": now,
@@ -2381,7 +2570,7 @@ async def revoke_api_key(key_id: int, current_user: dict = Depends(get_current_u
     if READ_ONLY_FS:
         raise HTTPException(status_code=500, detail="Storage is read-only; cannot delete API keys")
     keys = load_api_keys()
-    idx = next((i for i, k in enumerate(keys) if k.get("id") == key_id and k.get("user_id") == current_user.get("id")), None)
+    idx = next((i for i, k in enumerate(keys) if k.get("id") == key_id and current_user.get("id") in (k.get("user_id"), k.get("merchant_id"))), None)
     if idx is None:
         raise HTTPException(status_code=404, detail="API key not found")
     removed = keys.pop(idx)
@@ -2459,21 +2648,16 @@ async def debug_add_api_key(payload: dict = Body(...)):
 
 
 @app.get("/invoices/{invoice_id}", response_model=InvoiceOut)
-async def get_invoice(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def get_invoice(invoice_id: str, current_user: dict = Depends(get_plan_user)):
     invoices = load_invoices()
-    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
-    return _invoice_out(inv)
+    return _invoice_out(_accessible_invoice(invoices, invoice_id, current_user))
 
 
 @app.patch("/invoices/{invoice_id}", response_model=InvoiceOut)
-async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: dict = Depends(get_current_user)):
+async def update_invoice(invoice_id: str, payload: InvoiceUpdate, current_user: dict = Depends(get_plan_user)):
     """Update an invoice. Recalculates VAT if items are modified. Validates state transitions."""
     invoices = load_invoices()
-    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+    inv = _accessible_invoice(invoices, invoice_id, current_user)
     
     # State transition validation
     current_status = inv.get("status", "draft")
@@ -2595,9 +2779,25 @@ def _invoice_total(inv: dict) -> float:
     return float(inv.get("total") or inv.get("amount") or 0)
 
 
+def _invoice_cfg(inv: dict):
+    """Payment settings for this invoice. Shop sales are paid straight to the merchant's own
+    wallet (`pay_to`, fixed when the invoice is created); plans to the platform wallet.
+    Invoices from before payout wallets have no `pay_to` and keep the platform wallet."""
+    cfg = crypto_payments.config()
+    if "pay_to" in inv:
+        cfg.wallet_address = inv.get("pay_to") or ""
+    return cfg
+
+
+def _merchant_pay_to(merchant_id) -> Optional[str]:
+    user = next((u for u in load_users() if str(u.get("id")) == str(merchant_id)), None) or {}
+    wallet = user.get("payout_wallet")
+    return wallet if wallet and crypto_payments.ADDRESS_RE.match(wallet) else None
+
+
 def _invoice_payment_txs(inv: dict, cfg=None) -> List[dict]:
     """Confirmed on-chain payments recorded for this invoice (app/store.py)."""
-    cfg = cfg or crypto_payments.config()
+    cfg = cfg or _invoice_cfg(inv)
     return [t for t in store.list_blockchain_txs()
             if t.get("invoice_id") == str(inv.get("id")) and t.get("chain") == cfg.chain_key
             and (t.get("data") or {}).get("units") is not None]
@@ -2613,7 +2813,7 @@ def _payments_out(txs: List[dict], cfg) -> List[dict]:
 
 
 def _invoice_out(inv: dict) -> "InvoiceOut":
-    cfg = crypto_payments.config()
+    cfg = _invoice_cfg(inv)
     txs = _invoice_payment_txs(inv, cfg)
     paid_units = sum(int(t["data"]["units"]) for t in txs)
     return InvoiceOut(**{
@@ -2676,7 +2876,7 @@ def _created_at_ts(inv: dict) -> Optional[int]:
 
 def _apply_payment_status(inv: dict, sessions_cache: Optional[list] = None) -> None:
     """Derive status from the confirmed payments (never from client input)."""
-    cfg = crypto_payments.config()
+    cfg = _invoice_cfg(inv)
     due = crypto_payments.to_units(_invoice_total(inv), cfg.token_decimals)
     paid = _invoice_paid_units(inv, cfg)
     if paid <= 0 or inv.get("status") in ("void", "cancelled"):
@@ -2687,6 +2887,8 @@ def _apply_payment_status(inv: dict, sessions_cache: Optional[list] = None) -> N
             inv["paid_at"] = datetime.now(timezone.utc).isoformat()
             inv["payment_system"] = "web3"
             _mark_linked_session_paid(inv)
+            if inv.get("type") == "plan":
+                _activate_plan(inv)
         inv["status"] = "overpaid" if paid > due else "paid"
     else:
         inv["status"] = "partially_paid"
@@ -2712,7 +2914,7 @@ def _mark_linked_session_paid(inv: dict) -> None:
 
 def _process_tx(inv: dict, tx_hash: str) -> dict:
     """Verify one transaction for `inv` and record it if confirmed. Mutates inv (caller saves)."""
-    cfg = crypto_payments.config()
+    cfg = _invoice_cfg(inv)
     existing = next((t for t in store.list_blockchain_txs() if t["tx_hash"] == tx_hash), None)
     if existing:
         if existing.get("invoice_id") == str(inv.get("id")):
@@ -2758,6 +2960,7 @@ def _process_tx(inv: dict, tx_hash: str) -> dict:
     if not store.claim_blockchain_tx(tx_hash, chain=cfg.chain_key, invoice_id=inv.get("id"),
                                      session_id=inv.get("session_id"), amount=result["units"],
                                      data={"units": result["units"], "payer": result.get("payer"),
+                                           "pay_to": cfg.wallet_address.lower(),
                                            "token": cfg.token_address.lower(), "block": result.get("block_number")}):
         return _process_tx(inv, tx_hash)  # recorded concurrently; report who owns it
 
@@ -2767,7 +2970,7 @@ def _process_tx(inv: dict, tx_hash: str) -> dict:
 
 
 def _payment_view(inv: dict, tx_results: Optional[list] = None) -> dict:
-    cfg = crypto_payments.config()
+    cfg = _invoice_cfg(inv)
     due = crypto_payments.to_units(_invoice_total(inv), cfg.token_decimals)
     paid = _invoice_paid_units(inv, cfg)
     return {
@@ -2792,7 +2995,21 @@ def _payment_view(inv: dict, tx_results: Optional[list] = None) -> dict:
         "chain": {"id": cfg.chain_id, "name": cfg.chain_name},
         "wallet_address": cfg.wallet_address,
         "confirmations_required": cfg.confirmations,
+        "kind": "plan" if inv.get("type") == "plan" else "invoice",
+        "return_url": _return_url(inv),
     }
+
+
+def _return_url(inv: dict) -> Optional[str]:
+    """Where the payer goes after paying: the dashboard for a plan, the shop for a checkout."""
+    if inv.get("type") == "plan":
+        return f"{PUBLIC_DASHBOARD_URL}/dashboard"
+    if inv.get("session_id"):
+        s = next((x for x in load_sessions() if x.get("id") == inv["session_id"]), None)
+        url = (s or {}).get("success_url")
+        if url and str(url).startswith(("https://", "http://")):
+            return url
+    return None
 
 
 def _recheck_pending(invoices: List[dict], inv: dict) -> list:
@@ -2801,6 +3018,154 @@ def _recheck_pending(invoices: List[dict], inv: dict) -> list:
         _apply_payment_status(inv)
         save_invoices(invoices)
     return results
+
+
+def _activate_plan(inv: dict) -> None:
+    """Give the buyer of a paid plan invoice PLAN_PERIOD_DAYS of that plan. Runs once per
+    invoice; paying while a plan is still running adds the days after its end date."""
+    plan_key = inv.get("plan")
+    if plan_key not in PLANS:
+        return
+    users = load_users()
+    user = next((u for u in users if str(u.get("id")) == str(inv.get("plan_buyer_id"))), None)
+    if not user:
+        logging.getLogger("uvicorn.error").error("plan invoice %s paid but buyer %s not found", inv.get("id"), inv.get("plan_buyer_id"))
+        return
+    history = user.setdefault("plan_history", [])
+    if any(h.get("invoice_id") == inv.get("id") for h in history):
+        return
+    now = datetime.now(timezone.utc)
+    current = _parse_ts(user.get("plan_expires_at"))
+    start = current if current and current > now else now
+    expires = start + timedelta(days=PLAN_PERIOD_DAYS)
+    user["plan"] = plan_key
+    user["plan_expires_at"] = expires.isoformat()
+    history.append({"invoice_id": inv.get("id"), "plan": plan_key, "paid_at": now.isoformat(),
+                    "expires_at": expires.isoformat(), "tx_hash": inv.get("blockchain_tx_id")})
+    save_users(users)
+    log_event(f"PLAN_ACTIVATED plan={plan_key} until={expires.date()} invoice={str(inv.get('id'))[:8]}", user.get("name"), "-")
+
+
+@app.get("/plans")
+def list_plans():
+    """Public: the plans and their prices."""
+    return [{"id": k, "name": v["name"], "price": v["price"], "currency": "EUR",
+             "period_days": PLAN_PERIOD_DAYS, "monthly_invoices": v["monthly_invoices"],
+             "description": v["description"], "purchasable": v["price"] is not None}
+            for k, v in PLANS.items()]
+
+
+@app.get("/merchant/plan")
+async def merchant_plan(current_user: dict = Depends(get_current_user)):
+    return _plan_status(current_user)
+
+
+@app.post("/plans/checkout")
+async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(get_current_user)):
+    """Start buying a plan: returns the APIUSD payment page for the plan invoice. The plan
+    becomes active only after that payment is verified on-chain."""
+    plan_key = str(payload.get("plan") or "").lower()
+    plan = PLANS.get(plan_key)
+    if not plan:
+        raise HTTPException(status_code=400, detail="Unknown plan")
+    if plan["price"] is None:
+        raise HTTPException(status_code=400, detail="This plan is a custom quote. Please contact us.")
+    if not crypto_payments.config().enabled:
+        raise HTTPException(status_code=503, detail="Crypto payments are not configured")
+
+    uid = str(current_user.get("id"))
+    user = next((u for u in load_users() if str(u.get("id")) == uid), current_user)
+    if not re.fullmatch(r"[A-Z]{2}", str(user.get("country") or "").upper()):
+        raise HTTPException(status_code=400, detail="Set your country in Account settings first (needed for VAT)")
+    vat = _plan_vat(user)
+    amounts = _plan_amounts(plan, vat)
+
+    invoices = load_invoices()
+    # Reuse this user's open invoice for the same plan instead of creating one per click:
+    # one already partly paid, or an unpaid one with the same amounts (country/VAT unchanged)
+    inv = next((i for i in invoices if i.get("type") == "plan" and str(i.get("plan_buyer_id")) == uid
+                and i.get("plan") == plan_key
+                and (i.get("status") == "partially_paid"
+                     or (i.get("status") == "issued" and not i.get("pending_txs")
+                         and i.get("total") == amounts["total"] and i.get("vat_rate") == amounts["vat_rate"]))), None)
+    if not inv:
+        price = amounts["subtotal"]
+        inv = {
+            "id": str(uuid.uuid4()),
+            "type": "plan",
+            "plan": plan_key,
+            "plan_buyer_id": current_user.get("id"),
+            "merchant_id": PLATFORM_MERCHANT_ID,
+            "pay_to": crypto_payments.config().wallet_address,
+            "invoice_number": get_next_invoice_number(PLATFORM_MERCHANT_ID),
+            "seller_name": PLATFORM_NAME,
+            "seller_country": PLATFORM_COUNTRY,
+            "seller_vat": PLATFORM_VAT_NUMBER or None,
+            "seller_address": PLATFORM_ADDRESS or None,
+            "buyer_name": user.get("business_name") or user.get("name"),
+            "buyer_email": user.get("email"),
+            "buyer_address": user.get("address"),
+            "buyer_country": user.get("country"),
+            "buyer_vat": user.get("vat_number"),
+            "buyer_type": "B2B" if vat["scheme"] == "reverse_charge" else None,
+            "items": [{"description": f"{plan['name']} plan - {PLAN_PERIOD_DAYS} days",
+                       "quantity": 1, "unit_price": price, "amount": price}],
+            **amounts,
+            "vat_scheme": vat["scheme"],
+            "notes": vat["note"],
+            "tax_treatment": vat["note"],
+            "currency": "EUR",
+            "payment_system": "web3",
+            "status": "issued",
+            "date_issued": datetime.now(timezone.utc).date().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        invoices.append(inv)
+        save_invoices(invoices)
+        log_event(f"PLAN_CHECKOUT plan={plan_key} invoice={inv['id'][:8]}", current_user.get("name"), "-")
+    return {"invoice_id": inv["id"], "plan": plan_key, "amount": inv["total"], "subtotal": inv.get("subtotal"),
+            "vat_rate": inv.get("vat_rate"), "vat_amount": inv.get("vat_amount"), "vat_note": inv.get("notes"),
+            "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay?invoice={inv['id']}"}
+
+
+@app.get("/plans/quote")
+async def plan_quote(current_user: dict = Depends(get_current_user)):
+    """Plan prices for the current user, including the VAT for their country."""
+    user = next((u for u in load_users() if str(u.get("id")) == str(current_user.get("id"))), current_user)
+    country_ok = bool(re.fullmatch(r"[A-Z]{2}", str(user.get("country") or "").upper()))
+    vat = _plan_vat(user) if country_ok else None
+    return {"country": user.get("country") if country_ok else None, "vat_note": vat["note"] if vat else None,
+            "plans": [{"id": k, **(_plan_amounts(v, vat) if vat else {})}
+                      for k, v in PLANS.items() if v["price"] is not None]}
+
+
+@app.post("/admin/users/{user_id}/plan")
+async def admin_grant_plan(user_id: str, payload: dict = Body(...), admin: dict = Depends(require_admin)):
+    """Admin: give a user a plan without payment (Enterprise deals, existing customers).
+    Body: {"plan": "professional", "days": 30}, or {"plan": null} to remove it."""
+    plan_key = payload.get("plan")
+    users = load_users()
+    user = next((u for u in users if str(u.get("id")) == str(user_id)), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if plan_key is None:
+        user["plan"], user["plan_expires_at"] = None, None
+    else:
+        if plan_key not in PLANS:
+            raise HTTPException(status_code=400, detail="Unknown plan")
+        try:
+            days = int(payload.get("days") or PLAN_PERIOD_DAYS)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="days must be a number")
+        if days <= 0:
+            raise HTTPException(status_code=400, detail="days must be positive")
+        expires = datetime.now(timezone.utc) + timedelta(days=days)
+        user["plan"], user["plan_expires_at"] = plan_key, expires.isoformat()
+        user.setdefault("plan_history", []).append({"granted_by": admin.get("name"), "plan": plan_key,
+                                                    "paid_at": None, "expires_at": expires.isoformat()})
+    save_users(users)
+    log_event(f"PLAN_GRANTED user={user_id} plan={plan_key}", admin.get("name"), "-")
+    return {"id": user.get("id"), "name": user.get("name"), **_plan_status(user)}
 
 
 @app.get("/pay/{invoice_id}")
@@ -2816,14 +3181,13 @@ def get_invoice_payment(invoice_id: str):
 def submit_invoice_payment(invoice_id: str, payload: dict = Body(...)):
     """Submit a transaction hash that pays this invoice. Status changes only after the
     transaction is confirmed on-chain and pays the configured wallet in the configured token."""
-    cfg = crypto_payments.config()
-    if not cfg.enabled:
-        raise HTTPException(status_code=503, detail="Crypto payments are not configured")
     tx_hash = crypto_payments.normalise_tx_hash(payload.get("tx_hash"))
     if not tx_hash:
         raise HTTPException(status_code=400, detail="Invalid transaction hash")
     invoices = load_invoices()
     inv = _payable_invoice(invoices, invoice_id)
+    if not _invoice_cfg(inv).enabled:
+        raise HTTPException(status_code=503, detail="The seller has not set up a wallet for crypto payments")
     if inv.get("status") in ("void", "cancelled"):
         raise HTTPException(status_code=409, detail="This invoice can no longer be paid")
     if _payment_system(inv) != "web3":
@@ -3989,11 +4353,9 @@ What would you like to know?"""
 
 
 @app.get("/invoices/{invoice_id}/pdf")
-async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_current_user)):
+async def download_invoice_pdf(invoice_id: str, current_user: dict = Depends(get_plan_user)):
     invoices = load_invoices()
-    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)), None)
-    if not inv:
-        raise HTTPException(status_code=404, detail="Invoice not found")
+    inv = _accessible_invoice(invoices, invoice_id, current_user)
 
     # Return the PDF stored when the invoice was issued (older invoices stored a file path)
     stored_pdf = inv.get("pdf_url") or ""
@@ -4334,6 +4696,26 @@ except Exception:
 
 
 # --- Simple checkout endpoint for plugin integration (persistence-only) ---
+def _webshop_api_key(x_api_key: str):
+    """Resolve a webshop's API key. Returns (key, None) or (None, error response).
+    The merchant behind the key needs an active plan and room in its monthly limit."""
+    try:
+        key = _find_api_key(x_api_key)
+    except Exception:
+        return None, JSONResponse(status_code=500, content={"error": "Failed to load API keys"})
+    if not key:
+        return None, JSONResponse(status_code=403, content={"error": "Invalid API key"})
+    merchant = _api_key_merchant(key)
+    if not merchant:
+        return None, JSONResponse(status_code=403, content={"error": "Invalid API key"})
+    try:
+        _require_active_plan(merchant)
+        _check_monthly_limit(merchant)
+    except HTTPException as exc:
+        return None, JSONResponse(status_code=exc.status_code, content={"error": exc.detail})
+    return key, None
+
+
 @app.post("/checkout")
 def checkout(
     payload: dict,
@@ -4347,19 +4729,9 @@ def checkout(
     if READ_ONLY_FS:
         return JSONResponse(status_code=503, content={"error": "Persistence disabled on this server"})
 
-    # Find key from persistent storage
-    try:
-        api_keys = load_api_keys()
-    except Exception:
-        return JSONResponse(status_code=500, content={"error": "Failed to load API keys"})
-
-    key = next((k for k in api_keys if k.get("key") == x_api_key), None)
-    # Local dev fallback: allow any key in non-production for quick testing
-    if not key and not IS_PROD:
-        # Create a temporary key object mapping to merchant_id 1
-        key = {"merchant_id": 1, "key": x_api_key, "mode": "test"}
-    if not key:
-        return JSONResponse(status_code=403, content={"error": "Invalid API key"})
+    key, error = _webshop_api_key(x_api_key)
+    if error:
+        return error
 
     # Build invoice and persist to invoices.json
     try:
@@ -4376,6 +4748,7 @@ def checkout(
     invoice = {
         "id": str(uuid.uuid4()),
         "merchant_id": key.get("merchant_id"),
+        "pay_to": _merchant_pay_to(key.get("user_id") or key.get("merchant_id")),
         "amount": amount,
         "mode": mode,
         "status": "pending",  # paid only after a verified payment
@@ -4405,16 +4778,12 @@ def create_session(
     if READ_ONLY_FS:
         return JSONResponse(status_code=503, content={"error": "Persistence disabled on this server"})
 
-    try:
-        api_keys = load_api_keys()
-    except Exception:
-        return JSONResponse(status_code=500, content={"error": "Failed to load API keys"})
+    key, error = _webshop_api_key(x_api_key)
+    if error:
+        return error
 
-    key = next((k for k in api_keys if k.get("key") == x_api_key), None)
-    if not key and not IS_PROD:
-        key = {"merchant_id": 1, "key": x_api_key, "mode": "test"}
-    if not key:
-        return JSONResponse(status_code=403, content={"error": "Invalid API key"})
+    if not _merchant_pay_to(key.get("user_id") or key.get("merchant_id")):
+        return JSONResponse(status_code=409, content={"error": "Set your payout wallet in the APIBlockchain dashboard (Account settings) to receive APIUSD payments"})
 
     try:
         amount = float(payload.get("amount", 0) or 0)
@@ -4427,9 +4796,7 @@ def create_session(
 
     session_id = str(uuid.uuid4())
 
-    # Build hosted checkout URL. Allow override via HOSTED_CHECKOUT_BASE env var.
-    HOSTED_BASE = os.getenv("HOSTED_CHECKOUT_BASE", "https://api.apiblockchain.io")
-    session_url = f"{HOSTED_BASE.rstrip('/')}/checkout?session={session_id}"
+    session_url = f"{HOSTED_CHECKOUT_BASE}/checkout?session={session_id}"
 
     session = {
         "id": session_id,
@@ -4447,6 +4814,10 @@ def create_session(
             "customer_name": payload.get("customer_name"),
             "buyer_country": payload.get("buyer_country") or payload.get("country"),  # For VAT calculation
             "buyer_vat_number": payload.get("buyer_vat_number") or payload.get("vat_number"),  # For B2B reverse charge
+            "buyer_address": payload.get("buyer_address") or payload.get("customer_address"),
+            "order_id": payload.get("order_id"),
+            "description": payload.get("description"),
+            "items": payload.get("items") if isinstance(payload.get("items"), list) else None,
             "webhook_sources": [],
         }
     }
@@ -4503,7 +4874,7 @@ def hosted_checkout(session: str = None):
                 users = load_users()
                 u = next((x for x in users if x.get("id") == s.get("merchant_id")), None)
                 if u:
-                        merchant_name = u.get("name")
+                        merchant_name = u.get("business_name") or u.get("name")
         except Exception:
                 merchant_name = None
 
@@ -4511,6 +4882,7 @@ def hosted_checkout(session: str = None):
                 merchant_name = f"Merchant {s.get('merchant_id')}"
 
         amount = float(s.get("amount") or 0)
+        currency_sign = {"EUR": "€", "USD": "$", "GBP": "£"}.get(str(s.get("currency") or "EUR").upper(), "€")
         success_url = s.get("success_url") or ""
         cancel_url = s.get("cancel_url") or ""
 
@@ -4546,7 +4918,7 @@ def hosted_checkout(session: str = None):
             "<img class=\"logo\" src=\"https://apiblockchain.io/logo.svg\" alt=\"APIBlockchain\"/>"
             "<h2>Checkout</h2>"
             "<p><strong>Merchant:</strong> " + merchant_escaped + "</p>"
-            "<p class=\"amount\"><strong>Amount:</strong> $" + f"{amount:.2f}" + "</p>"
+            "<p class=\"amount\"><strong>Amount:</strong> " + currency_sign + f"{amount:.2f}" + "</p>"
             "<div class=\"actions\">"
             "<button id=\"pay-web3\">Pay with Crypto (APIUSD)</button>"
             "</div>"
@@ -4575,6 +4947,45 @@ def hosted_checkout(session: str = None):
         return HTMLResponse(html)
 
 
+def _session_invoice_details(s: dict, amount: float) -> dict:
+    """Seller, buyer and lines for the invoice of a webshop checkout. The amount the
+    customer pays is the invoice total; VAT is whatever the shop already included."""
+    meta = s.get("metadata") or {}
+    merchant = next((u for u in load_users() if str(u.get("id")) == str(s.get("merchant_id"))), {}) or {}
+    items = []
+    for it in meta.get("items") or []:
+        if not isinstance(it, dict):
+            continue
+        try:
+            qty = float(it.get("quantity") or 1)
+            unit = float(it.get("unit_price") if it.get("unit_price") is not None else it.get("price") or 0)
+        except (TypeError, ValueError):
+            continue
+        items.append({"description": str(it.get("description") or it.get("name") or it.get("product_name") or "Item"),
+                      "quantity": qty, "unit_price": unit, "amount": round(qty * unit, 2)})
+    if not items or round(sum(i["amount"] for i in items), 2) != round(amount, 2):
+        items = [{"description": meta.get("description") or (f"Order {meta['order_id']}" if meta.get("order_id") else "Order"),
+                  "quantity": 1, "unit_price": amount, "amount": amount}]
+    return {
+        "order_number": meta.get("order_id"),
+        "seller_name": merchant.get("business_name") or merchant.get("name"),
+        "seller_address": merchant.get("address"),
+        "seller_country": merchant.get("country"),
+        "seller_vat": merchant.get("vat_number"),
+        "buyer_name": meta.get("customer_name"),
+        "buyer_email": meta.get("customer_email"),
+        "buyer_address": meta.get("buyer_address"),
+        "buyer_country": meta.get("buyer_country"),
+        "buyer_vat": meta.get("buyer_vat_number"),
+        "buyer_type": "B2B" if meta.get("buyer_vat_number") else "B2C",
+        "items": items,
+        "subtotal": amount,
+        "vat_rate": 0.0,
+        "vat_amount": 0.0,
+        "description": meta.get("description"),
+    }
+
+
 @app.post("/session/{session_id}/pay-crypto")
 def session_pay_crypto(session_id: str):
     """Hosted checkout: create (once) the invoice for this session and return its payment page."""
@@ -4592,9 +5003,11 @@ def session_pay_crypto(session_id: str):
             raise HTTPException(status_code=400, detail="Session has no amount")
         inv = {
             "id": str(uuid.uuid4()),
-            "invoice_number": get_next_invoice_number(),
+            "invoice_number": get_next_invoice_number(s.get("merchant_id")),
             "session_id": session_id,
             "merchant_id": s.get("merchant_id"),
+            "pay_to": _merchant_pay_to(s.get("merchant_id")),
+            **_session_invoice_details(s, amount),
             "amount": amount,
             "total": amount,
             "currency": s.get("currency") or "EUR",
@@ -4791,7 +5204,6 @@ async def webhook_stripe(request: Request):
         log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
         return {"received": True, "duplicate": True, "message": "Payment already processed"}
 
-    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
     try:
@@ -4808,7 +5220,6 @@ async def webhook_stripe(request: Request):
         "success": True,
         "session_id": session_id,
         "invoice": invoice,
-        "api_key_generated": api_key.get('id'),
         "customer_access": access_link,
     }
 
@@ -5016,7 +5427,6 @@ async def webhook_coinbase(request: Request):
         log_event(f'WEBHOOK_DUPLICATE_PAYMENT session_id={session_id[:8]}', '-', '-')
         return {"received": True, "duplicate": True, "message": "Payment already processed"}
 
-    api_key = auto_unlock_api_keys(session.get('merchant_id'), session)
     access_link = generate_customer_access_link(session_id, session.get('merchant_id'))
     
     try:
@@ -5033,7 +5443,6 @@ async def webhook_coinbase(request: Request):
         "success": True,
         "session_id": session_id,
         "invoice": invoice,
-        "api_key_generated": api_key.get('id'),
         "customer_access": access_link,
     }
 
@@ -5071,6 +5480,9 @@ def get_session_status(session_id: str):
         "payment_provider": session.get('payment_provider'),
         "paid_at": session.get('paid_at'),
         "amount": session.get('amount'),
+        "order_id": (session.get('metadata') or {}).get('order_id'),
+        "invoice_id": session.get('invoice_id'),
+        "blockchain_tx_id": session.get('blockchain_tx_id'),
         "created_at": session.get('created_at'),
     }
 
