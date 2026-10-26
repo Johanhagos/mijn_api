@@ -2880,8 +2880,10 @@ def _apply_payment_status(inv: dict, sessions_cache: Optional[list] = None) -> N
     cfg = _invoice_cfg(inv)
     due = crypto_payments.to_units(_invoice_total(inv), cfg.token_decimals)
     paid = _invoice_paid_units(inv, cfg)
-    if paid <= 0 or inv.get("status") in ("void", "cancelled"):
+    if paid <= 0 or inv.get("status") in ("void", "cancelled", "charged_back"):
         return
+    if inv.get("payment_provider") == "mollie" and inv.get("status") == "paid":
+        return  # paid by iDEAL; crypto payments do not change that
     inv["amount_paid"] = crypto_payments.from_units(paid, cfg.token_decimals)
     if paid >= due:
         if inv.get("status") not in ("paid", "overpaid"):
@@ -3047,6 +3049,111 @@ def _activate_plan(inv: dict) -> None:
     log_event(f"PLAN_ACTIVATED plan={plan_key} until={expires.date()} invoice={str(inv.get('id'))[:8]}", user.get("name"), "-")
 
 
+# ---------- iDEAL via Mollie (plans only; Mollie pays out to the platform's bank account) ----------
+MOLLIE_API = "https://api.mollie.com/v2"
+MOLLIE_PAYMENT_ID_RE = re.compile(r"^tr_[A-Za-z0-9]+$")
+
+
+def _mollie_key() -> str:
+    return os.getenv("MOLLIE_API_KEY", "").strip()
+
+
+def _mollie(method: str, path: str, body: Optional[dict] = None) -> dict:
+    import requests
+    r = requests.request(method, MOLLIE_API + path, json=body, timeout=15,
+                         headers={"Authorization": f"Bearer {_mollie_key()}"})
+    if r.status_code >= 400:
+        raise RuntimeError(f"Mollie {r.status_code}: {r.text[:300]}")
+    return r.json()
+
+
+def _process_mollie_payment(payment_id: str) -> Optional[dict]:
+    """Fetch the payment from Mollie (never trust the webhook body) and, when it is paid in
+    full, mark its plan invoice paid and activate the plan. Safe to call repeatedly."""
+    payment = _mollie("GET", f"/payments/{payment_id}")
+    invoice_id = (payment.get("metadata") or {}).get("invoice_id")
+    invoices = load_invoices()
+    inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)
+                and payment_id in (i.get("mollie_payment_ids") or [])), None)
+    if not inv:
+        logging.getLogger("uvicorn.error").warning("Mollie payment %s has no matching invoice", payment_id)
+        return None
+    status = payment.get("status")
+    if payment.get("amountChargedBack") or status == "charged_back":
+        if inv.get("mollie_payment_id") == payment_id and inv.get("status") != "charged_back":
+            inv["status"] = "charged_back"
+            save_invoices(invoices)
+            log_event(f"MOLLIE_CHARGEBACK invoice={str(inv.get('id'))[:8]} payment={payment_id}", "-", "-")
+        return inv
+    if status != "paid" or inv.get("status") in ("paid", "overpaid"):
+        return inv
+    amount = payment.get("amount") or {}
+    try:
+        value = round(float(amount.get("value")), 2)
+    except (TypeError, ValueError):
+        value = None
+    if amount.get("currency") != "EUR" or value != round(_invoice_total(inv), 2):
+        log_event(f"MOLLIE_AMOUNT_MISMATCH invoice={str(inv.get('id'))[:8]} payment={payment_id} {amount}", "-", "-")
+        return inv
+    if not store.claim_payment("mollie", payment_id, invoice_id=inv.get("id"), amount=value, currency="EUR",
+                               data={"method": payment.get("method")}):
+        return inv  # already processed
+    inv["status"] = "paid"
+    inv["paid_at"] = datetime.now(timezone.utc).isoformat()
+    inv["payment_system"] = "ideal"
+    inv["payment_provider"] = "mollie"
+    inv["mollie_payment_id"] = payment_id
+    try:
+        if inv.get("type") == "plan":
+            _activate_plan(inv)
+        save_invoices(invoices)
+    except Exception:
+        store.release_payment("mollie", payment_id)
+        raise
+    log_event(f"MOLLIE_PAID invoice={str(inv.get('id'))[:8]} payment={payment_id} amount={value}", "-", "-")
+    return inv
+
+
+@app.post("/webhooks/mollie")
+async def webhook_mollie(request: Request):
+    """Mollie calls this with `id=tr_...` when a payment changes. The body is only a hint:
+    the status is always fetched from Mollie with our API key."""
+    from urllib.parse import parse_qs
+    raw = (await request.body()).decode("utf-8", errors="replace")
+    payment_id = (parse_qs(raw).get("id") or [""])[0]
+    if not MOLLIE_PAYMENT_ID_RE.match(payment_id) or not _mollie_key():
+        return {"received": True}
+    try:
+        _process_mollie_payment(payment_id)
+    except Exception as exc:
+        # Non-200 makes Mollie retry later
+        logging.getLogger("uvicorn.error").warning("Mollie webhook %s failed: %s", payment_id, exc)
+        return JSONResponse(status_code=500, content={"error": "processing failed"})
+    return {"received": True}
+
+
+@app.get("/plans/payments/{invoice_id}")
+async def plan_payment_status(invoice_id: str, current_user: dict = Depends(get_current_user)):
+    """The buyer's view after returning from iDEAL: re-checks the payment at Mollie (in
+    case the webhook has not arrived yet) and returns the plan status."""
+    inv = next((i for i in load_invoices() if str(i.get("id")) == str(invoice_id) and i.get("type") == "plan"
+                and str(i.get("plan_buyer_id")) == str(current_user.get("id"))), None)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if inv.get("status") not in ("paid", "overpaid") and _mollie_key():
+        for pid in reversed(inv.get("mollie_payment_ids") or []):
+            try:
+                updated = _process_mollie_payment(pid)
+            except Exception as exc:
+                logging.getLogger("uvicorn.error").warning("Mollie status check %s failed: %s", pid, exc)
+                continue
+            if updated and updated.get("status") in ("paid", "overpaid"):
+                inv = updated
+                break
+    user = next((u for u in load_users() if str(u.get("id")) == str(current_user.get("id"))), current_user)
+    return {"invoice_id": inv.get("id"), "status": inv.get("status"), **_plan_status(user)}
+
+
 @app.get("/plans")
 def list_plans():
     """Public: the plans and their prices."""
@@ -3067,12 +3174,17 @@ async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(
     becomes active only after that payment is verified on-chain."""
     plan_key = str(payload.get("plan") or "").lower()
     plan = PLANS.get(plan_key)
+    method = str(payload.get("method") or "apiusd").lower()
     if not plan:
         raise HTTPException(status_code=400, detail="Unknown plan")
     if plan["price"] is None:
         raise HTTPException(status_code=400, detail="This plan is a custom quote. Please contact us.")
-    if not crypto_payments.config().enabled:
+    if method not in ("apiusd", "ideal"):
+        raise HTTPException(status_code=400, detail="method must be 'apiusd' or 'ideal'")
+    if method == "apiusd" and not crypto_payments.config().enabled:
         raise HTTPException(status_code=503, detail="Crypto payments are not configured")
+    if method == "ideal" and not _mollie_key():
+        raise HTTPException(status_code=503, detail="iDEAL is not available right now")
 
     uid = str(current_user.get("id"))
     user = next((u for u in load_users() if str(u.get("id")) == uid), current_user)
@@ -3125,9 +3237,28 @@ async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(
         invoices.append(inv)
         save_invoices(invoices)
         log_event(f"PLAN_CHECKOUT plan={plan_key} invoice={inv['id'][:8]}", current_user.get("name"), "-")
-    return {"invoice_id": inv["id"], "plan": plan_key, "amount": inv["total"], "subtotal": inv.get("subtotal"),
-            "vat_rate": inv.get("vat_rate"), "vat_amount": inv.get("vat_amount"), "vat_note": inv.get("notes"),
-            "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay?invoice={inv['id']}"}
+    result = {"invoice_id": inv["id"], "plan": plan_key, "amount": inv["total"], "subtotal": inv.get("subtotal"),
+              "vat_rate": inv.get("vat_rate"), "vat_amount": inv.get("vat_amount"), "vat_note": inv.get("notes"),
+              "payment_url": f"{PUBLIC_DASHBOARD_URL}/pay?invoice={inv['id']}"}
+    if method == "ideal":
+        if inv.get("status") != "issued" or inv.get("pending_txs"):
+            raise HTTPException(status_code=409, detail="A crypto payment for this plan is already under way. Please finish it in APIUSD.")
+        try:
+            payment = _mollie("POST", "/payments", {
+                "amount": {"currency": "EUR", "value": f"{_invoice_total(inv):.2f}"},
+                "description": f"{PLATFORM_NAME} {plan['name']} plan {inv.get('invoice_number')}",
+                "redirectUrl": f"{PUBLIC_DASHBOARD_URL}/plans?paid={inv['id']}",
+                "webhookUrl": f"{HOSTED_CHECKOUT_BASE}/webhooks/mollie",
+                "method": "ideal",
+                "metadata": {"invoice_id": inv["id"]},
+            })
+        except Exception as exc:
+            logging.getLogger("uvicorn.error").error("Mollie payment for %s failed: %s", inv["id"], exc)
+            raise HTTPException(status_code=502, detail="iDEAL is not available right now. Please try again or pay in APIUSD.")
+        inv.setdefault("mollie_payment_ids", []).append(payment["id"])
+        save_invoices(invoices)
+        result["checkout_url"] = payment["_links"]["checkout"]["href"]
+    return result
 
 
 @app.get("/plans/quote")
@@ -3136,7 +3267,9 @@ async def plan_quote(current_user: dict = Depends(get_current_user)):
     user = next((u for u in load_users() if str(u.get("id")) == str(current_user.get("id"))), current_user)
     country_ok = bool(re.fullmatch(r"[A-Z]{2}", str(user.get("country") or "").upper()))
     vat = _plan_vat(user) if country_ok else None
+    methods = (["ideal"] if _mollie_key() else []) + (["apiusd"] if crypto_payments.config().enabled else [])
     return {"country": user.get("country") if country_ok else None, "vat_note": vat["note"] if vat else None,
+            "methods": methods,
             "plans": [{"id": k, **(_plan_amounts(v, vat) if vat else {})}
                       for k, v in PLANS.items() if v["price"] is not None]}
 

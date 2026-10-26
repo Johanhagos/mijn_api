@@ -347,3 +347,115 @@ def test_plan_invoice_shows_platform_vat_kvk_and_address(env):
     inv = next(i for i in main.store.load_invoices() if i["id"] == buy["invoice_id"])
     assert inv["seller_vat"] == "NL005511005B38" and inv["seller_registration_number"] == "KvK 42121823"
     assert inv["seller_address"] == "G.A. Brederodestraat 100, 1132 ST Volendam" and inv["seller_country"] == "NL"
+
+
+class FakeMollie:
+    """Stands in for the Mollie API: payments are created 'open' and the test decides
+    what Mollie reports for them."""
+
+    def __init__(self):
+        self.payments, self.created = {}, []
+
+    def __call__(self, method, path, body=None):
+        if method == "POST" and path == "/payments":
+            pid = f"tr_{uuid.uuid4().hex[:10]}"
+            self.created.append(body)
+            self.payments[pid] = {"id": pid, "status": "open", "amount": body["amount"], "method": "ideal",
+                                  "metadata": body["metadata"],
+                                  "_links": {"checkout": {"href": f"https://www.mollie.com/checkout/{pid}"}}}
+            return self.payments[pid]
+        if method == "GET" and path.startswith("/payments/"):
+            return self.payments[path.rsplit("/", 1)[1]]
+        raise AssertionError((method, path))
+
+
+@pytest.fixture
+def mollie(env):
+    fake = FakeMollie()
+    env["mp"].setenv("MOLLIE_API_KEY", "test_dummy")
+    env["mp"].setattr(env["main"], "_mollie", fake)
+    yield fake
+    env["mp"].delenv("MOLLIE_API_KEY")
+
+
+def _ideal(env, auth, plan="professional"):
+    r = env["client"].post("/plans/checkout", headers=auth, json={"plan": plan, "method": "ideal"})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _webhook(c, pid):
+    return c.post("/webhooks/mollie", content=f"id={pid}", headers={"Content-Type": "application/x-www-form-urlencoded"})
+
+
+def test_ideal_plan_is_active_only_after_mollie_says_paid(env, mollie):
+    c = env["client"]
+    _, auth = _merchant(c)  # NL: 21% VAT
+    buy = _ideal(env, auth)
+    pid = buy["checkout_url"].rsplit("/", 1)[1]
+    sent = mollie.created[-1]
+    assert sent["amount"] == {"currency": "EUR", "value": "36.29"} and sent["method"] == "ideal"
+    assert sent["webhookUrl"].endswith("/webhooks/mollie") and sent["redirectUrl"].endswith(f"/plans?paid={buy['invoice_id']}")
+
+    # Webhook while still open, or a forged one: nothing changes
+    assert _webhook(c, pid).status_code == 200
+    assert _webhook(c, "tr_doesnotexist1").status_code in (200, 500)
+    assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
+
+    mollie.payments[pid]["status"] = "paid"
+    assert _webhook(c, pid).status_code == 200
+    me = c.get("/merchant/me", headers=auth).json()
+    assert me["plan_active"] is True and me["plan"] == "professional"
+    # Replayed webhook: plan not extended twice
+    first = me["plan_expires_at"]
+    _webhook(c, pid)
+    assert c.get("/merchant/me", headers=auth).json()["plan_expires_at"] == first
+    inv = next(i for i in env["main"].store.load_invoices() if i["id"] == buy["invoice_id"])
+    assert inv["status"] == "paid" and inv["payment_provider"] == "mollie"
+
+
+def test_ideal_status_check_without_webhook(env, mollie):
+    c = env["client"]
+    _, auth = _merchant(c, country="DE")
+    buy = _ideal(env, auth, "starter")
+    assert mollie.created[-1]["amount"]["value"] == "23.80"  # DE VAT 19% (OSS)
+    pid = buy["checkout_url"].rsplit("/", 1)[1]
+    assert c.get(f"/plans/payments/{buy['invoice_id']}", headers=auth).json()["plan_active"] is False
+    mollie.payments[pid]["status"] = "paid"
+    st = c.get(f"/plans/payments/{buy['invoice_id']}", headers=auth).json()
+    assert st["status"] == "paid" and st["plan_active"] is True and st["plan"] == "starter"
+    # Someone else cannot look at it
+    _, other = _merchant(c)
+    assert c.get(f"/plans/payments/{buy['invoice_id']}", headers=other).status_code == 404
+
+
+def test_ideal_wrong_amount_or_failed_payment_does_not_activate(env, mollie):
+    c = env["client"]
+    _, auth = _merchant(c)
+    buy = _ideal(env, auth)
+    pid = buy["checkout_url"].rsplit("/", 1)[1]
+    for status in ("failed", "canceled", "expired"):
+        mollie.payments[pid]["status"] = status
+        _webhook(c, pid)
+        assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
+    mollie.payments[pid].update(status="paid", amount={"currency": "EUR", "value": "1.00"})
+    _webhook(c, pid)
+    assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
+
+
+def test_ideal_paid_plan_cannot_also_be_paid_in_crypto(env, mollie):
+    c = env["client"]
+    _, auth = _merchant(c)
+    buy = _ideal(env, auth)
+    pid = buy["checkout_url"].rsplit("/", 1)[1]
+    mollie.payments[pid]["status"] = "paid"
+    _webhook(c, pid)
+    assert c.get(f"/pay/{buy['invoice_id']}").json()["payable"] is False
+    assert _pay(c, buy["invoice_id"], 36.29).status_code == 409
+
+
+def test_ideal_unavailable_without_mollie_key(env):
+    c = env["client"]
+    _, auth = _merchant(c)
+    assert c.post("/plans/checkout", headers=auth, json={"plan": "starter", "method": "ideal"}).status_code == 503
+    assert c.post("/plans/checkout", headers=auth, json={"plan": "starter", "method": "paypal"}).status_code == 400

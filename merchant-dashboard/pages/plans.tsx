@@ -20,6 +20,7 @@ interface Plan {
 interface Quote {
   country: string | null;
   vat_note: string | null;
+  methods?: string[];
   plans: { id: string; subtotal?: number; vat_rate?: number; vat_amount?: number; total?: number }[];
 }
 
@@ -34,6 +35,9 @@ interface Me {
 export default function Plans() {
   const router = useRouter();
   const wanted = typeof router.query.plan === 'string' ? router.query.plan : null;
+  // Back from iDEAL: ?paid=<invoice id>
+  const returned = typeof router.query.paid === 'string' ? router.query.paid : null;
+  const [waiting, setWaiting] = useState<'checking' | 'failed' | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [me, setMe] = useState<Me | null>(null);
   const [quote, setQuote] = useState<Quote | null>(null);
@@ -63,12 +67,35 @@ export default function Plans() {
     })();
   }, [router, router.isReady, wanted]);
 
-  const buy = async (planId: string) => {
-    setBusy(planId);
+  // After iDEAL: wait until Mollie has confirmed the payment, then open the dashboard
+  useEffect(() => {
+    if (!returned) return;
+    setWaiting('checking');
+    let tries = 0;
+    let stop = false;
+    const check = async () => {
+      try {
+        const st = await api.protectedApi(`/plans/payments/${encodeURIComponent(returned)}`);
+        if (stop) return;
+        if (st.plan_active && st.status === 'paid') {
+          window.location.href = '/dashboard';
+          return;
+        }
+      } catch { /* try again */ }
+      if (++tries >= 20) { setWaiting('failed'); return; }
+      setTimeout(check, 3000);
+    };
+    check();
+    return () => { stop = true; };
+  }, [returned]);
+
+  const buy = async (planId: string, method: 'ideal' | 'apiusd') => {
+    setBusy(`${planId}:${method}`);
     setError(null);
     try {
-      const res = await api.protectedApi('/plans/checkout', 'POST', { plan: planId });
-      window.location.href = `/pay?invoice=${encodeURIComponent(res.invoice_id)}`;
+      const res = await api.protectedApi('/plans/checkout', 'POST', { plan: planId, method });
+      // iDEAL: Mollie's payment page; APIUSD: our crypto pay page
+      window.location.href = method === 'ideal' ? res.checkout_url : `/pay?invoice=${encodeURIComponent(res.invoice_id)}`;
     } catch (err: any) {
       let detail = 'Could not start the payment. Please try again.';
       try { detail = JSON.parse(err.message).detail || detail; } catch { /* plain text */ }
@@ -79,6 +106,7 @@ export default function Plans() {
 
   const priceFor = (id: string) => quote?.plans.find((q) => q.id === id);
   const needsCountry = quote !== null && !quote.country;
+  const methods = quote?.methods || ['apiusd'];
   const until = me?.plan_expires_at ? new Date(me.plan_expires_at).toLocaleDateString() : null;
 
   return (
@@ -86,8 +114,20 @@ export default function Plans() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-gray-900 text-center mb-2">Choose your plan</h1>
         <p className="text-gray-600 text-center mb-8">
-          Pay in APIUSD. Your dashboard, API keys and webshop checkout are unlocked as soon as the payment is confirmed.
+          Pay with iDEAL or APIUSD. Your dashboard, API keys and webshop checkout are unlocked as soon as the payment is confirmed.
         </p>
+
+        {waiting === 'checking' && (
+          <div className="bg-blue-50 border-l-4 border-blue-400 text-gray-800 rounded p-4 mb-6">
+            Waiting for the iDEAL confirmation… Your dashboard opens as soon as the payment is confirmed.
+          </div>
+        )}
+        {waiting === 'failed' && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 text-yellow-900 rounded p-4 mb-6">
+            We have not received a confirmation of your iDEAL payment yet. If you completed it, refresh this page in a minute;
+            if you cancelled it, choose a plan below to try again.
+          </div>
+        )}
 
         {me?.plan_active && (
           <div className="bg-green-50 border-l-4 border-green-500 text-green-900 rounded p-4 mb-6 flex justify-between items-center">
@@ -128,11 +168,22 @@ export default function Plans() {
                 </div>
               )}
               {p.purchasable ? (
-                <button onClick={() => buy(p.id)} disabled={busy !== null || needsCountry}
-                        className="mt-6 w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60">
-                  {busy === p.id ? 'Opening payment…'
-                    : `Pay ${(priceFor(p.id)?.total ?? p.price ?? 0).toFixed(2)} APIUSD`}
-                </button>
+                <div className="mt-6 space-y-2">
+                  {methods.includes('ideal') && (
+                    <button onClick={() => buy(p.id, 'ideal')} disabled={busy !== null || needsCountry}
+                            className="w-full py-3 rounded-lg bg-pink-600 text-white font-bold hover:bg-pink-700 disabled:opacity-60">
+                      {busy === `${p.id}:ideal` ? 'Opening iDEAL…'
+                        : `Pay €${(priceFor(p.id)?.total ?? p.price ?? 0).toFixed(2)} with iDEAL`}
+                    </button>
+                  )}
+                  {methods.includes('apiusd') && (
+                    <button onClick={() => buy(p.id, 'apiusd')} disabled={busy !== null || needsCountry}
+                            className="w-full py-3 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700 disabled:opacity-60">
+                      {busy === `${p.id}:apiusd` ? 'Opening payment…'
+                        : `Pay ${(priceFor(p.id)?.total ?? p.price ?? 0).toFixed(2)} APIUSD`}
+                    </button>
+                  )}
+                </div>
               ) : (
                 <a href="mailto:sales@apiblockchain.io?subject=Enterprise%20plan"
                    className="mt-6 w-full py-3 rounded-lg bg-gray-800 text-white font-bold text-center hover:bg-gray-900">
