@@ -349,33 +349,39 @@ def test_plan_invoice_shows_platform_vat_kvk_and_address(env):
     assert inv["seller_address"] == "G.A. Brederodestraat 100, 1132 ST Volendam" and inv["seller_country"] == "NL"
 
 
-class FakeMollie:
-    """Stands in for the Mollie API: payments are created 'open' and the test decides
-    what Mollie reports for them."""
+class FakeStripe:
+    """Stands in for Stripe Checkout: sessions are created unpaid and the test decides what
+    Stripe reports for them."""
 
     def __init__(self):
-        self.payments, self.created = {}, []
+        self.sessions, self.created = {}, []
 
-    def __call__(self, method, path, body=None):
-        if method == "POST" and path == "/payments":
-            pid = f"tr_{uuid.uuid4().hex[:10]}"
-            self.created.append(body)
-            self.payments[pid] = {"id": pid, "status": "open", "amount": body["amount"], "method": "ideal",
-                                  "metadata": body["metadata"],
-                                  "_links": {"checkout": {"href": f"https://www.mollie.com/checkout/{pid}"}}}
-            return self.payments[pid]
-        if method == "GET" and path.startswith("/payments/"):
-            return self.payments[path.rsplit("/", 1)[1]]
-        raise AssertionError((method, path))
+    def create(self, params):
+        cid = f"cs_test_{uuid.uuid4().hex[:12]}"
+        self.created.append(params)
+        amount = params["line_items"][0]["price_data"]["unit_amount"]
+        self.sessions[cid] = {"id": cid, "url": f"https://checkout.stripe.com/c/pay/{cid}", "payment_status": "unpaid",
+                              "amount_total": amount, "currency": "eur", "metadata": params["metadata"],
+                              "payment_intent": f"pi_{uuid.uuid4().hex[:12]}"}
+        return self.sessions[cid]
+
+    def get(self, cid):
+        return self.sessions[cid]
+
+
+STRIPE_SECRET = "whsec_plan_test"
 
 
 @pytest.fixture
-def mollie(env):
-    fake = FakeMollie()
-    env["mp"].setenv("MOLLIE_API_KEY", "test_dummy")
-    env["mp"].setattr(env["main"], "_mollie", fake)
+def stripe_fake(env):
+    fake = FakeStripe()
+    env["mp"].setenv("STRIPE_SECRET_KEY", "sk_test_dummy")
+    env["mp"].setenv("STRIPE_WEBHOOK_SECRET", STRIPE_SECRET)
+    env["mp"].setattr(env["main"], "_stripe_create_checkout", fake.create)
+    env["mp"].setattr(env["main"], "_stripe_get_checkout", fake.get)
     yield fake
-    env["mp"].delenv("MOLLIE_API_KEY")
+    env["mp"].delenv("STRIPE_SECRET_KEY")
+    env["mp"].delenv("STRIPE_WEBHOOK_SECRET")
 
 
 def _ideal(env, auth, plan="professional"):
@@ -384,78 +390,95 @@ def _ideal(env, auth, plan="professional"):
     return r.json()
 
 
-def _webhook(c, pid):
-    return c.post("/webhooks/mollie", content=f"id={pid}", headers={"Content-Type": "application/x-www-form-urlencoded"})
+def _webhook(c, cid, secret=STRIPE_SECRET, event="checkout.session.completed", metadata=None):
+    """A Stripe event for checkout `cid`, signed like Stripe does (the body is only a hint)."""
+    import hashlib
+    import hmac
+    body = json.dumps({"type": event, "data": {"object": {"id": cid, "object": "checkout.session",
+                                                          "payment_status": "paid",  # never trusted
+                                                          "metadata": metadata or {"kind": "plan"}}}})
+    ts = str(int(time.time()))
+    sig = hmac.new(secret.encode(), f"{ts}.{body}".encode(), hashlib.sha256).hexdigest()
+    return c.post("/webhooks/stripe", content=body, headers={"Stripe-Signature": f"t={ts},v1={sig}"})
 
 
-def test_ideal_plan_is_active_only_after_mollie_says_paid(env, mollie):
+def _cid(buy):
+    return buy["checkout_url"].rsplit("/", 1)[1]
+
+
+def test_ideal_plan_is_active_only_after_stripe_says_paid(env, stripe_fake):
     c = env["client"]
     _, auth = _merchant(c)  # NL: 21% VAT
     buy = _ideal(env, auth)
-    pid = buy["checkout_url"].rsplit("/", 1)[1]
-    sent = mollie.created[-1]
-    assert sent["amount"] == {"currency": "EUR", "value": "36.29"} and sent["method"] == "ideal"
-    assert sent["webhookUrl"].endswith("/webhooks/mollie") and sent["redirectUrl"].endswith(f"/plans?paid={buy['invoice_id']}")
+    cid = _cid(buy)
+    sent = stripe_fake.created[-1]
+    assert sent["payment_method_types"] == ["ideal"] and sent["line_items"][0]["price_data"]["currency"] == "eur"
+    assert sent["line_items"][0]["price_data"]["unit_amount"] == 3629  # 29.99 + 21% VAT
+    assert sent["success_url"].endswith(f"/plans?paid={buy['invoice_id']}") and sent["metadata"]["kind"] == "plan"
 
-    # Webhook while still open, or a forged one: nothing changes
-    assert _webhook(c, pid).status_code == 200
-    assert _webhook(c, "tr_doesnotexist1").status_code in (200, 500)
+    # The event says "paid", but Stripe itself still says unpaid: nothing changes
+    assert _webhook(c, cid).status_code == 200
     assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
+    # Wrongly signed event: rejected
+    assert _webhook(c, cid, secret="whsec_wrong").status_code == 401
 
-    mollie.payments[pid]["status"] = "paid"
-    assert _webhook(c, pid).status_code == 200
+    stripe_fake.sessions[cid]["payment_status"] = "paid"
+    assert _webhook(c, cid).status_code == 200
     me = c.get("/merchant/me", headers=auth).json()
     assert me["plan_active"] is True and me["plan"] == "professional"
-    # Replayed webhook: plan not extended twice
     first = me["plan_expires_at"]
-    _webhook(c, pid)
+    _webhook(c, cid)  # replayed: plan not extended twice
+    _webhook(c, cid, event="checkout.session.async_payment_succeeded")
     assert c.get("/merchant/me", headers=auth).json()["plan_expires_at"] == first
     inv = next(i for i in env["main"].store.load_invoices() if i["id"] == buy["invoice_id"])
-    assert inv["status"] == "paid" and inv["payment_provider"] == "mollie"
+    assert inv["status"] == "paid" and inv["payment_provider"] == "stripe" and inv["payment_system"] == "ideal"
 
 
-def test_ideal_status_check_without_webhook(env, mollie):
+def test_ideal_status_check_without_webhook(env, stripe_fake):
     c = env["client"]
     _, auth = _merchant(c, country="DE")
     buy = _ideal(env, auth, "starter")
-    assert mollie.created[-1]["amount"]["value"] == "23.80"  # DE VAT 19% (OSS)
-    pid = buy["checkout_url"].rsplit("/", 1)[1]
+    assert stripe_fake.created[-1]["line_items"][0]["price_data"]["unit_amount"] == 2380  # DE VAT 19% (OSS)
     assert c.get(f"/plans/payments/{buy['invoice_id']}", headers=auth).json()["plan_active"] is False
-    mollie.payments[pid]["status"] = "paid"
+    stripe_fake.sessions[_cid(buy)]["payment_status"] = "paid"
     st = c.get(f"/plans/payments/{buy['invoice_id']}", headers=auth).json()
     assert st["status"] == "paid" and st["plan_active"] is True and st["plan"] == "starter"
-    # Someone else cannot look at it
     _, other = _merchant(c)
     assert c.get(f"/plans/payments/{buy['invoice_id']}", headers=other).status_code == 404
 
 
-def test_ideal_wrong_amount_or_failed_payment_does_not_activate(env, mollie):
+def test_ideal_wrong_amount_or_unknown_checkout_does_not_activate(env, stripe_fake):
     c = env["client"]
     _, auth = _merchant(c)
     buy = _ideal(env, auth)
-    pid = buy["checkout_url"].rsplit("/", 1)[1]
-    for status in ("failed", "canceled", "expired"):
-        mollie.payments[pid]["status"] = status
-        _webhook(c, pid)
-        assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
-    mollie.payments[pid].update(status="paid", amount={"currency": "EUR", "value": "1.00"})
-    _webhook(c, pid)
+    cid = _cid(buy)
+    stripe_fake.sessions[cid].update(payment_status="paid", amount_total=100)
+    _webhook(c, cid)
+    assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
+    stripe_fake.sessions[cid].update(amount_total=3629, currency="usd")
+    _webhook(c, cid)
+    assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
+    # A paid checkout that belongs to no plan invoice
+    stripe_fake.sessions["cs_test_foreign123"] = {"id": "cs_test_foreign123", "payment_status": "paid",
+                                                  "amount_total": 3629, "currency": "eur",
+                                                  "metadata": {"invoice_id": buy["invoice_id"], "kind": "plan"}}
+    _webhook(c, "cs_test_foreign123")
     assert c.get("/merchant/me", headers=auth).json()["plan_active"] is False
 
 
-def test_ideal_paid_plan_cannot_also_be_paid_in_crypto(env, mollie):
+def test_ideal_paid_plan_cannot_also_be_paid_in_crypto(env, stripe_fake):
     c = env["client"]
     _, auth = _merchant(c)
     buy = _ideal(env, auth)
-    pid = buy["checkout_url"].rsplit("/", 1)[1]
-    mollie.payments[pid]["status"] = "paid"
-    _webhook(c, pid)
+    stripe_fake.sessions[_cid(buy)]["payment_status"] = "paid"
+    _webhook(c, _cid(buy))
     assert c.get(f"/pay/{buy['invoice_id']}").json()["payable"] is False
     assert _pay(c, buy["invoice_id"], 36.29).status_code == 409
 
 
-def test_ideal_unavailable_without_mollie_key(env):
+def test_ideal_unavailable_without_stripe_key(env):
     c = env["client"]
     _, auth = _merchant(c)
     assert c.post("/plans/checkout", headers=auth, json={"plan": "starter", "method": "ideal"}).status_code == 503
     assert c.post("/plans/checkout", headers=auth, json={"plan": "starter", "method": "paypal"}).status_code == 400
+    assert "ideal" not in c.get("/plans/quote", headers=auth).json()["methods"]

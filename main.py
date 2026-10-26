@@ -2882,7 +2882,7 @@ def _apply_payment_status(inv: dict, sessions_cache: Optional[list] = None) -> N
     paid = _invoice_paid_units(inv, cfg)
     if paid <= 0 or inv.get("status") in ("void", "cancelled", "charged_back"):
         return
-    if inv.get("payment_provider") == "mollie" and inv.get("status") == "paid":
+    if inv.get("payment_system") == "ideal" and inv.get("status") == "paid":
         return  # paid by iDEAL; crypto payments do not change that
     inv["amount_paid"] = crypto_payments.from_units(paid, cfg.token_decimals)
     if paid >= due:
@@ -3049,103 +3049,83 @@ def _activate_plan(inv: dict) -> None:
     log_event(f"PLAN_ACTIVATED plan={plan_key} until={expires.date()} invoice={str(inv.get('id'))[:8]}", user.get("name"), "-")
 
 
-# ---------- iDEAL via Mollie (plans only; Mollie pays out to the platform's bank account) ----------
-MOLLIE_API = "https://api.mollie.com/v2"
-MOLLIE_PAYMENT_ID_RE = re.compile(r"^tr_[A-Za-z0-9]+$")
+# ---------- iDEAL via Stripe Checkout (plans only; Stripe pays out to the platform's bank account) ----------
+STRIPE_CHECKOUT_ID_RE = re.compile(r"^cs_(test|live)_[A-Za-z0-9]+$")
 
 
-def _mollie_key() -> str:
-    return os.getenv("MOLLIE_API_KEY", "").strip()
+def _stripe_key() -> str:
+    return os.getenv("STRIPE_SECRET_KEY", "").strip()
 
 
-def _mollie(method: str, path: str, body: Optional[dict] = None) -> dict:
-    import requests
-    r = requests.request(method, MOLLIE_API + path, json=body, timeout=15,
-                         headers={"Authorization": f"Bearer {_mollie_key()}"})
-    if r.status_code >= 400:
-        raise RuntimeError(f"Mollie {r.status_code}: {r.text[:300]}")
-    return r.json()
+def _stripe_dict(obj) -> dict:
+    return obj.to_dict() if hasattr(obj, "to_dict") else dict(obj)
 
 
-def _process_mollie_payment(payment_id: str) -> Optional[dict]:
-    """Fetch the payment from Mollie (never trust the webhook body) and, when it is paid in
-    full, mark its plan invoice paid and activate the plan. Safe to call repeatedly."""
-    payment = _mollie("GET", f"/payments/{payment_id}")
-    invoice_id = (payment.get("metadata") or {}).get("invoice_id")
+def _stripe_create_checkout(params: dict) -> dict:
+    import stripe
+    params = {k: v for k, v in params.items() if v is not None}  # None would be sent as an empty value
+    return _stripe_dict(stripe.checkout.Session.create(api_key=_stripe_key(), **params))
+
+
+def _stripe_get_checkout(checkout_id: str) -> dict:
+    import stripe
+    return _stripe_dict(stripe.checkout.Session.retrieve(checkout_id, api_key=_stripe_key()))
+
+
+def _process_stripe_checkout(checkout_id: str) -> Optional[dict]:
+    """Fetch the Checkout Session from Stripe (never trust the webhook body) and, when it is
+    paid in full, mark its plan invoice paid and activate the plan. Safe to call repeatedly."""
+    cs = _stripe_get_checkout(checkout_id)
+    invoice_id = (cs.get("metadata") or {}).get("invoice_id")
     invoices = load_invoices()
     inv = next((i for i in invoices if str(i.get("id")) == str(invoice_id)
-                and payment_id in (i.get("mollie_payment_ids") or [])), None)
+                and checkout_id in (i.get("stripe_checkout_ids") or [])), None)
     if not inv:
-        logging.getLogger("uvicorn.error").warning("Mollie payment %s has no matching invoice", payment_id)
+        logging.getLogger("uvicorn.error").warning("Stripe checkout %s has no matching invoice", checkout_id)
         return None
-    status = payment.get("status")
-    if payment.get("amountChargedBack") or status == "charged_back":
-        if inv.get("mollie_payment_id") == payment_id and inv.get("status") != "charged_back":
-            inv["status"] = "charged_back"
-            save_invoices(invoices)
-            log_event(f"MOLLIE_CHARGEBACK invoice={str(inv.get('id'))[:8]} payment={payment_id}", "-", "-")
+    if cs.get("payment_status") != "paid" or inv.get("status") in ("paid", "overpaid"):
         return inv
-    if status != "paid" or inv.get("status") in ("paid", "overpaid"):
+    due_cents = int(round(_invoice_total(inv) * 100))
+    if str(cs.get("currency") or "").lower() != "eur" or cs.get("amount_total") != due_cents:
+        log_event(f"STRIPE_AMOUNT_MISMATCH invoice={str(inv.get('id'))[:8]} checkout={checkout_id[:16]} "
+                  f"{cs.get('amount_total')} {cs.get('currency')}", "-", "-")
         return inv
-    amount = payment.get("amount") or {}
-    try:
-        value = round(float(amount.get("value")), 2)
-    except (TypeError, ValueError):
-        value = None
-    if amount.get("currency") != "EUR" or value != round(_invoice_total(inv), 2):
-        log_event(f"MOLLIE_AMOUNT_MISMATCH invoice={str(inv.get('id'))[:8]} payment={payment_id} {amount}", "-", "-")
-        return inv
-    if not store.claim_payment("mollie", payment_id, invoice_id=inv.get("id"), amount=value, currency="EUR",
-                               data={"method": payment.get("method")}):
+    ref = cs.get("payment_intent") or checkout_id
+    if isinstance(ref, dict):
+        ref = ref.get("id") or checkout_id
+    if not store.claim_payment("stripe", ref, invoice_id=inv.get("id"), amount=due_cents / 100, currency="EUR",
+                               data={"checkout": checkout_id, "method": "ideal"}):
         return inv  # already processed
     inv["status"] = "paid"
     inv["paid_at"] = datetime.now(timezone.utc).isoformat()
     inv["payment_system"] = "ideal"
-    inv["payment_provider"] = "mollie"
-    inv["mollie_payment_id"] = payment_id
+    inv["payment_provider"] = "stripe"
+    inv["stripe_intent_id"] = ref
     try:
         if inv.get("type") == "plan":
             _activate_plan(inv)
         save_invoices(invoices)
     except Exception:
-        store.release_payment("mollie", payment_id)
+        store.release_payment("stripe", ref)
         raise
-    log_event(f"MOLLIE_PAID invoice={str(inv.get('id'))[:8]} payment={payment_id} amount={value}", "-", "-")
+    log_event(f"STRIPE_IDEAL_PAID invoice={str(inv.get('id'))[:8]} amount={due_cents / 100}", "-", "-")
     return inv
-
-
-@app.post("/webhooks/mollie")
-async def webhook_mollie(request: Request):
-    """Mollie calls this with `id=tr_...` when a payment changes. The body is only a hint:
-    the status is always fetched from Mollie with our API key."""
-    from urllib.parse import parse_qs
-    raw = (await request.body()).decode("utf-8", errors="replace")
-    payment_id = (parse_qs(raw).get("id") or [""])[0]
-    if not MOLLIE_PAYMENT_ID_RE.match(payment_id) or not _mollie_key():
-        return {"received": True}
-    try:
-        _process_mollie_payment(payment_id)
-    except Exception as exc:
-        # Non-200 makes Mollie retry later
-        logging.getLogger("uvicorn.error").warning("Mollie webhook %s failed: %s", payment_id, exc)
-        return JSONResponse(status_code=500, content={"error": "processing failed"})
-    return {"received": True}
 
 
 @app.get("/plans/payments/{invoice_id}")
 async def plan_payment_status(invoice_id: str, current_user: dict = Depends(get_current_user)):
-    """The buyer's view after returning from iDEAL: re-checks the payment at Mollie (in
+    """The buyer's view after returning from iDEAL: re-checks the payment at Stripe (in
     case the webhook has not arrived yet) and returns the plan status."""
     inv = next((i for i in load_invoices() if str(i.get("id")) == str(invoice_id) and i.get("type") == "plan"
                 and str(i.get("plan_buyer_id")) == str(current_user.get("id"))), None)
     if not inv:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    if inv.get("status") not in ("paid", "overpaid") and _mollie_key():
-        for pid in reversed(inv.get("mollie_payment_ids") or []):
+    if inv.get("status") not in ("paid", "overpaid") and _stripe_key():
+        for cid in reversed(inv.get("stripe_checkout_ids") or []):
             try:
-                updated = _process_mollie_payment(pid)
+                updated = _process_stripe_checkout(cid)
             except Exception as exc:
-                logging.getLogger("uvicorn.error").warning("Mollie status check %s failed: %s", pid, exc)
+                logging.getLogger("uvicorn.error").warning("Stripe status check %s failed: %s", cid, exc)
                 continue
             if updated and updated.get("status") in ("paid", "overpaid"):
                 inv = updated
@@ -3183,7 +3163,7 @@ async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(
         raise HTTPException(status_code=400, detail="method must be 'apiusd' or 'ideal'")
     if method == "apiusd" and not crypto_payments.config().enabled:
         raise HTTPException(status_code=503, detail="Crypto payments are not configured")
-    if method == "ideal" and not _mollie_key():
+    if method == "ideal" and not _stripe_key():
         raise HTTPException(status_code=503, detail="iDEAL is not available right now")
 
     uid = str(current_user.get("id"))
@@ -3243,21 +3223,29 @@ async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(
     if method == "ideal":
         if inv.get("status") != "issued" or inv.get("pending_txs"):
             raise HTTPException(status_code=409, detail="A crypto payment for this plan is already under way. Please finish it in APIUSD.")
+        due_cents = int(round(_invoice_total(inv) * 100))
+        meta = {"invoice_id": inv["id"], "kind": "plan"}
         try:
-            payment = _mollie("POST", "/payments", {
-                "amount": {"currency": "EUR", "value": f"{_invoice_total(inv):.2f}"},
-                "description": f"{PLATFORM_NAME} {plan['name']} plan {inv.get('invoice_number')}",
-                "redirectUrl": f"{PUBLIC_DASHBOARD_URL}/plans?paid={inv['id']}",
-                "webhookUrl": f"{HOSTED_CHECKOUT_BASE}/webhooks/mollie",
-                "method": "ideal",
-                "metadata": {"invoice_id": inv["id"]},
+            cs = _stripe_create_checkout({
+                "mode": "payment",
+                "payment_method_types": ["ideal"],
+                "line_items": [{"quantity": 1, "price_data": {
+                    "currency": "eur", "unit_amount": due_cents,
+                    "product_data": {"name": f"{PLATFORM_NAME} {plan['name']} plan ({PLAN_PERIOD_DAYS} days)",
+                                     "description": f"Invoice {inv.get('invoice_number')}, incl. {inv.get('vat_rate'):g}% VAT"}}}],
+                "customer_email": inv.get("buyer_email") or None,
+                "metadata": meta,
+                "payment_intent_data": {"metadata": meta, "description": f"Plan invoice {inv.get('invoice_number')}"},
+                "client_reference_id": inv["id"],
+                "success_url": f"{PUBLIC_DASHBOARD_URL}/plans?paid={inv['id']}",
+                "cancel_url": f"{PUBLIC_DASHBOARD_URL}/plans",
             })
         except Exception as exc:
-            logging.getLogger("uvicorn.error").error("Mollie payment for %s failed: %s", inv["id"], exc)
+            logging.getLogger("uvicorn.error").error("Stripe checkout for %s failed: %s", inv["id"], exc)
             raise HTTPException(status_code=502, detail="iDEAL is not available right now. Please try again or pay in APIUSD.")
-        inv.setdefault("mollie_payment_ids", []).append(payment["id"])
+        inv.setdefault("stripe_checkout_ids", []).append(cs["id"])
         save_invoices(invoices)
-        result["checkout_url"] = payment["_links"]["checkout"]["href"]
+        result["checkout_url"] = cs["url"]
     return result
 
 
@@ -3267,7 +3255,7 @@ async def plan_quote(current_user: dict = Depends(get_current_user)):
     user = next((u for u in load_users() if str(u.get("id")) == str(current_user.get("id"))), current_user)
     country_ok = bool(re.fullmatch(r"[A-Z]{2}", str(user.get("country") or "").upper()))
     vat = _plan_vat(user) if country_ok else None
-    methods = (["ideal"] if _mollie_key() else []) + (["apiusd"] if crypto_payments.config().enabled else [])
+    methods = (["ideal"] if _stripe_key() else []) + (["apiusd"] if crypto_payments.config().enabled else [])
     return {"country": user.get("country") if country_ok else None, "vat_note": vat["note"] if vat else None,
             "methods": methods,
             "plans": [{"id": k, **(_plan_amounts(v, vat) if vat else {})}
@@ -5280,8 +5268,18 @@ async def webhook_stripe(request: Request):
         log_event('WEBHOOK_STRIPE_INVALID_SIGNATURE', '-', '-')
         return JSONResponse(status_code=401, content={"error": "Invalid signature"})
     payload = json.loads(raw)
-    
+
     event_type = payload.get('type', '')
+    obj = payload.get('data', {}).get('object', {}) or {}
+    if (obj.get('metadata') or {}).get('kind') == 'plan':
+        # Plan paid with iDEAL (Stripe Checkout). The status is fetched from Stripe.
+        if event_type.startswith('checkout.session.') and STRIPE_CHECKOUT_ID_RE.match(str(obj.get('id', ''))):
+            try:
+                _process_stripe_checkout(obj['id'])
+            except Exception as exc:
+                logging.getLogger("uvicorn.error").warning("Stripe plan checkout %s failed: %s", obj.get('id'), exc)
+                return JSONResponse(status_code=500, content={"error": "processing failed"})  # Stripe retries
+        return {"received": True}
     if event_type not in ['payment_intent.succeeded', 'charge.completed']:
         log_event(f'WEBHOOK_STRIPE_IGNORED event_type={event_type}', '-', '-')
         return {"received": True}
