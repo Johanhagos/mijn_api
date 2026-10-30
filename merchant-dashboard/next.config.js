@@ -10,6 +10,8 @@ const securityHeaders = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // Build a self-contained server bundle for container/Railway deploys.
+  output: 'standalone',
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];
   },

@@ -22,7 +22,7 @@ interface PaymentView {
   payments: { tx_hash: string; amount: string; explorer_url: string }[];
   results: { tx_hash: string; state: string; reason?: string; confirmations?: number; required?: number }[];
   token: { symbol: string; address: string; decimals: number };
-  chain: { id: number; name: string };
+  chain: { id: number; name: string; rpc_urls?: string[]; explorer_url?: string };
   wallet_address: string;
   payment_system?: string;
   currency?: string;
@@ -211,9 +211,9 @@ export default function PayInvoice() {
           params: [{
             chainId: chainHex,
             chainName: view.chain.name,
-            nativeCurrency: { name: 'Sepolia ETH', symbol: 'ETH', decimals: 18 },
-            rpcUrls: ['https://ethereum-sepolia-rpc.publicnode.com'],
-            blockExplorerUrls: ['https://sepolia.etherscan.io'],
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: view.chain.rpc_urls && view.chain.rpc_urls.length ? view.chain.rpc_urls : [],
+            blockExplorerUrls: view.chain.explorer_url ? [view.chain.explorer_url] : [],
           }],
         });
       } catch {

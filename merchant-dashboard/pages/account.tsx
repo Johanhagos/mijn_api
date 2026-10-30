@@ -285,7 +285,7 @@ export default function AccountPage() {
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <h2 className="text-xl font-semibold text-gray-900 mb-1">Payouts</h2>
                 <p className="text-sm text-gray-600 mb-4">
-                  Your customers&apos; APIUSD payments go straight to this wallet (Sepolia). APIBlockchain never holds your money.
+                  Your customers&apos; stablecoin payments (USDC on Ethereum) go straight to this wallet. APIBlockchain never holds your money.
                 </p>
                 <label htmlFor="payoutWallet" className="block text-sm font-medium text-gray-700 mb-2">
                   Payout wallet address
