@@ -3230,7 +3230,8 @@ async def plan_checkout(payload: dict = Body(...), current_user: dict = Depends(
         try:
             cs = _stripe_create_checkout({
                 "mode": "payment",
-                "payment_method_types": ["ideal"],
+                # Stripe no longer accepts payment_method_types on Checkout Sessions;
+                # enabled methods (iDEAL, card, ...) are configured in the Stripe Dashboard.
                 "line_items": [{"quantity": 1, "price_data": {
                     "currency": "eur", "unit_amount": due_cents,
                     "product_data": {"name": f"{PLATFORM_NAME} {plan['name']} plan ({PLAN_PERIOD_DAYS} days)",
